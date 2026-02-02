@@ -20,13 +20,22 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
-});
+}) ->name('welcome');
 
 Route::get('/ping', fn () => response()->json(['ok' => true]))->name('ping');
 
 Route::get('/dashboard', function () {
-    return Inertia::render('Dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
+    $user = auth()->user();
+
+    return match ($user->role) {
+        'tamu' => Inertia::render('Tamu/Dashboard'),
+        'mahasiswa' => Inertia::render('Mahasiswa/Dashboard'),
+        'dosen' => Inertia::render('Dosen/Dashboard'),
+        'superadmin' => Inertia::render('Admin/Dashboard'),
+        default => abort(403),
+    };
+})->middleware(['auth'])->name('dashboard');
+
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -74,7 +83,7 @@ Route::middleware('auth')->group(function () {
     | MAHASISWA
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:mahasiswa')->group(function () {
+    Route::middleware('auth','role:mahasiswa')->group(function () {
 
         // PROGRESS
         Route::get('/progress', [ProgressController::class, 'myProgress'])->name('progress.me');
@@ -100,9 +109,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/recommendations/{recommendation}/complete', [RecommendationController::class, 'markCompleted'])->name('recommendations.complete');
 
         // LEADERBOARD
-        Route::get('/leaderboard/practice', [LeaderboardController::class, 'practice'])->name('leaderboard.practice');
-        Route::get('/leaderboard/quiz', [LeaderboardController::class, 'quiz'])->name('leaderboard.quiz');
-        Route::get('/leaderboard/combined', [LeaderboardController::class, 'combined'])->name('leaderboard.combined');
+        Route::prefix('leaderboard')->name('mahasiswa.leaderboard.')->group(function () {
+            Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
+            Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
+            Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
+        });
     });
 
     /*
@@ -110,7 +121,7 @@ Route::middleware('auth')->group(function () {
     | DOSEN
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:dosen')->group(function () {
+    Route::middleware('auth','role:dosen')->group(function () {
 
         // ===== KELAS =====
         Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
@@ -156,9 +167,11 @@ Route::middleware('auth')->group(function () {
         Route::delete('/quizzes/{quiz}/map/{question}', [QuizController::class, 'mapDetach'])->name('quizzes.map.detach');
 
         // leaderboard (dosen juga lihat)
-        Route::get('/leaderboard/practice', [LeaderboardController::class, 'practice'])->name('teacher.leaderboard.practice');
-        Route::get('/leaderboard/quiz', [LeaderboardController::class, 'quiz'])->name('teacher.leaderboard.quiz');
-        Route::get('/leaderboard/combined', [LeaderboardController::class, 'combined'])->name('teacher.leaderboard.combined');
+        Route::prefix('leaderboard')->name('leaderboard.')->group(function () {
+            Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
+            Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
+            Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
+        });
     });
 
     /*
@@ -176,9 +189,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         Route::put('/users/{user}/role', [UserController::class, 'updateRole'])->name('users.role');
 
-        // leaderboard global
-        Route::get('/leaderboard/practice', [LeaderboardController::class, 'practice'])->name('leaderboard.practice');
-        Route::get('/leaderboard/quiz', [LeaderboardController::class, 'quiz'])->name('leaderboard.quiz');
-        Route::get('/leaderboard/combined', [LeaderboardController::class, 'combined'])->name('leaderboard.combined');
+        Route::prefix('leaderboard')->name('leaderboard.')->group(function () {
+            Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
+            Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
+            Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
+        });
     });
 });

@@ -1,29 +1,24 @@
 import { Link } from "@inertiajs/react";
-import { GradientBackground } from "react-bits";
 
 export default function AuthLayout({ children }) {
   return (
-    <GradientBackground
-      colors={["#020617", "#020617", "#0f172a", "#020617"]}
-      animate
-      className="min-h-screen"
-    >
+    <div className="relative w-full min-h-screen bg-[#050a24]">
       {/* Top-left brand */}
       <div className="absolute left-10 top-8 flex items-center gap-3">
         <Link href={route("welcome")} className="flex items-center gap-3">
-          <img src="/images/logo.png" alt="Oopedia" className="h-10 w-auto" />
-          <span className="text-white text-xl font-semibold tracking-wide">
-            Oopedia<span className="text-blue-400">.</span>
+            <span className="w-36 font-bold italic text-white text-[28px] tracking-[2.80px] leading-7 [font-family:'Poppins-BoldItalic',Helvetica]">
+              Oopedia
+              <span className="font-bold italic text-primary text-[28px] tracking-[2.80px] leading-7 [font-family:'Poppins-BoldItalic',Helvetica]">
+                .
+              </span>
           </span>
         </Link>
       </div>
 
       {/* Center card */}
-      <div className="min-h-screen flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-          {children}
-        </div>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        {children}
       </div>
-    </GradientBackground>
+    </div>
   );
 }

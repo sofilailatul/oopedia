@@ -1,51 +1,60 @@
 import { Head, Link } from "@inertiajs/react";
 import PublicLayout from "@/Layouts/PublicLayout";
+import Button from "@/Components/Button";
 
 export default function Welcome() {
   return (
     <PublicLayout>
       <Head title="Welcome" />
 
-      <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-        {/* LEFT TEXT */}
-        <div>
-          <h1 className="text-5xl md:text-6xl font-light leading-tight">
-            Daftar sekarang <br />
-            untuk menikmati <br />
-            pengalaman belajar <br />
-            yang personal di <span className="font-semibold">Oopedia</span>.
-          </h1>
-          <p className="mt-6 text-slate-300 max-w-md">
-            Mulai dengan masuk atau buat akun baru untuk mendapatkan pengalaman belajar yang lebih personal.
+      <div className="relative min-h-screen flex items-center justify-center">
+        {/* CONTAINER UTAMA */}
+        <div className="flex flex-col items-center text-center text-white px-6">
+          {/* LOGO */}
+          <img
+            src="/images/logo.png"
+            alt="Oopedia"
+            className="mb-6 h-20 w-auto"
+          />
+
+          {/* HERO TEXT */}
+          <p className="mb-12 text-white/90 text-[56px] leading-[1.1] italic font-light [font-family:'Poppins-LightItalic',Helvetica]">
+            Daftar sekarang untuk 
+            <br />
+            menikmati pengalaman belajar yang
+            <br />
+            personal di
+            <br />
+            <span className="text-white/60">Oopedia.</span>
           </p>
-        </div>
-
-        {/* RIGHT CARD CTA */}
-        <div className="bg-white text-slate-900 rounded-2xl shadow-2xl p-8">
-          <div className="flex justify-center mb-4">
-            <img src="/images/logo.png" alt="Oopedia" className="h-14 w-auto" />
-          </div>
-
-          <h2 className="text-2xl font-semibold text-center">Mulai Sekarang</h2>
-          <p className="text-center text-slate-500 mt-2">
-            Masuk atau buat akun untuk lanjut.
+          {/* SUBTITLE */}
+          <p className="mt-2 max-w-sm text-white/70">
+            Masuk atau buat akun untuk melanjutkan pengalaman belajar kamu.
           </p>
 
-          <div className="mt-8 space-y-3">
-            <Link
-              href={route("login")}
-              className="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-medium"
-            >
-              Masuk
+          {/* BUTTONS */}
+          <div className="mt-8 flex space-x-4">
+            <Link href={route("login")}>
+              <Button
+                color="yellow"
+                variant="solid"
+                size="lg"
+              >
+                Masuk
+              </Button>
             </Link>
 
-            <Link
-              href={route("register")}
-              className="block w-full text-center border border-slate-300 hover:bg-slate-50 py-3 rounded-lg font-medium"
-            >
-              Daftar Akun
+            <Link href={route("register")}>
+              <Button
+                color="yellow"
+                variant="outline"
+                size="lg"
+              >
+                Daftar Akun
+              </Button>
             </Link>
           </div>
+
         </div>
       </div>
     </PublicLayout>
