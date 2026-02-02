@@ -30,6 +30,9 @@ import {
   MdWarning,
   MdError,
   MdCheckCircle,
+  MdRefresh,
+  MdArrowBack,
+  MdArrowForward,
 } from 'react-icons/md';
 
 import {
@@ -39,13 +42,16 @@ import {
   FaUsers,
   FaGraduationCap,
   FaChartBar,
-  FaBell,        // ✅ Bell dari FA
-  FaUser,        // ✅ User dari FA
-  FaSignOutAlt,  // ✅ Logout dari FA
+  FaBell,
+  FaUser,
+  FaSignOutAlt,
   FaClock,
   FaStar,
   FaUpload,
   FaDownload,
+  FaCode,
+  FaCheckCircle,
+  FaTimesCircle,
 } from 'react-icons/fa';
 
 export const Icons = {
@@ -70,10 +76,15 @@ export const Icons = {
   Upload: FaUpload,
   Download: FaDownload,
   Close: MdClose,
+  Refresh: MdRefresh,
+  Back: MdArrowBack,
+  Forward: MdArrowForward,
   
   // States
   Lock: MdLock,
   Unlock: MdLockOpen,
+  Success: FaCheckCircle,
+  Failed: FaTimesCircle,
   
   // Navigation arrows
   ChevronRight: MdChevronRight,
@@ -81,11 +92,11 @@ export const Icons = {
   Menu: MdMenu,
   
   // User & Auth
-  Notification: FaBell,       
-  Bell: FaBell,               
+  Notification: FaBell,
+  Bell: FaBell,
   Account: MdAccountCircle,
-  User: FaUser,               
-  Logout: FaSignOutAlt,       
+  User: FaUser,
+  Logout: FaSignOutAlt,
   
   // Utility
   Search: MdSearch,
@@ -93,12 +104,13 @@ export const Icons = {
   More: MdMoreVert,
   Clock: FaClock,
   Star: FaStar,
+  Code: FaCode,
   
   // Alerts
   Info: MdInfo,
   Warning: MdWarning,
   Error: MdError,
-  Success: MdCheckCircle,
+  CheckCircle: MdCheckCircle,
 };
 
 export default Icons;

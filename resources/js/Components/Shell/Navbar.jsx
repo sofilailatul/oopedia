@@ -1,62 +1,111 @@
-import { Link, usePage } from '@inertiajs/react';
-import Icons from '@/icons'; 
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link, router, usePage } from "@inertiajs/react";
+import { FaBell, FaChevronDown, FaUser, FaSignOutAlt } from "react-icons/fa";
 
-export default function Navbar({ onMenuClick }) {
+function useOutsideClick(ref, handler) {
+  useEffect(() => {
+    const listener = (e) => {
+      if (!ref.current || ref.current.contains(e.target)) return;
+      handler();
+    };
+    document.addEventListener("mousedown", listener);
+    document.addEventListener("touchstart", listener);
+    return () => {
+      document.removeEventListener("mousedown", listener);
+      document.removeEventListener("touchstart", listener);
+    };
+  }, [ref, handler]);
+}
+
+function cap(str) {
+  const s = String(str || "");
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+export default function Navbar({ title = "Dashboard" }) {
   const { auth } = usePage().props;
 
+  const user = auth?.user ?? null;
+
+  const role = useMemo(() => (user?.role ? String(user.role) : "tamu"), [user]);
+  const nama = user?.name ?? user?.nama ?? "Guest";
+
+  const avatar =
+    user?.avatar || user?.photo_url || "https://i.pravatar.cc/100?img=5";
+
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  useOutsideClick(menuRef, () => setOpen(false));
+
+  const logout = () => {
+    setOpen(false);
+    router.post("/logout");
+  };
+
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-      <div className="flex items-center justify-between h-16 px-4">
-        {/* Left: Menu button & Logo */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
-          >
-            <Icons.Menu className="w-5 h-5" />
-          </button>
-          
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold">OP</span>
-            </div>
-            <span className="font-bold text-xl hidden sm:block">OOPedia</span>
-          </Link>
-        </div>
+    <div className="px-1">
+      <div className="flex  items-center justify-between px-[30px] py-[7px] relative bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
+        <h1 className="text-l tracking-[0] leading-[normal] font-semibold text-white">{title}</h1>
 
-        {/* Right: Notifications & User menu */}
-        <div className="flex items-center gap-3">
-          {/* Notifications */}
-          <button className="p-2 rounded-lg hover:bg-gray-100 relative">
-            <Icons.Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-
-          {/* User Menu */}
-          <div className="flex items-center gap-2 pl-3 border-l">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium">{auth?.user?.name || 'Guest'}</p>
-              <p className="text-xs text-gray-500 capitalize">{auth?.user?.role || 'Tamu'}</p>
-            </div>
-            
-            <button className="p-2 rounded-lg hover:bg-gray-100">
-              <Icons.User className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Logout (jika sudah login) */}
-          {auth?.user && (
-            <Link
-              href="/logout"
-              method="post"
-              as="button"
-              className="p-2 rounded-lg hover:bg-red-50 text-red-600"
+        {/* Right */}
+        <div className="flex items-center gap-5">
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-white/10"
             >
-              <Icons.Logout className="w-5 h-5" />
-            </Link>
-          )}
+              <img
+                src={avatar}
+                alt="avatar"
+                className="h-8 w-8 rounded-full object-cover"
+              />
+
+              <div className="text-left leading-tight">
+                <div className="text-[13px] font-medium">{nama}</div>
+              </div>
+
+              <FaChevronDown
+                className={`text-sm opacity-80 transition ${
+                  open ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {open && (
+              <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-lg bg-white text-gray-900 shadow-lg ring-1 ring-black/5">
+                <div className="px-4 py-3">
+                  {/* ✅ ganti {nama} jadi {name} */}
+                  <div className="text-[14px] font-medium">{nama}</div>
+                  <div className="text-xs text-gray-500 capitalize">{role}</div>
+                </div>
+
+                <div className="h-px bg-gray-100" />
+
+                <div className="p-2">
+                  <Link
+                    href="/profile"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
+                  >
+                    <FaUser />
+                    Profile
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
+                  >
+                    <FaSignOutAlt />
+                    Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </header>
+    </div>
   );
 }

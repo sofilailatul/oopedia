@@ -31,7 +31,7 @@ Route::get('/dashboard', function () {
         'tamu' => Inertia::render('Tamu/Dashboard'),
         'mahasiswa' => Inertia::render('Mahasiswa/Dashboard'),
         'dosen' => Inertia::render('Dosen/Dashboard'),
-        'superadmin' => Inertia::render('Admin/Dashboard'),
+        'superadmin' => Inertia::render('SuperAdmin/Dashboard'),
         default => abort(403),
     };
 })->middleware(['auth'])->name('dashboard');

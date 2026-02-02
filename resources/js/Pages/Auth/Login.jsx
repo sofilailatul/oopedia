@@ -108,7 +108,7 @@ export default function Login({ status }) {
                 </div>
 
                 {/* Submit */}
-                <Button color="Blue" variant="solid" size="lg" >
+                <Button color="blue" variant="solid" size="lg" >
                   {processing ? "Loading..." : "Login"}
                 </Button>
               </form>

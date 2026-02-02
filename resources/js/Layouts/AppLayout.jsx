@@ -2,6 +2,7 @@ import AppShell from '@/Components/Shell/AppShell'
 import Sidebar from '@/Components/Shell/Sidebar'
 import Navbar from '@/Components/Shell/Navbar'
 import { usePage } from '@inertiajs/react'
+import { Head } from '@inertiajs/react'
 
 function normalizeRole(authUser) {
   if (authUser?.role) return authUser.role
@@ -24,11 +25,15 @@ export default function AppLayout({ children, label = 'Dashboard' }) {
           : 'tamu'
 
   return (
-    <AppShell
-      sidebar={<Sidebar />}
-      navbar={<Navbar label={label} roleLabel={roleLabel} />}
-    >
-      {children}
-    </AppShell>
+    <>
+      <Head title={`${label} | OOpedia`} />
+
+      <AppShell
+        sidebar={<Sidebar />}
+        navbar={<Navbar label={label} roleLabel={roleLabel} />}
+      >
+        {children}
+      </AppShell>
+    </>
   )
 }
