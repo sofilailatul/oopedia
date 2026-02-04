@@ -10,13 +10,22 @@ class PracticeAttemptSeeder extends Seeder
 {
     public function run(): void
     {
-        $practiceIds = array_slice(SeederState::$practiceIds, 0, 2); // demo 2 practice
+        // === ambil 3 level dari 1 materi (material_id = 1)
+        $materialId = 1;
+
+        $practicesPerMaterial = PracticeModel::where('material_id', $materialId)
+            ->orderByRaw("FIELD(difficulty_level, 'easy', 'normal', 'hard')")
+            ->get();
 
         foreach (SeederState::$mahasiswaIds as $userId) {
             $user = UserModel::findOrFail($userId);
 
-            foreach ($practiceIds as $pid) {
-                $practice = PracticeModel::with('questions.options', 'questions.items')->findOrFail($pid);
+            $targetPractices = ((int) $user->id === 3)
+                ? $practicesPerMaterial
+                : $practicesPerMaterial->take(2);
+
+            foreach ($targetPractices as $practice) {
+                $practice->load('questions.options', 'questions.items');
 
                 $attempt = $practice->attempts()->create([
                     'user_id' => $user->id,
@@ -37,9 +46,12 @@ class PracticeAttemptSeeder extends Seeder
                 $mcScore = 0; $mcCorrect = 0;
                 $ddScore = 0; $ddCorrect = 0;
 
+                // ===== MULTIPLE CHOICE =====
                 if ($mcq) {
                     $correctOpt = $mcq->options->firstWhere('is_correct', true);
-                    $isCorrect = (rand(1, 100) <= 70);
+
+                    // user 3 pasti benar
+                    $isCorrect = ((int) $user->id === 3) ? true : (rand(1, 100) <= 70);
 
                     $chosenOpt = $isCorrect
                         ? $correctOpt
@@ -59,10 +71,16 @@ class PracticeAttemptSeeder extends Seeder
                     ]);
                 }
 
+                // ===== DRAG & DROP =====
                 if ($dd) {
-                    $itemsOrdered = $dd->items->sortBy('order_number')->pluck('item_text')->values()->toArray();
+                    $itemsOrdered = $dd->items
+                        ->sortBy('order_number')
+                        ->pluck('item_text')
+                        ->values()
+                        ->toArray();
 
-                    $isCorrect = (rand(1, 100) <= 60);
+                    $isCorrect = ((int) $user->id === 3) ? true : (rand(1, 100) <= 60);
+
                     $ddCorrect = $isCorrect ? 1 : 0;
                     $ddScore = $isCorrect ? 50 : 0;
 

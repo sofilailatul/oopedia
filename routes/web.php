@@ -12,6 +12,7 @@ use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\LeaderboardController;
 use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -24,17 +25,9 @@ Route::get('/', function () {
 
 Route::get('/ping', fn () => response()->json(['ok' => true]))->name('ping');
 
-Route::get('/dashboard', function () {
-    $user = auth()->user();
-
-    return match ($user->role) {
-        'tamu' => Inertia::render('Tamu/Dashboard'),
-        'mahasiswa' => Inertia::render('Mahasiswa/Dashboard'),
-        'dosen' => Inertia::render('Dosen/Dashboard'),
-        'superadmin' => Inertia::render('SuperAdmin/Dashboard'),
-        default => abort(403),
-    };
-})->middleware(['auth'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth'])
+    ->name('dashboard');
 
 
 Route::middleware('auth')->group(function () {

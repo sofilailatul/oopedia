@@ -8,7 +8,7 @@ use App\Models\MaterialModel;
 use App\Models\PracticeModel;
 use App\Models\QuizModel;
 use App\Models\User;
-use App\Models\ClassModel; // Sesuaikan dengan nama model Class kamu
+use App\Models\ClassModel; 
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -16,29 +16,21 @@ class DashboardController extends Controller
     /**
      * Handle dashboard redirect based on user role
      */
-    public function index()
+    public function index(Request $request)
     {
-        $user = auth()->user();
+        $user = $request->user();
 
-        // Redirect based on role
-        if ($user->hasRole('tamu')) {
-            return $this->tamuDashboard();
-        }
+        return match ($user->role) {
+            'tamu' => $this->tamuDashboard($user),
 
-        if ($user->hasRole('mahasiswa')) {
-            return $this->mahasiswaDashboard();
-        }
+            'dosen' => Inertia::render('Dosen/Dashboard'),
 
-        if ($user->hasRole('dosen')) {
-            return $this->dosenDashboard();
-        }
+            'superadmin' => Inertia::render('SuperAdmin/Dashboard'),
 
-        if ($user->hasRole('superadmin')) {
-            return $this->adminDashboard();
-        }
+            'mahasiswa' => $this->mahasiswaDashboard($user),
 
-        // Fallback
-        abort(403, 'Unauthorized role');
+            default => abort(403),
+        };
     }
 
     /**
@@ -58,91 +50,153 @@ class DashboardController extends Controller
     /**
      * Dashboard untuk MAHASISWA
      */
-    protected function mahasiswaDashboard()
+    protected function mahasiswaDashboard($user)
     {
-        $user = auth()->user();
-        
-        // Check if user has joined a class
-        $hasClass = $user->class_id !== null;
+        $userId = $user->id;
 
-        // Get stats
+        // ambil class_id dari pivot class_user (ambil kelas pertama)
+        $classId = DB::table('class_user')
+            ->where('user_id', $userId)
+            ->value('class_id');
+
+        $hasClass = !is_null($classId);
+
         $stats = [
             'materials_completed' => 0,
-            'total_materials' => MaterialModel::count(),
+            'total_materials' => 0,
+
+            // practice dihitung PER MATERI
             'practices_completed' => 0,
+            'total_practices' => 0,
+
             'quizzes_completed' => 0,
             'total_quizzes' => QuizModel::count(),
+
+            'avg_quiz_score' => null,
+            'total_time_spent_seconds' => 0,
+
             'total_points' => 0,
+
+            'practice_by_difficulty' => [],
+            'all_difficulty_completed' => false,
         ];
 
         $recommendations = [];
+        $recentActivities = [];
 
-        if ($hasClass) {
-            // Materials completed (based on progress table)
-            $stats['materials_completed'] = DB::table('user_material_progress')
-                ->where('user_id', $user->id)
-                ->where('is_completed', true)
-                ->count();
+        /* =====================================================
+        * QUIZ (tidak tergantung kelas)
+        * ===================================================== */
+        $stats['quizzes_completed'] = DB::table('quiz_attempts')
+            ->where('user_id', $userId)
+            ->whereNotNull('finished_at')
+            ->count();
 
-            // Practice attempts completed
-            $stats['practices_completed'] = DB::table('practice_attempts')
-                ->where('user_id', $user->id)
-                ->where('is_finished', true)
-                ->distinct('practice_id')
-                ->count('practice_id');
+        $avg = DB::table('quiz_attempts')
+            ->where('user_id', $userId)
+            ->whereNotNull('finished_at')
+            ->avg('total_score');
 
-            // Quiz attempts completed
-            $stats['quizzes_completed'] = DB::table('quiz_attempts')
-                ->where('user_id', $user->id)
-                ->where('is_finished', true)
-                ->count();
+        $stats['avg_quiz_score'] = $avg !== null ? round($avg, 1) : null;
 
-            // Total points (practice + quiz scores)
-            $practicePoints = DB::table('practice_attempts')
-                ->where('user_id', $user->id)
-                ->where('is_finished', true)
-                ->sum('score');
+        /* =====================================================
+        * POINTS (tidak tergantung kelas)
+        * ===================================================== */
+        $practicePoints = DB::table('practice_attempts')
+            ->where('user_id', $userId)
+            ->whereNotNull('finished_at')
+            ->sum('final_score');
 
-            $quizPoints = DB::table('quiz_attempts')
-                ->where('user_id', $user->id)
-                ->where('is_finished', true)
-                ->sum('total_score');
+        $quizPoints = DB::table('quiz_attempts')
+            ->where('user_id', $userId)
+            ->whereNotNull('finished_at')
+            ->sum('total_score');
 
-            $stats['total_points'] = $practicePoints + $quizPoints;
+        $stats['total_points'] = (int)$practicePoints + (int)$quizPoints;
 
-            // Get recommendations (materials that need review based on quiz scores)
-            $recommendations = DB::table('recommendations')
-                ->join('materials', 'recommendations.material_id', '=', 'materials.id')
-                ->where('recommendations.user_id', $user->id)
-                ->where('recommendations.is_completed', false)
-                ->select([
-                    'recommendations.id',
-                    'recommendations.score',
-                    'recommendations.created_at',
-                    'materials.id as material_id',
-                    'materials.title as material_title',
-                ])
-                ->orderBy('recommendations.created_at', 'desc')
-                ->limit(3)
-                ->get()
-                ->map(function ($rec) {
-                    return [
-                        'id' => $rec->id,
-                        'score' => $rec->score,
-                        'material' => [
-                            'id' => $rec->material_id,
-                            'title' => $rec->material_title,
-                        ],
-                    ];
-                });
+        /* =====================================================
+        * TOTAL TIME (optional)
+        * ===================================================== */
+        try {
+            $stats['total_time_spent_seconds'] = (int) DB::table('study_sessions')
+                ->where('user_id', $userId)
+                ->sum('duration_seconds');
+        } catch (\Throwable $e) {
+            $stats['total_time_spent_seconds'] = 0;
         }
 
+        /* =====================================================
+        * YANG BUTUH KELAS (progress material & rekomendasi)
+        * ===================================================== */
+        if ($hasClass) {
+            // MATERIAL selesai jika status unlocked (progress per kelas)
+            $stats['materials_completed'] = DB::table('user_progress')
+                ->where('user_id', $userId)
+                ->where('class_id', $classId)
+                ->where('status', 'unlocked')
+                ->count();
+
+            // total materials global
+            $stats['total_materials'] = DB::table('materials')->count();
+        } else {
+            // kalau belum join kelas tetap boleh tampil total materials (opsional)
+            $stats['total_materials'] = DB::table('materials')->count();
+        }
+
+        /* =====================================================
+        * PRACTICE GLOBAL (karena materials/practices sama semua kelas)
+        * 1 materi selesai jika semua difficulty_level selesai
+        * ===================================================== */
+        // total materi yang punya practice
+        $stats['total_practices'] = DB::table('practices')
+            ->distinct()
+            ->count('material_id');
+
+        // materi complete semua level (ONLY_FULL_GROUP_BY safe)
+        $stats['practices_completed'] = DB::table('practices as p')
+            ->leftJoin('practice_attempts as pa', function ($join) use ($userId) {
+                $join->on('pa.practices_id', '=', 'p.id')
+                    ->where('pa.user_id', '=', $userId)
+                    ->whereNotNull('pa.finished_at');
+            })
+            ->selectRaw('p.material_id')
+            ->groupBy('p.material_id')
+            ->havingRaw(
+                'COUNT(DISTINCT p.difficulty_level) =
+                COUNT(DISTINCT CASE WHEN pa.practices_id IS NOT NULL THEN p.difficulty_level END)'
+            )
+            ->get()
+            ->count();
+
+        // progress per difficulty_level
+        $practiceByDifficulty = DB::table('practices as p')
+            ->leftJoin('practice_attempts as pa', function ($join) use ($userId) {
+                $join->on('pa.practices_id', '=', 'p.id')
+                    ->where('pa.user_id', '=', $userId)
+                    ->whereNotNull('pa.finished_at');
+            })
+            ->selectRaw('p.difficulty_level, COUNT(DISTINCT p.id) as total, COUNT(DISTINCT pa.practices_id) as completed')
+            ->groupBy('p.difficulty_level')
+            ->get();
+
+        $stats['practice_by_difficulty'] = $practiceByDifficulty;
+
+        $stats['all_difficulty_completed'] = $practiceByDifficulty->isNotEmpty()
+            ? $practiceByDifficulty->every(fn ($row) => (int)$row->total > 0 && (int)$row->completed >= (int)$row->total)
+            : false;
+
         return Inertia::render('Mahasiswa/Dashboard', [
+            'auth' => [
+                'user' => $user,
+            ],
             'stats' => $stats,
             'recommendations' => $recommendations,
+            'recentActivities' => $recentActivities,
             'hasClass' => $hasClass,
         ]);
     }
+
+
 
     /**
      * Dashboard untuk DOSEN
