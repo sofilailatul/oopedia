@@ -5,7 +5,7 @@ import { useState } from "react";
 
 export default function Register() {
   const { data, setData, post, processing, errors } = useForm({
-    name: "",
+    nama: "",
     email: "",
     password: "",
     password_confirmation: "",
@@ -88,15 +88,15 @@ export default function Register() {
                   </label>
                   <input
                     type="text"
-                    value={data.name}
-                    onChange={(e) => setData("name", e.target.value)}
+                    value={data.nama}
+                    onChange={(e) => setData("nama", e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                     placeholder="Nama lengkap"
                     autoFocus
                     required
                   />
-                  {errors.name && (
-                    <p className="mt-2 text-sm text-red-600">{errors.name}</p>
+                  {errors.nama && (
+                    <p className="mt-2 text-sm text-red-600">{errors.nama}</p>
                   )}
                 </div>
 

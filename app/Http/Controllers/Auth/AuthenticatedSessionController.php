@@ -24,16 +24,26 @@ class AuthenticatedSessionController extends Controller
         ]);
     }
 
+    
+
     /**
      * Handle an incoming authentication request.
      */
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
-
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $role = $request->user()->role;
+
+        $target = match ($role) {
+            'superadmin', 'admin' => route('dashboard'),
+            'dosen' => route('dashboard'),
+            'mahasiswa' => route('dashboard'),
+            default => route('dashboard'),
+        };
+
+        return redirect()->intended($target);
     }
 
     /**

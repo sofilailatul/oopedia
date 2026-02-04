@@ -33,8 +33,8 @@ export default function Login({ status }) {
             </div>
 
             {/* Title + Form */}
-            <div className="flex w-full flex-col items-stretch gap-4">
-              <h1 className="text-[#101828] text-xl font-semibold">
+            <div className="flex w-full flex-col gap-4">
+              <h1 className="text-[#101828] text-xl font-semibold text-center">
                 Masuk ke Akun Kamu
               </h1>
 
@@ -44,7 +44,7 @@ export default function Login({ status }) {
                 </div>
               )}
 
-              <form onSubmit={submit} className="w-full space-y-3">
+              <form onSubmit={submit} className="w-full space-y-3 items-center">
                 {/* Email */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -108,9 +108,11 @@ export default function Login({ status }) {
                 </div>
 
                 {/* Submit */}
-                <Button color="blue" variant="solid" size="lg" >
-                  {processing ? "Loading..." : "Login"}
-                </Button>
+                <div className="flex justify-center">
+                  <Button color="blue" variant="solid" size="lg">
+                    {processing ? "Loading..." : "Masuk Ke Akun"}
+                  </Button>
+                </div>
               </form>
 
               {/* Register */}
