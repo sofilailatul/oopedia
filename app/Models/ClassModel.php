@@ -44,4 +44,11 @@ class ClassModel extends Model
     {
         return $this->hasMany(UserProgressModel::class, 'class_id');
     }
+    
+    public function scopeJoinedBy($query, int $userId)
+    {
+        return $query->whereHas('users', function($q) use ($userId) {
+            $q->where('users.id', $userId);
+        });
+    }
 }

@@ -46,4 +46,9 @@ class QuizModel extends Model
     {
         return $this->hasMany(QuizAttemptModel::class, 'quizzes_id');
     }
+
+    public function quizMaps()
+    {
+        return $this->hasMany(QuizMapModel::class, 'quiz_id');
+    }
 }

@@ -32,14 +32,14 @@ const NAV_BY_ROLE = {
   ],
   mahasiswa: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },
-    { label: "Materi", href: "/mahasiswa/materi", icon: FaBook },
+    { label: "Materi", href: "/materi", icon: FaBook },
     { label: "Latihan Soal", href: "/mahasiswa/latihan-soal", icon: FaClipboardList },
     { label: "Kuis", href: "/mahasiswa/kuis", icon: FaFileAlt },
     { label: "Leaderboard", href: "/mahasiswa/leaderboard", icon: FaTrophy },
   ],
   tamu: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },
-    { label: "Materi", href: "/tamu/materi", icon: FaBook },
+    { label: "Materi", href: "/materi", icon: FaBook },
     { label: "Latihan Soal", href: "/tamu/latihan-soal", icon: FaClipboardList },
   ],
 };

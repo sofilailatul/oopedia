@@ -7,23 +7,59 @@ import Card from '@/Components/Card';
 import StatCard from '@/Components/StatCard';
 import ActionCard from "@/Components/ActionCard";
 
-export default function MahasiswaDashboard({ auth, stats, recentActivities, recommendations }) {
-  console.log("AUTH:", auth);
-  console.log("STATS:", stats);
+function DigitBox({ digit, digitBg }) {
+  return (
+    <span className={`inline-flex h-7 w-6 items-center justify-center rounded-md text-xs font-bold text-white ${digitBg}`}>
+      {digit}
+    </span>
+  );
+}
 
+function renderDigits(number, digitBg, length = 2) {
+  return number
+    .toString()
+    .padStart(length, "0")
+    .split("")
+    .map((d, i) => <DigitBox key={i} digit={d} digitBg={digitBg} />);
+}
+
+export default function MahasiswaDashboard({ auth, stats}) {
   const hasClass = auth.user?.class_id !== null;
   const nama = auth.user?.name ?? auth.user?.nama ?? "Guest";
   const classes = auth?.user?.classes ?? [];
 
-  const { data, setData, post, processing, errors, reset } = useForm({
-    class_code: '',
-  });
+  const statThemes = {
+    green: {
+      iconBg: "bg-green-100",
+      iconColor: "text-green-600",
+      digitBg: "bg-green-600",
+    },
+    blue: {
+      iconBg: "bg-blue-100",
+      iconColor: "text-blue-700",
+      digitBg: "bg-blue-700",
+    },
+    yellow: {
+      iconBg: "bg-yellow-100",
+      iconColor: "text-yellow-600",
+      digitBg: "bg-yellow-500",
+    },
+    red: {
+      iconBg: "bg-red-100",
+      iconColor: "text-red-500",
+      digitBg: "bg-red-500",
+    },
+    purple: {
+      iconBg: "bg-purple-100",
+      iconColor: "text-purple-600",
+      digitBg: "bg-purple-600",
+    },
+  };
 
   return (
   <AppLayout title="Dashboard">
     <div className="p-1">
       <div className=" gap-6 mb-6 items-stretch justify-center">
-        {/* Welcome Card (lebih panjang) */}
         <Card
           title={`Selamat Datang, ${nama}!`}
           icon={Icons.WaveHand}
@@ -45,11 +81,11 @@ export default function MahasiswaDashboard({ auth, stats, recentActivities, reco
           )}
         </Card>
       </div>
-      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+      <div className="grid lg:grid-cols-2 gap-6 mb-6 ">
         {/* Quick Actions */}
-        <div className="bg-white rounded-lg border-[#9fc4ff] p-6">
+        <div className="bg-white border border-[#9fc4ff] rounded-lg  p-6">
           <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
-          <div className="space-y-3">
+          <div className="space-y-3 ">
             <ActionCard
               href="/materials"
               icon={Icons.Materials}
@@ -79,30 +115,47 @@ export default function MahasiswaDashboard({ auth, stats, recentActivities, reco
             />
            </div>
          </div>
-                 <div className="lg:col-span-1 flex flex-col gap-6 h-full">
+          <div className="lg:col-span-1 flex flex-col gap-6 h-full">
             <StatCard
               icon={Icons.Materials}
-              iconBg="bg-blue-100"
-              iconColor="text-blue-600"
+              iconBg={statThemes.red.iconBg}
+              iconColor={statThemes.red.iconColor}
               label="Materi Selesai"
-              value={`${stats?.materials_completed || 0}/${stats?.total_materials || 0}`}
-              className="flex-1 flex flex-col justify-center font-bold"
+              value={
+                <div className="flex items-center gap-1">
+                  {renderDigits(stats?.materials_completed || 0, statThemes.red.digitBg)}
+                  <span className="mx-1 text-xs font-semibold text-gray-500">/</span>
+                  {renderDigits(stats?.total_materials || 0, statThemes.red.digitBg)}
+                </div>
+              }
             />
             <StatCard
               icon={Icons.Quiz}
-              iconBg="bg-purple-100"
-              iconColor="text-purple-600"
+              iconBg={statThemes.green.iconBg}
+              iconColor={statThemes.green.iconColor}
               label="Latihan Selesai"
-              value={`${stats?.practices_completed || 0}/${stats?.total_practices || 0}`}
-              className="flex-1 flex flex-col justify-center font-bold"
+              value=
+              {
+                <div className="flex items-center gap-1">
+                  {renderDigits(stats?.practices_completed || 0, statThemes.green.digitBg)}
+                  <span className="mx-1 text-xs font-semibold text-gray-500">/</span>
+                  {renderDigits(stats?.total_practices || 0, statThemes.green.digitBg)}
+                </div>
+              }
             />
             <StatCard
               icon={Icons.Quiz}
-              iconBg="bg-purple-100"
-              iconColor="text-purple-600"
+              iconBg={statThemes.purple.iconBg}
+              iconColor={statThemes.purple.iconColor}
               label="Quiz Selesai"
-              value={`${stats?.quizzes_completed || 0}/${stats?.total_quizzes || 0}`}
-              className="flex-1 flex flex-col justify-center font-bold"
+              value=
+              {          
+                <div className="flex items-center gap-1">
+                  {renderDigits(stats?.quizzes_completed || 0, statThemes.purple.digitBg)}
+                  <span className="mx-1 text-xs font-semibold text-gray-500">/</span>
+                  {renderDigits(stats?.total_quizzes || 0, statThemes.purple.digitBg)}
+                </div>
+              }
             />
         </div> 
        </div>

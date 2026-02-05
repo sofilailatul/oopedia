@@ -50,17 +50,21 @@ Route::middleware('auth')->group(function () {
     | MATERI 
     |--------------------------------------------------------------------------
     */
-    Route::get('/materials', [MaterialController::class, 'index'])->name('materials.index');
-    Route::get('/materials/{material}', [MaterialController::class, 'show'])->name('materials.show');
+    Route::get('/materi', [MaterialController::class, 'index'])->name('materials.index');
+    Route::get('/materi/{material}', [MaterialController::class, 'show'])->name('materials.show');
+    Route::post('/materi/{material}/finish-read',[MaterialController::class, 'finishRead']);
+    Route::get('/materi/{material}/finish-read', function () {
+    abort(405, 'Finish-read hanya boleh POST');
+});
 
     /*
     |--------------------------------------------------------------------------
     | PRACTICE 
     |--------------------------------------------------------------------------
     */
-    Route::get('/practices', [PracticeController::class, 'index'])->name('practices.index');
-    Route::get('/practices/materials/{material}', [PracticeController::class, 'byMaterial'])->name('practices.byMaterial');
-    Route::get('/practices/{practice}/summary', [PracticeController::class, 'summary'])->name('practices.summary');
+    Route::get('/latihan-soal', [PracticeController::class, 'index'])->name('practices.index');
+    Route::get('/latihan-soal/materi/{material}', [PracticeController::class, 'byMaterial'])->name('practices.byMaterial');
+    Route::get('/latihan-soal/{practice}/summary', [PracticeController::class, 'summary'])->name('practices.summary');
 
     /*
     |--------------------------------------------------------------------------

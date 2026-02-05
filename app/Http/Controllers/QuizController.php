@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 
 class QuizController extends Controller
 {
-    // MAHASISWA: list quiz (biasanya berdasarkan class yg diikuti)
     public function index(Request $request)
     {
         $user = $request->user();
@@ -119,10 +118,9 @@ class QuizController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // hitung total score berdasarkan pivot points quiz_map
         $quiz = QuizModel::with('questions')->findOrFail($attempt->quizzes_id);
 
-        $pointsByQ = $quiz->questions->pluck('pivot.points', 'id'); // [questionId => points]
+        $pointsByQ = $quiz->questions->pluck('pivot.points', 'id'); 
 
         $score = 0;
         foreach ($attempt->answers as $ans) {
@@ -136,7 +134,32 @@ class QuizController extends Controller
             'total_score' => $score,
         ]);
 
+        $this->updateCompletedQuizAt($request->user()->id, $attempt->quizzes_id);
+        DB::commit();
+
         return response()->json($attempt);
+    }
+
+    private function updateCompletedQuizAt(int $userId, int $quizId): void
+    {
+        // 1. Ambil class_id
+        $classId = DB::table('class_user')
+            ->where('user_id', $userId)
+            ->value('class_id');
+        
+        // 2. Ambil material_ids dari quiz
+        $materialIds = QuizMapModel::query()
+            ->join('quiz_questions', 'quiz_questions.id', '=', 'quiz_map.quiz_question_id')
+            ->where('quiz_map.quiz_id', $quizId)
+            ->pluck('quiz_questions.material_id')
+            ->unique();
+        
+        // 3. Update completed_quiz_at
+        UserProgressModel::query()
+            ->where('user_id', $userId)
+            ->where('class_id', $classId)
+            ->whereIn('material_id', $materialIds)
+            ->update(['completed_quiz_at' => now()]);
     }
 
     public function attemptDetail(Request $request, $attempt)

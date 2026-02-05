@@ -15,12 +15,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('material_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('class_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('class_id')->nullable()->constrained()->cascadeOnDelete();
 
             // status belajar
-            $table->enum('status', ['locked','unlocked','completed'])->default('locked');
-
-            $table->timestamp('completed_at')->nullable();
+            $table->enum('status', ['locked','unlocked','in_progress', 'completed'])->default('locked');
+            $table->timestamp('read_at')->nullable();
+            $table->timestamp('completed_practice_at')->nullable();
+            $table->timestamp('completed_quiz_at')->nullable();
             $table->timestamps();
 
             $table->unique(['user_id','material_id','class_id']);

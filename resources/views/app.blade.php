@@ -6,7 +6,7 @@
         <link rel="icon" type="image/png" href="/images/logo.png">
 
 
-        <title inertia>{{ config('app.name', 'OOpedia') }}</title>
+        <title inertia>{{ config('app.name') }}</title>
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.googleapis.com">

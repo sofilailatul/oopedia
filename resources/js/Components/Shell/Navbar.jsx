@@ -43,7 +43,7 @@ export default function Navbar({ title = "Dashboard" }) {
   };
 
   return (
-    <div className="px-1">
+    <div>
       <div className="flex  items-center justify-between px-[30px] py-[7px] relative bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
         <h1 className="text-l tracking-[0] leading-[normal] font-semibold text-white">{title}</h1>
 
