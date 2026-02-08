@@ -17,6 +17,7 @@ return new class extends Migration
             $table->text('question_text');
             $table->enum('type', ['multiple_choice','drag_drop']);
             $table->string('image_path')->nullable();
+            $table->integer('points')->default(10);
             $table->text('feedback_correct')->nullable();
             $table->text('feedback_incorrect')->nullable();
             $table->timestamps();

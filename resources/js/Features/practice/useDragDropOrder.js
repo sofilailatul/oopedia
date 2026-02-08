@@ -1,0 +1,124 @@
+// resources/js/Features/practice/useDragDropOrder.js
+
+import { useEffect, useMemo, useState } from "react";
+import { buildDragState } from "./dragDropUtils";
+import { QUESTION_TYPE } from "./constants";
+
+export function useDragDropOrder({ current, answers, setDragSelection }) {
+  const [dragStates, setDragStates] = useState({});
+
+  const currentDrag = useMemo(() => {
+    if (!current || current.type !== QUESTION_TYPE.DRAG) return null;
+
+    const existing = dragStates[current.id];
+    if (existing) return existing;
+
+    const savedSelection = answers?.[current.id]?.selection_items ?? [];
+    return buildDragState(current, savedSelection);
+  }, [current, dragStates, answers]);
+
+  useEffect(() => {
+    if (!current || current.type !== QUESTION_TYPE.DRAG) return;
+    if (dragStates[current.id]) return;
+
+    const savedSelection = answers?.[current.id]?.selection_items ?? [];
+    setDragStates((prev) => ({
+      ...prev,
+      [current.id]: buildDragState(current, savedSelection),
+    }));
+  }, [current, dragStates, answers]);
+
+  const updateDragState = (questionId, nextState) => {
+    setDragStates((prev) => ({ ...prev, [questionId]: nextState }));
+
+    const selectionItems = nextState.slots.filter(Boolean);
+    setDragSelection(questionId, selectionItems);
+  };
+
+  const handleDragStart = (event, payload) => {
+    event.dataTransfer.setData("text/plain", JSON.stringify(payload));
+    event.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDropOnSlot = (event, slotIndex) => {
+    event.preventDefault();
+    if (!currentDrag || !current) return;
+
+    const raw = event.dataTransfer.getData("text/plain");
+    if (!raw) return;
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    const { source, index, text } = payload;
+    if (!text) return;
+
+    const nextPool = [...currentDrag.pool];
+    const nextSlots = [...currentDrag.slots];
+    const targetItem = nextSlots[slotIndex] ?? null;
+
+    if (source === "pool") {
+      const poolIndex = nextPool.indexOf(text);
+      if (poolIndex >= 0) nextPool.splice(poolIndex, 1);
+      if (targetItem) nextPool.push(targetItem);
+      nextSlots[slotIndex] = text;
+    } else if (source === "slot") {
+      if (index === slotIndex) return;
+      nextSlots[index] = targetItem;
+      nextSlots[slotIndex] = text;
+    }
+
+    updateDragState(current.id, { pool: nextPool, slots: nextSlots });
+  };
+
+  const handleDropOnPool = (event) => {
+    event.preventDefault();
+    if (!currentDrag || !current) return;
+
+    const raw = event.dataTransfer.getData("text/plain");
+    if (!raw) return;
+
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+
+    if (payload.source !== "slot") return;
+    const { index, text } = payload;
+    if (!text) return;
+
+    const nextPool = [...currentDrag.pool, text];
+    const nextSlots = [...currentDrag.slots];
+    nextSlots[index] = null;
+
+    updateDragState(current.id, { pool: nextPool, slots: nextSlots });
+  };
+
+  const removeFromSlot = (slotIndex) => {
+    if (!currentDrag || !current) return;
+    const slot = currentDrag.slots[slotIndex];
+    if (!slot) return;
+
+    const nextPool = [...currentDrag.pool, slot];
+    const nextSlots = [...currentDrag.slots];
+    nextSlots[slotIndex] = null;
+
+    updateDragState(current.id, { pool: nextPool, slots: nextSlots });
+  };
+
+  return {
+    currentDrag,
+    dragHandlers: {
+      handleDragStart,
+      handleDropOnSlot,
+      handleDropOnPool,
+      removeFromSlot,
+    },
+  };
+}

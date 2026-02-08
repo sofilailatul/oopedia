@@ -16,12 +16,14 @@ class PracticeQuestionModel extends Model
         'question_text',
         'type',
         'image_path',
+        'points',
         'feedback_correct',
         'feedback_incorrect',
     ];
 
     protected $casts = [
         'type' => 'string',
+        'points' => 'integer',
     ];
 
     // Relationships
@@ -37,7 +39,8 @@ class PracticeQuestionModel extends Model
 
     public function items()
     {
-        return $this->hasMany(PracticeItemModel::class, 'practice_questions_id');
+        return $this->hasMany(PracticeItemModel::class, 'practice_questions_id')
+            ->orderBy('order_number');
     }
 
     public function answers()

@@ -33,14 +33,14 @@ const NAV_BY_ROLE = {
   mahasiswa: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },
     { label: "Materi", href: "/materi", icon: FaBook },
-    { label: "Latihan Soal", href: "/mahasiswa/latihan-soal", icon: FaClipboardList },
+    { label: "Latihan Soal", href: "/daftar-latihan-soal", icon: FaClipboardList },
     { label: "Kuis", href: "/mahasiswa/kuis", icon: FaFileAlt },
     { label: "Leaderboard", href: "/mahasiswa/leaderboard", icon: FaTrophy },
   ],
   tamu: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },
     { label: "Materi", href: "/materi", icon: FaBook },
-    { label: "Latihan Soal", href: "/tamu/latihan-soal", icon: FaClipboardList },
+    { label: "Latihan Soal", href: "/daftar-latihan-soal", icon: FaClipboardList },
   ],
 };
 
@@ -61,7 +61,7 @@ export default function Sidebar() {
   const items = NAV_BY_ROLE[role] || NAV_BY_ROLE.tamu;
 
   return (
-    <aside className="flex flex-col w-[180px] h-[1024px] items-start gap-5 relative bg-[#e0f1fe]">
+    <aside className="flex flex-col w-[180px] items-start gap-5 relative bg-[#e0f1fe]">
       <header className="flex items-center gap-[11px] px-[5px] py-[10px] self-stretch w-full border-b [border-bottom-style:solid] border-[#1e1e1e70] relative flex-[0_0_auto]">
         <img
           className="relative w-[34px] h-[49px] aspect-[0.71] object-cover" src="/images/logo.png" alt="Oopedia"/>

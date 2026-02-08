@@ -39,4 +39,9 @@ class QuizAttemptModel extends Model
     {
         return $this->hasMany(UserQuizAnswerModel::class, 'quiz_attempts_id');
     }
+
+    public function materialScores()
+    {
+        return $this->hasMany(QuizAttemptMaterialScoreModel::class, 'quiz_attempts_id');
+    }
 }

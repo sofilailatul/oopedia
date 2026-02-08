@@ -156,7 +156,7 @@ export default function Show({ material }) {
                                     👤 <strong>{material.author}</strong>
                                 </span>
                                 <span>•</span>
-                                <span>📋 Materi #{material.order_number}</span>
+                                <span>📋 Materi {material.order_number}</span>
                             </div>
 
                             {progress.read_at && (

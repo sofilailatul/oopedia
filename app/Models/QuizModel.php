@@ -51,4 +51,14 @@ class QuizModel extends Model
     {
         return $this->hasMany(QuizMapModel::class, 'quiz_id');
     }
+
+    public function materials()
+    {
+        return $this->belongsToMany(
+            MaterialModel::class,
+            'quiz_materials',
+            'quizzes_id',
+            'material_id'
+        )->withTimestamps();
+    }
 }

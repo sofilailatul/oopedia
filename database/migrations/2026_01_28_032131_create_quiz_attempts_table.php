@@ -19,6 +19,7 @@ return new class extends Migration
             $table->timestamp('finished_at')->nullable();
             $table->integer('total_score')->default(0);
             $table->timestamps();
+            $table->unique(['user_id', 'quizzes_id'], 'quiz_attempts_user_quiz_once');
         });
     }
 

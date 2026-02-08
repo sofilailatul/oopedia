@@ -14,7 +14,7 @@ function normalizeRole(authUser) {
   return 'tamu'
 }
 
-export default function AppLayout({ children, label = 'Dashboard', title = 'Dashboard' }) {
+export default function AppLayout({ children, label = 'Dashboard', title = 'Dashboard', fullHeight = true }) {
   const { auth } = usePage().props
   const role = normalizeRole(auth?.user)
 
@@ -31,6 +31,7 @@ export default function AppLayout({ children, label = 'Dashboard', title = 'Dash
       <AppShell
         sidebar={<Sidebar />}
         navbar={<Navbar title={title} roleLabel={roleLabel} />}
+        fullHeight={fullHeight}
       >
         {children}
       </AppShell>

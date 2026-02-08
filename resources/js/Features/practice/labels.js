@@ -1,0 +1,14 @@
+import { DIFFICULTY, QUESTION_TYPE } from "./constants";
+
+export const difficultyLabel = (level) =>
+  ({
+    [DIFFICULTY.EASY]: "Easy",
+    [DIFFICULTY.NORMAL]: "Normal",
+    [DIFFICULTY.HARD]: "Hard",
+  }[level] ?? "Pilih Level");
+
+export const questionTypeLabel = (type) =>
+  ({
+    [QUESTION_TYPE.MC]: "Multiple Choice",
+    [QUESTION_TYPE.DRAG]: "Drag & Drop",
+  }[type] ?? "Pilih Tipe Soal");

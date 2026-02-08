@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             PracticeAttemptSeeder::class,
             QuizAttemptSeeder::class,
             MaterialContentSeeder::class,
+            QuizMaterialAndAttemptScore::class,
         ]);
     }
 }

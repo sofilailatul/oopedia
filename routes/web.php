@@ -62,10 +62,16 @@ Route::middleware('auth')->group(function () {
     | PRACTICE 
     |--------------------------------------------------------------------------
     */
-    Route::get('/latihan-soal', [PracticeController::class, 'index'])->name('practices.index');
-    Route::get('/latihan-soal/materi/{material}', [PracticeController::class, 'byMaterial'])->name('practices.byMaterial');
-    Route::get('/latihan-soal/{practice}/summary', [PracticeController::class, 'summary'])->name('practices.summary');
-
+    Route::get('/daftar-latihan-soal', [PracticeController::class, 'index'])
+        ->name('practices.index');
+    Route::post('/latihan-soal/{practice}/attempts', [PracticeController::class, 'startAttempt'])
+        ->name('practices.attempts.start');
+    Route::get('/latihan-soal-attempts/{attempt}', [PracticeController::class, 'attemptDetail'])
+        ->name('practice_attempts.show');
+    Route::post('/latihan-soal-attempts/{attempt}/answers', [PracticeController::class, 'submitAnswers'])
+        ->name('practice_attempts.answers');
+    Route::get('/latihan-soal/{practice}/summary', [PracticeController::class, 'summary'])
+        ->name('practices.summary');
     /*
     |--------------------------------------------------------------------------
     | TAMU (register tapi belum join kelas)
@@ -84,12 +90,6 @@ Route::middleware('auth')->group(function () {
 
         // PROGRESS
         Route::get('/progress', [ProgressController::class, 'myProgress'])->name('progress.me');
-
-        // PRACTICE (attempt & nilai)
-        Route::post('/practices/{practice}/attempts', [PracticeController::class, 'startAttempt'])->name('practices.attempts.start');
-        Route::post('/practice-attempts/{attempt}/answers', [PracticeController::class, 'submitAnswers'])->name('practice_attempts.answers');
-        Route::post('/practice-attempts/{attempt}/finish', [PracticeController::class, 'finishAttempt'])->name('practice_attempts.finish');
-        Route::get('/practice-attempts/{attempt}', [PracticeController::class, 'attemptDetail'])->name('practice_attempts.show');
 
         // QUIZ
         Route::get('/quizzes', [QuizController::class, 'index'])->name('quizzes.index');
