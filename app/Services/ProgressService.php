@@ -217,7 +217,7 @@ class ProgressService
         $quizIds = QuizMap::query()
             ->join('quiz_questions', 'quiz_questions.id', '=', 'quiz_map.quiz_question_id')
             ->where('quiz_questions.material_id', $materialId)
-            ->pluck('quiz_map.quiz_id')
+            ->pluck('quiz_map.quizzes_id')
             ->unique()
             ->values();
 

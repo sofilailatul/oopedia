@@ -227,7 +227,7 @@ class DashboardController extends Controller
         // Recent activities (latest quiz attempts from students)
         $recentActivities = DB::table('quiz_attempts')
             ->join('users', 'quiz_attempts.user_id', '=', 'users.id')
-            ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+            ->join('quizzes', 'quiz_attempts.quizzes_id', '=', 'quizzes.id')
             ->whereIn('quizzes.class_id', $classIds)
             ->where('quiz_attempts.is_finished', true)
             ->select([
@@ -298,7 +298,7 @@ class DashboardController extends Controller
         // System activity (latest quiz attempts across all classes)
         $recentActivities = DB::table('quiz_attempts')
             ->join('users', 'quiz_attempts.user_id', '=', 'users.id')
-            ->join('quizzes', 'quiz_attempts.quiz_id', '=', 'quizzes.id')
+            ->join('quizzes', 'quiz_attempts.quizzes_id', '=', 'quizzes.id')
             ->where('quiz_attempts.is_finished', true)
             ->select([
                 'users.name as student_name',

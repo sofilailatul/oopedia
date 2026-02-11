@@ -92,14 +92,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/progress', [ProgressController::class, 'myProgress'])->name('progress.me');
 
         // QUIZ
-        Route::get('/quizzes', [QuizController::class, 'index'])->name('quizzes.index');
+        Route::get('/kuis', [QuizController::class, 'index'])->name('quizzes.index');
         Route::get('/quizzes/{quiz}', [QuizController::class, 'show'])->name('quizzes.show');
         Route::get('/quizzes/{quiz}/questions', [QuizController::class, 'questions'])->name('quizzes.questions');
-
         Route::post('/quizzes/{quiz}/attempts', [QuizController::class, 'startAttempt'])->name('quizzes.attempts.start');
+        Route::get('/quiz-attempts/{attempt}', [QuizController::class, 'attemptShow'])->name('quiz_attempts.show');
         Route::post('/quiz-attempts/{attempt}/answers', [QuizController::class, 'submitAnswers'])->name('quiz_attempts.answers');
-        Route::post('/quiz-attempts/{attempt}/finish', [QuizController::class, 'finishAttempt'])->name('quiz_attempts.finish');
-        Route::get('/quiz-attempts/{attempt}', [QuizController::class, 'attemptDetail'])->name('quiz_attempts.show');
+        Route::post('/quiz-attempts/{attempt}/check-answer', [QuizController::class, 'checkAnswer'])->name('quiz_attempts.check_answer');
+        Route::get('/quiz-attempts/{attempt}/review',[QuizController::class, 'review'])->name('quizzes.review');
+        Route::get('/quiz-attempts/{attempt}/completed', [QuizController::class, 'completed']) ->name('quiz_attempts.completed');
 
         // RECOMMENDATION
         Route::get('/recommendations', [RecommendationController::class, 'myRecommendations'])->name('recommendations.me');

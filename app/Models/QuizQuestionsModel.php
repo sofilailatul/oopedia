@@ -30,7 +30,7 @@ class QuizQuestionsModel extends Model
             QuizModel::class,
             'quiz_map',
             'quiz_question_id',
-            'quiz_id'
+            'quizzes_id'
         )->withPivot(['points'])
          ->withTimestamps();
     }

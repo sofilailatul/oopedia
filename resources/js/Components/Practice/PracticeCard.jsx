@@ -5,6 +5,8 @@ import Card from '@/Components/Card';
 import Button from '@/Components/Button';
 
 export default function PracticeCard({ practice, onClick }) {
+  const hasActiveAttempt = Boolean(practice?.has_active_attempt);
+
   return (
     <Card className="rounded-2xl shadow-sm">
       <div>
@@ -20,12 +22,11 @@ export default function PracticeCard({ practice, onClick }) {
       </div>
 
       <Button
-        type="button"
-        variant="Solid"
-        color="blue"
+        variant="solid"
+        color={hasActiveAttempt ? "yellow" : "blue"}
         onClick={() => onClick(practice)}
       >
-        Start Practice
+        {hasActiveAttempt ? "Lanjutkan mengerjakan" : "Start Practice"}
       </Button>
     </Card>
   );

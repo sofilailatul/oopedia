@@ -105,7 +105,7 @@ export default function Show({ material }) {
         const nextStep = progressData.next_step;
 
         if (nextStep === "practice") {
-            router.visit(`/latihan-soal/materi/${material.id}`);
+            router.visit(`/daftar-latihan-soal`);
             return;
         }
         if (nextStep === "quiz") {
@@ -142,7 +142,7 @@ export default function Show({ material }) {
                 <ContentCard className="border-[#9fc4ff]" title={null}>
                     <div className="flex items-start justify-between gap-4 space-y-4">
                         <div className="space-y-4">
-                            <h1 className="text-xl font-bold text-gray-900">
+                            <h1 className="text-lg font-bold text-gray-900">
                                 {material.material_name}
                             </h1>
                             {material.description && (

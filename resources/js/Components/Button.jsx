@@ -27,7 +27,7 @@ export default function Button({
     },
     yellow: {
       solid:
-        "bg-yellow-400 text-black hover:bg-yellow-500 focus:ring-yellow-100",
+        "bg-yellow-400 text-yellow-800 hover:bg-yellow-500 focus:ring-yellow-100",
       outline:
         "border border-yellow-400 text-yellow-600 hover:bg-yellow-50 focus:ring-yellow-100",
       ghost: "text-yellow-600 hover:bg-yellow-50 focus:ring-yellow-100",

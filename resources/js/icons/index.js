@@ -33,6 +33,7 @@ import {
   MdRefresh,
   MdArrowBack,
   MdArrowForward,
+  MdLightbulb,
 } from 'react-icons/md';
 
 import {
@@ -105,6 +106,7 @@ export const Icons = {
   Clock: FaClock,
   Star: FaStar,
   Code: FaCode,
+  Lightbulb: MdLightbulb,
   
   // Alerts
   Info: MdInfo,

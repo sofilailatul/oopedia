@@ -235,8 +235,7 @@ export default function AttemptShow(props) {
               </Button>
 
               <Button
-                type="button"
-                variant="Solid"
+                variant="solid"
                 color="green"
                 onClick={() => actions.submit(false)}
                 disabled={answeredCount === 0}

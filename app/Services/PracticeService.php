@@ -19,20 +19,20 @@ class PracticeService
     
     public function getPracticesForUser($userId)
     {
-        // Ambil semua practice dengan material
+        
         $practiceRows = PracticeModel::query()
             ->with('material:id,material_name')
             ->orderBy('material_id')
             ->get();
 
-        // Ambil scores terbaru per practice
+        
         $scores = $this->getLatestScores($userId);
-        
-        // Hitung jumlah soal per practice
+
+        $anyAttempts = $this->getAnyAttempts($userId);
+
         $questionCounts = $this->getQuestionCounts();
-        
-        // Group per material
-        return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts);
+
+        return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $anyAttempts);
     }
 
     private function getLatestScores($userId)
@@ -65,11 +65,30 @@ class PracticeService
             });
     }
 
-    private function groupPracticesByMaterial($practiceRows, $scores, $questionCounts)
+    private function getAnyAttempts($userId)
+    {
+        $attemptTable = (new PracticeAttemptModel())->getTable();
+
+        $latestSub = PracticeAttemptModel::query()
+            ->where('user_id', $userId)
+            ->select('practices_id', DB::raw('MAX(created_at) as max_created_at'))
+            ->groupBy('practices_id');
+
+        return PracticeAttemptModel::query()
+            ->joinSub($latestSub, 'latest', function ($join) use ($attemptTable) {
+                $join->on("$attemptTable.practices_id", '=', 'latest.practices_id')
+                    ->on("$attemptTable.created_at", '=', 'latest.max_created_at');
+            })
+            ->where("$attemptTable.user_id", $userId)
+            ->get()
+            ->keyBy('practices_id');
+    }
+
+    private function groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $activeAttempts)
     {
         $grouped = $practiceRows->groupBy('material_id');
 
-        return $grouped->map(function ($items) use ($scores, $questionCounts) {
+        return $grouped->map(function ($items) use ($scores, $questionCounts, $activeAttempts) {
             $material = $items->first()->material;
 
             $easy   = $items->firstWhere('difficulty_level', 'easy');
@@ -79,6 +98,15 @@ class PracticeService
             $easyId   = $easy?->id;
             $normalId = $normal?->id;
             $hardId   = $hard?->id;
+
+            $activeEasy = $easyId ? $activeAttempts->get($easyId) : null;
+            $activeNormal = $normalId ? $activeAttempts->get($normalId) : null;
+            $activeHard = $hardId ? $activeAttempts->get($hardId) : null;
+
+            $latestActive = collect([$activeEasy, $activeNormal, $activeHard])
+                ->filter()
+                ->sortByDesc('created_at')
+                ->first();
 
             return [
                 'material_id'   => $material?->id,
@@ -93,6 +121,11 @@ class PracticeService
                     'normal' => $normalId ? ($scores[$normalId] ?? null) : null,
                     'hard'   => $hardId   ? ($scores[$hardId]   ?? null) : null,
                 ],
+                'has_active_attempt' => (bool) $latestActive,
+                'active_attempt' => $latestActive ? [
+                    'id' => $latestActive->id,
+                    'practices_id' => $latestActive->practices_id,
+                ] : null,
                 'question_counts' => [
                     'easy' => [
                         'multiple_choice' => $easyId ? ($questionCounts[$easyId]['multiple_choice'] ?? 0) : 0,
@@ -119,19 +152,19 @@ class PracticeService
     
     public function validateAndCreateAttempt($userId, $practiceId, $data)
     {
-        // Validasi level
+        
         $this->validateLevel($userId, $practiceId, $data['level']);
         
-        // Buat attempt
+        
         return $this->createAttempt($userId, $practiceId, $data);
     }
 
     private function validateLevel($userId, $practiceId, $selectedLevel)
     {
-        // Cek apakah practice ada
+        
         $practice = PracticeModel::findOrFail($practiceId);
         
-        // Jika bukan normal, pastikan normal sudah selesai
+        
         if ($selectedLevel !== 'normal') {
             $this->validateNormalCompleted($userId, $practice->material_id);
         }
@@ -145,7 +178,7 @@ class PracticeService
             ->first();
 
         if (!$normalPractice) {
-            return; // Tidak ada normal practice
+            return; 
         }
 
         $hasFinishedNormal = PracticeAttemptModel::query()
@@ -175,7 +208,7 @@ class PracticeService
             'is_passed' => 0,
         ]);
 
-        // Simpan config di session
+        
         session([
             "attempt_cfg_{$attempt->id}" => [
                 'level' => $data['level'],
@@ -198,7 +231,7 @@ class PracticeService
     {
         $attempt = PracticeAttemptModel::findOrFail($attemptId);
         
-        // Pastikan user punya akses
+        
         if ($attempt->user_id !== Auth::id()) {
             abort(403);
         }
@@ -254,7 +287,7 @@ class PracticeService
     {
         $attempt = PracticeAttemptModel::findOrFail($attemptId);
         
-        // Pastikan user punya akses
+        
         if ($attempt->user_id !== Auth::id()) {
             abort(403);
         }
@@ -311,7 +344,7 @@ class PracticeService
 
             $totalEarned += $result['score'];
             
-            // Simpan jawaban
+            
             $this->saveUserAnswer($attempt->id, $qid, $answerData, $result);
         }
 
