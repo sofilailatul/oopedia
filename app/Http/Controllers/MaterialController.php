@@ -308,6 +308,219 @@ class MaterialController extends Controller
         };
     }
 
+    public function dosenCreate(Request $request)
+    {
+        return Inertia::render('Dosen/Materials/Create', [
+            'authUser' => $request->user(),
+        ]);
+    }
+
+    public function dosenIndex()
+    {
+        $materials = MaterialModel::query()
+            ->select('id', 'material_name', 'order_number')
+            ->orderBy('order_number')
+            ->get();
+
+        return Inertia::render('Dosen/Materials/Index', [
+            'materials' => $materials,
+        ]);
+    }
+
+    public function dosenShow(Request $request, MaterialModel $material)
+    {
+        $material->load(['creator', 'contents' => function ($q) {
+            $q->orderBy('sort_order');
+        }]);
+
+        $author = $material->creator?->name
+                ?? $material->creator?->nama
+                ?? '—';
+
+        return Inertia::render('Dosen/Materials/Show', [
+            'authUser' => $request->user(),
+            'material' => [
+                'id' => $material->id,
+                'material_name' => $material->material_name,
+                'description' => $material->description,
+                'order_number' => $material->order_number,
+                'author' => $author,
+                'contents' => $material->contents->map(function ($c) {
+                    return [
+                        'id' => $c->id,
+                        'title' => $c->title,
+                        'content_text' => $c->content_text,
+                        'image_path' => $c->image_path,
+                        'image_url' => $c->image_url,
+                    ];
+                }),
+            ],
+        ]);
+    }
+
+    public function dosenEdit(Request $request, MaterialModel $material)
+    {
+        $material->load(['creator', 'contents' => function ($q) {
+            $q->orderBy('sort_order');
+        }]);
+
+        $author = $material->creator?->name
+                ?? $material->creator?->nama
+                ?? '—';
+
+        return Inertia::render('Dosen/Materials/Edit', [
+            'authUser' => $request->user(),
+            'material' => [
+                'id' => $material->id,
+                'material_name' => $material->material_name,
+                'description' => $material->description,
+                'order_number' => $material->order_number,
+                'author' => $author,
+                'contents' => $material->contents->map(function ($c) {
+                    return [
+                        'id' => $c->id,
+                        'title' => $c->title,
+                        'content_text' => $c->content_text,
+                        'image_path' => $c->image_path,
+                        'image_url' => $c->image_url,
+                    ];
+                }),
+            ],
+        ]);
+    }
+
+    public function dosenStore(Request $request)
+    {
+        $data = $request->validate([
+            'material_name' => ['required','string','max:255'],
+            'description' => ['nullable','string'],
+            'order_number' => ['nullable','integer','min:1'],
+            'sections' => ['nullable','array'],
+            'sections.*.title' => ['nullable','string','max:255'],
+            'sections.*.content_text' => ['nullable','string'],
+            'sections.*.image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
+        ]);
+
+        $nextOrder = $data['order_number']
+            ?? ((MaterialModel::max('order_number') ?? 0) + 1);
+
+        $material = MaterialModel::create([
+            'material_name' => $data['material_name'],
+            'description' => $data['description'] ?? null,
+            'content' => null,
+            'order_number' => $nextOrder,
+            'created_by' => $request->user()->id,
+        ]);
+
+        $sections = $data['sections'] ?? [];
+        $sort = 1;
+
+        foreach ($sections as $index => $sectionData) {
+            $text = $sectionData['content_text'] ?? null;
+            $title = $sectionData['title'] ?? null;
+            $imageFile = $request->file("sections.$index.image");
+
+            if (!$title && !$text && !$imageFile) {
+                continue;
+            }
+
+            $imagePath = null;
+            if ($imageFile) {
+                $imagePath = $imageFile->store("materials/{$material->id}/sections", 'public');
+            }
+
+            MaterialContentModel::create([
+                'material_id' => $material->id,
+                'title' => $title,
+                'content_text' => $text ?? '',
+                'image_path' => $imagePath,
+                'sort_order' => $sort++,
+            ]);
+        }
+
+        return redirect()->route('dosen.materials.index');
+    }
+
+    public function dosenUpdate(Request $request, MaterialModel $material)
+    {
+        $data = $request->validate([
+            'material_name' => ['required','string','max:255'],
+            'description' => ['nullable','string'],
+            'order_number' => ['required','integer','min:1'],
+            'sections' => ['nullable','array'],
+            'sections.*.id' => ['nullable','integer'],
+            'sections.*.title' => ['nullable','string','max:255'],
+            'sections.*.content_text' => ['nullable','string'],
+            'sections.*.image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
+        ]);
+
+        $material->update([
+            'material_name' => $data['material_name'],
+            'description' => $data['description'] ?? null,
+            'order_number' => $data['order_number'],
+        ]);
+
+        $existingSections = MaterialContentModel::where('material_id', $material->id)
+            ->orderBy('sort_order')
+            ->get()
+            ->keyBy('id');
+
+        $keepIds = [];
+        $sort = 1;
+
+        foreach (($data['sections'] ?? []) as $index => $sectionData) {
+            $text = $sectionData['content_text'] ?? null;
+            $title = $sectionData['title'] ?? null;
+            $imageFile = $request->file("sections.$index.image");
+            $sectionId = $sectionData['id'] ?? null;
+
+            if (!$title && !$text && !$imageFile) {
+                continue;
+            }
+
+            if ($sectionId && $existingSections->has($sectionId)) {
+                $section = $existingSections[$sectionId];
+                $section->title = $title;
+                $section->content_text = $text ?? '';
+
+                if ($imageFile) {
+                    $imagePath = $imageFile->store("materials/{$material->id}/sections", 'public');
+                    $section->image_path = $imagePath;
+                }
+
+                $section->sort_order = $sort++;
+                $section->save();
+
+                $keepIds[] = $section->id;
+            } else {
+                $imagePath = null;
+                if ($imageFile) {
+                    $imagePath = $imageFile->store("materials/{$material->id}/sections", 'public');
+                }
+
+                $section = MaterialContentModel::create([
+                    'material_id' => $material->id,
+                    'title' => $title,
+                    'content_text' => $text ?? '',
+                    'image_path' => $imagePath,
+                    'sort_order' => $sort++,
+                ]);
+
+                $keepIds[] = $section->id;
+            }
+        }
+
+        if (count($keepIds) > 0) {
+            MaterialContentModel::where('material_id', $material->id)
+                ->whereNotIn('id', $keepIds)
+                ->delete();
+        } else {
+            MaterialContentModel::where('material_id', $material->id)->delete();
+        }
+
+        return redirect()->route('dosen.materials.show', $material->id);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -338,7 +551,11 @@ class MaterialController extends Controller
 
         $material->update($data);
 
-        return response()->json($material);
+        if ($request->wantsJson()) {
+            return response()->json($material);
+        }
+
+        return redirect()->route('dosen.materials.index');
     }
 
     public function destroy($material)
@@ -389,10 +606,24 @@ class MaterialController extends Controller
         $data = $request->validate([
             'title' => ['sometimes','nullable','string','max:255'],
             'content_text' => ['sometimes','required','string'],
-            'image_path' => ['sometimes','nullable','string','max:255'],
+            'image' => ['sometimes','nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
         ]);
 
-        $section->update($data);
+        if ($request->hasFile('image')) {
+            $imagePath = $request->file('image')
+                ->store("materials/{$material->id}/sections", 'public');
+
+            $section->image_path = $imagePath;
+        }
+
+        if (array_key_exists('title', $data)) {
+            $section->title = $data['title'];
+        }
+        if (array_key_exists('content_text', $data)) {
+            $section->content_text = $data['content_text'];
+        }
+
+        $section->save();
 
         return response()->json($section);
     }

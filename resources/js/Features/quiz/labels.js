@@ -7,7 +7,7 @@ export const statusLabel = (status) => {
 
 export const statusBadgeClass = (status) => {
   if (status === QUIZ_STATUS.DONE) return "bg-green-100 text-green-700";
-  return "bg-red-100 text-red-600";
+  return "bg-yellow-100 text-yellow-700";
 };
 
 export const formatDateLabel = (value) => {

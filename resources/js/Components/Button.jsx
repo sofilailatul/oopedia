@@ -1,4 +1,5 @@
 export default function Button({
+  as: Component = "button",
   children,
   color = "green",
   variant = "solid", // solid | outline | ghost
@@ -58,7 +59,7 @@ export default function Button({
   const safeVariant = colors[safeColor][variant] ? variant : "solid";
 
   return (
-    <button
+    <Component
       disabled={disabled}
       className={`
         ${base}
@@ -72,6 +73,6 @@ export default function Button({
       {leftIcon && <span className="text-lg">{leftIcon}</span>}
       {children}
       {rightIcon && <span className="text-lg">{rightIcon}</span>}
-    </button>
+    </Component>
   );
 }

@@ -23,10 +23,10 @@ export default function PracticeCard({ practice, onClick }) {
 
       <Button
         variant="solid"
-        color={hasActiveAttempt ? "yellow" : "blue"}
+        color={hasActiveAttempt ? "blue" : "yellow"}
         onClick={() => onClick(practice)}
       >
-        {hasActiveAttempt ? "Lanjutkan mengerjakan" : "Start Practice"}
+        {hasActiveAttempt ? "Lanjutkan mengerjakan" : "Mulai Latihan Soal"}
       </Button>
     </Card>
   );

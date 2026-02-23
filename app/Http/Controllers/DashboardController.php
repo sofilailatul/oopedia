@@ -23,7 +23,7 @@ class DashboardController extends Controller
         return match ($user->role) {
             'tamu' => $this->tamuDashboard($user),
 
-            'dosen' => Inertia::render('Dosen/Dashboard'),
+            'dosen' => $this->dosenDashboard(),
 
             'superadmin' => Inertia::render('SuperAdmin/Dashboard'),
 
@@ -205,55 +205,69 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
-        // Get dosen's classes
-        $classes = DB::table('classes')
-            ->where('teacher_id', $user->id)
-            ->select(['id', 'name', 'class_code', 'created_at'])
+        // Get classes joined/owned by this dosen via pivot class_user
+        $classes = DB::table('class_user as cu')
+            ->join('classes as c', 'c.id', '=', 'cu.class_id')
+            ->where('cu.user_id', $user->id)
+            ->select(['c.id', 'c.class_name', 'c.class_code', 'c.created_at'])
             ->get();
 
         $classIds = $classes->pluck('id');
 
-        // Stats
+        // Stats cards
+        $totalClasses = $classes->count();
+
+        $totalStudents = DB::table('class_user as cu')
+            ->join('users as u', 'u.id', '=', 'cu.user_id')
+            ->whereIn('cu.class_id', $classIds)
+            ->where('u.role', 'mahasiswa')
+            ->distinct('cu.user_id')
+            ->count('cu.user_id');
+
+        $totalMaterials = MaterialModel::where('created_by', $user->id)->count();
+
+        $totalQuizzes = QuizModel::whereIn('class_id', $classIds)->count();
+
         $stats = [
-            'total_classes' => $classes->count(),
-            'total_students' => DB::table('users')
-                ->whereIn('class_id', $classIds)
-                ->where('role', 'mahasiswa')
-                ->count(),
-            'total_materials' => Material::whereIn('class_id', $classIds)->count(),
-            'total_quizzes' => Quiz::whereIn('class_id', $classIds)->count(),
+            'total_classes' => $totalClasses,
+            'total_students' => $totalStudents,
+            'total_materials' => $totalMaterials,
+            'total_quizzes' => $totalQuizzes,
         ];
 
-        // Recent activities (latest quiz attempts from students)
-        $recentActivities = DB::table('quiz_attempts')
-            ->join('users', 'quiz_attempts.user_id', '=', 'users.id')
-            ->join('quizzes', 'quiz_attempts.quizzes_id', '=', 'quizzes.id')
-            ->whereIn('quizzes.class_id', $classIds)
-            ->where('quiz_attempts.is_finished', true)
+        // Recent activities (latest quiz attempts from students in this dosen's classes)
+        $recentActivities = DB::table('quiz_attempts as qa')
+            ->join('users as u', 'qa.user_id', '=', 'u.id')
+            ->join('quizzes as q', 'qa.quizzes_id', '=', 'q.id')
+            ->whereIn('q.class_id', $classIds)
+            ->whereNotNull('qa.finished_at')
             ->select([
-                'users.name as student_name',
-                'quizzes.title as quiz_title',
-                'quiz_attempts.total_score',
-                'quiz_attempts.finished_at',
+                'u.nama as student_name',
+                'q.title as quiz_title',
+                'qa.total_score',
+                'qa.finished_at',
             ])
-            ->orderBy('quiz_attempts.finished_at', 'desc')
+            ->orderBy('qa.finished_at', 'desc')
             ->limit(5)
             ->get();
 
-        // Top students (by total points in dosen's classes)
-        $topStudents = DB::table('users')
-            ->whereIn('class_id', $classIds)
-            ->where('role', 'mahasiswa')
-            ->select([
-                'users.id',
-                'users.name',
-                DB::raw('COALESCE(SUM(quiz_attempts.total_score), 0) as total_points')
-            ])
-            ->leftJoin('quiz_attempts', function($join) {
-                $join->on('users.id', '=', 'quiz_attempts.user_id')
-                    ->where('quiz_attempts.is_finished', true);
+        // Top students (by total quiz points in this dosen's classes)
+        $topStudents = DB::table('class_user as cu')
+            ->join('users as u', 'u.id', '=', 'cu.user_id')
+            ->leftJoin('quiz_attempts as qa', 'qa.user_id', '=', 'u.id')
+            ->leftJoin('quizzes as q', function ($join) use ($classIds) {
+                $join->on('q.id', '=', 'qa.quizzes_id')
+                    ->whereIn('q.class_id', $classIds);
             })
-            ->groupBy('users.id', 'users.name')
+            ->whereIn('cu.class_id', $classIds)
+            ->where('u.role', 'mahasiswa')
+            ->whereNotNull('qa.finished_at')
+            ->select([
+                'u.id',
+                'u.nama as name',
+                DB::raw('COALESCE(SUM(qa.total_score), 0) as total_points'),
+            ])
+            ->groupBy('u.id', 'u.nama')
             ->orderBy('total_points', 'desc')
             ->limit(5)
             ->get();
@@ -277,8 +291,8 @@ class DashboardController extends Controller
             'total_students' => User::where('role', 'mahasiswa')->count(),
             'total_teachers' => User::where('role', 'dosen')->count(),
             'total_classes' => DB::table('classes')->count(),
-            'total_materials' => Material::count(),
-            'total_quizzes' => Quiz::count(),
+            'total_materials' => MaterialModel::count(),
+            'total_quizzes' => QuizModel::count(),
         ];
 
         // User breakdown by role

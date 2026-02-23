@@ -65,7 +65,7 @@ export default function QuizCard({ quiz, onClick }) {
           type="button"
           onClick={handleButtonClick}
           variant="solid"
-          color={isDone ? "green" : "blue"}
+          color={isDone ? "green" : "yellow"}
           className="w-full"
         >
           {isDone ? "Review Kuis" : "Kerjakan Kuis"}

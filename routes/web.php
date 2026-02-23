@@ -106,12 +106,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/recommendations', [RecommendationController::class, 'myRecommendations'])->name('recommendations.me');
         Route::post('/recommendations/{recommendation}/complete', [RecommendationController::class, 'markCompleted'])->name('recommendations.complete');
 
-        // LEADERBOARD
-        Route::prefix('leaderboard')->name('mahasiswa.leaderboard.')->group(function () {
-            Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
-            Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
-            Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
-        });
+    });
+
+    // LEADERBOARD (mahasiswa + dosen)
+    Route::middleware('auth', 'role:mahasiswa,dosen')->prefix('leaderboard')->name('leaderboard.')->group(function () {
+        Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
+        Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
+        Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
     });
 
     /*
@@ -120,6 +121,14 @@ Route::middleware('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::middleware('auth','role:dosen')->group(function () {
+
+        // ===== KELOLA MATERI (dosen) =====
+        Route::get('/dosen/materi', [MaterialController::class, 'dosenIndex'])->name('dosen.materials.index');
+        Route::get('/dosen/materi/create', [MaterialController::class, 'dosenCreate'])->name('dosen.materials.create');
+        Route::get('/dosen/materi/{material}', [MaterialController::class, 'dosenShow'])->name('dosen.materials.show');
+        Route::get('/dosen/materi/{material}/edit', [MaterialController::class, 'dosenEdit'])->name('dosen.materials.edit');
+        Route::post('/dosen/materi', [MaterialController::class, 'dosenStore'])->name('dosen.materials.store');
+        Route::put('/dosen/materi/{material}', [MaterialController::class, 'dosenUpdate'])->name('dosen.materials.update');
 
         // ===== KELAS =====
         Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
@@ -164,12 +173,6 @@ Route::middleware('auth')->group(function () {
         Route::put('/quizzes/{quiz}/map/{question}', [QuizController::class, 'mapUpdate'])->name('quizzes.map.update');
         Route::delete('/quizzes/{quiz}/map/{question}', [QuizController::class, 'mapDetach'])->name('quizzes.map.detach');
 
-        // leaderboard (dosen juga lihat)
-        Route::prefix('leaderboard')->name('leaderboard.')->group(function () {
-            Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
-            Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
-            Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
-        });
     });
 
     /*

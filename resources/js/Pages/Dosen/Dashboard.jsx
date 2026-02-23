@@ -4,7 +4,7 @@ import AppLayout from '@/Layouts/AppLayout';
 import { Link } from '@inertiajs/react';
 import Icons from '@/icons';
 
-export default function DosenDashboard({ stats, classes, recentActivities, topStudents }) {
+export default function DosenDashboard({ stats = {}, classes = [], recentActivities = [], topStudents = [] }) {
   return (
     <AppLayout title="Dashboard Dosen">
       <div className="max-w-7xl">
@@ -87,7 +87,7 @@ export default function DosenDashboard({ stats, classes, recentActivities, topSt
               </Link>
 
               <Link
-                href="/materials/create"
+                href={route('dosen.materials.create')}
                 className="flex items-center gap-3 p-4 rounded-lg hover:bg-gray-50 border transition"
               >
                 <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -156,82 +156,6 @@ export default function DosenDashboard({ stats, classes, recentActivities, topSt
                   <Icons.Add className="w-4 h-4" />
                   Buat Kelas Pertama
                 </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Recent Activities & Top Students */}
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Recent Activities */}
-          <div className="bg-white rounded-lg border p-6">
-            <h2 className="text-lg font-bold mb-4">Aktivitas Terbaru</h2>
-            
-            {recentActivities && recentActivities.length > 0 ? (
-              <div className="space-y-3">
-                {recentActivities.map((activity, index) => (
-                  <div key={index} className="flex items-start gap-3 pb-3 border-b last:border-0">
-                    <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <Icons.Quiz className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{activity.student_name}</p>
-                      <p className="text-xs text-gray-600 truncate">
-                        Menyelesaikan "{activity.quiz_title}"
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-medium text-green-600">
-                          Skor: {activity.total_score}
-                        </span>
-                        <span className="text-xs text-gray-400">•</span>
-                        <span className="text-xs text-gray-500">
-                          {new Date(activity.finished_at).toLocaleDateString('id-ID')}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Belum ada aktivitas</p>
-              </div>
-            )}
-          </div>
-
-          {/* Top Students */}
-          <div className="bg-white rounded-lg border p-6">
-            <h2 className="text-lg font-bold mb-4">Top Students</h2>
-            
-            {topStudents && topStudents.length > 0 ? (
-              <div className="space-y-3">
-                {topStudents.map((student, index) => (
-                  <div key={student.id} className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm ${
-                      index === 0 ? 'bg-yellow-100 text-yellow-700' :
-                      index === 1 ? 'bg-gray-200 text-gray-700' :
-                      index === 2 ? 'bg-orange-100 text-orange-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{student.name}</p>
-                      <p className="text-sm text-gray-600">{student.total_points} poin</p>
-                    </div>
-                    {index < 3 && (
-                      <Icons.Star className={`w-5 h-5 ${
-                        index === 0 ? 'text-yellow-500' :
-                        index === 1 ? 'text-gray-400' :
-                        'text-orange-500'
-                      }`} />
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Belum ada data</p>
               </div>
             )}
           </div>
