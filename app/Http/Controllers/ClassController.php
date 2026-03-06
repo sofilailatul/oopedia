@@ -13,6 +13,21 @@ use Illuminate\Support\Str;
 
 class ClassController extends Controller
 {
+    // DOSEN: Inertia page for managing classes
+    public function dosenIndexPage(Request $request)
+    {
+        $user = $request->user();
+
+        $classes = ClassModel::withCount('users')
+            ->latest()
+            ->get(['id', 'class_name', 'class_code', 'description', 'created_at']);
+
+        return Inertia::render('Dosen/Classes/Index', [
+            'classes' => $classes,
+            'authUser' => $user,
+        ]);
+    }
+
     // DOSEN: list classes
     public function index()
     {
@@ -29,13 +44,12 @@ class ClassController extends Controller
     {
         $data = $request->validate([
             'class_name' => ['required','string','max:255'],
+            'class_code' => ['required','string','max:10','unique:classes,class_code'],
             'description' => ['nullable','string'],
         ]);
 
-        // bikin kode unik (6-8 chars)
-        do {
-            $code = strtoupper(Str::random(6));
-        } while (ClassModel::where('class_code', $code)->exists());
+        // normalisasi kode ke huruf besar
+        $code = strtoupper(trim($data['class_code']));
 
         $class = ClassModel::create([
             'class_name' => $data['class_name'],

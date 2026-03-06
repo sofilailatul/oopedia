@@ -131,6 +131,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/dosen/materi/{material}', [MaterialController::class, 'dosenUpdate'])->name('dosen.materials.update');
 
         // ===== KELAS =====
+        Route::get('/dosen/kelas', [ClassController::class, 'dosenIndexPage'])->name('dosen.classes.index');
         Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
         Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
         Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');

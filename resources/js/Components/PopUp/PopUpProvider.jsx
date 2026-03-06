@@ -90,16 +90,21 @@ function PopupModal({ modal, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-black/40 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6 bg-slate-900/30"
       onMouseDown={onBackdrop}
     >
-      <div className={`w-full ${sizeClass} rounded-2xl bg-white shadow-xl border border-slate-200`}>
-        <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-start justify-between">
-          <div className="text-slate-900 font-bold">{modal.title}</div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700">✕</button>
+      <div className={`w-full ${sizeClass} rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.18)] border border-slate-200/80 overflow-hidden`}>
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+          <div className="text-sm font-semibold text-slate-900 truncate">{modal.title}</div>
+          <button
+            onClick={onClose}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-white transition"
+          >
+            ✕
+          </button>
         </div>
 
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 bg-white">
           {modal.type === "custom" ? (
             modal.content
           ) : (
@@ -107,23 +112,25 @@ function PopupModal({ modal, onClose }) {
           )}
         </div>
 
-        <div className="px-6 pb-5 flex items-center justify-end gap-2">
-          {modal.type === "confirm" && (
-            <button
-              onClick={modal.onCancel}
-              className="px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-            >
-              {modal.cancelText}
-            </button>
-          )}
+        {modal.type !== "custom" && (
+          <div className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70">
+            {modal.type === "confirm" && (
+              <button
+                onClick={modal.onCancel}
+                className="px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm hover:bg-slate-50 hover:border-slate-300 transition"
+              >
+                {modal.cancelText}
+              </button>
+            )}
 
-          <button
-            onClick={modal.type === "confirm" ? modal.onConfirm : (modal.onConfirm ?? onClose)}
-            className="px-4 py-2 rounded-xl bg-slate-900 text-white hover:bg-slate-800"
-          >
-            {modal.confirmText ?? "OK"}
-          </button>
-        </div>
+            <button
+              onClick={modal.type === "confirm" ? modal.onConfirm : (modal.onConfirm ?? onClose)}
+              className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm hover:bg-slate-800 shadow-sm transition"
+            >
+              {modal.confirmText ?? "OK"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
