@@ -127,6 +127,8 @@ Route::middleware('auth')->group(function () {
             ->name('dosen.practices.index');
         Route::get('/dosen/latihan-soal/{practice}/show', [PracticeController::class, 'dosenShowPage'])
             ->name('dosen.practices.show');
+        Route::get('/dosen/latihan-soal/{practice}/create', [PracticeController::class, 'dosenCreatePage'])
+            ->name('dosen.practices.create');
         Route::get('/dosen/latihan-soal/{practice}', [PracticeController::class, 'dosenEditPage'])
             ->name('dosen.practices.edit');
         Route::post('/dosen/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])

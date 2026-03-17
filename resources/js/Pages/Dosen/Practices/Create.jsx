@@ -3,13 +3,18 @@ import AppLayout from "@/Layouts/AppLayout";
 import { router } from "@inertiajs/react";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 import { QUESTION_TYPE } from "@/Features/practice/constants";
-import { difficultyLabel } from "@/Features/practice/labels";
+import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
 
-function createEmptyQuestion() {
+function logCreateAction(action, detail = {}) {
+	console.log("[Latsol Create]", { action, ...detail });
+}
+
+function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
 		id: null,
 		question_text: "",
@@ -18,7 +23,7 @@ function createEmptyQuestion() {
 		feedbackIncorrect: "",
 		outputCode: "",
 		imageUrl: null,
-		type: QUESTION_TYPE.MC,
+		type,
 		options: [
 			{ id: null, text: "", is_correct: true },
 			{ id: null, text: "", is_correct: false },
@@ -58,17 +63,122 @@ function normalizeInitialQuestions(initial = []) {
 }
 
 export default function DosenPracticeCreate({ practice, teacher, questions: initialQuestions = [] }) {
+	const backHandlerRef = React.useRef(null);
+
+	const registerBackHandler = React.useCallback((handler) => {
+		backHandlerRef.current = handler;
+	}, []);
+
+	return (
+		<AppLayout
+			title="Buat Latihan Soal"
+			label="Buat Latihan Soal"
+			backHref={route("dosen.practices.index")}
+			backLabel="Kembali ke Halaman Daftar"
+			onBackClick={(e) => {
+				e?.preventDefault?.();
+				backHandlerRef.current?.();
+			}}
+		>
+			<CreatePracticeContent
+				practice={practice}
+				teacher={teacher}
+				initialQuestions={initialQuestions}
+				registerBackHandler={registerBackHandler}
+			/>
+		</AppLayout>
+	);
+}
+
+function CreatePracticeContent({
+	practice,
+	teacher,
+	initialQuestions = [],
+	registerBackHandler,
+}) {
 	const [questions, setQuestions] = React.useState(() =>
 		normalizeInitialQuestions(initialQuestions),
 	);
+	const [selectedType, setSelectedType] = React.useState(QUESTION_TYPE.MC);
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
+	const popup = usePopup();
+	const filteredQuestions = React.useMemo(() => {
+		if (!selectedType) return questions;
+		return questions.filter((q) => (q.type || QUESTION_TYPE.MC) === selectedType);
+	}, [questions, selectedType]);
+
+	const getQuestionIndexByLocalId = React.useCallback(
+		(localId) => questions.findIndex((q) => q._localId === localId),
+		[questions],
+	);
+
+	const hasAnyInput = React.useMemo(() => {
+		if ((questions ?? []).length > 1) return true;
+
+		return (questions ?? []).some((q) => {
+			const questionText = String(q.question_text ?? "").trim();
+			const outputCode = String(q.outputCode ?? "").trim();
+			const feedbackIncorrect = String(q.feedbackIncorrect ?? "").trim();
+			const feedbackCorrect = String(q.feedbackCorrect ?? "").trim();
+			const hasNonDefaultCorrectFeedback =
+				feedbackCorrect.length > 0 && feedbackCorrect !== "Jawaban kamu benar.";
+			const optionHasText = (q.options ?? []).some(
+				(opt) => String(opt.text ?? "").trim().length > 0,
+			);
+			const hasImage = !!q.imageFile || !!q.imageUrl;
+			const isNonDefaultType = (q.type ?? QUESTION_TYPE.MC) !== QUESTION_TYPE.MC;
+			const isNonDefaultPoints = Number(q.points ?? 10) !== 10;
+
+			return (
+				questionText.length > 0 ||
+				outputCode.length > 0 ||
+				feedbackIncorrect.length > 0 ||
+				hasNonDefaultCorrectFeedback ||
+				optionHasText ||
+				hasImage ||
+				isNonDefaultType ||
+				isNonDefaultPoints
+			);
+		});
+	}, [questions]);
+
+	const handleBackToIndex = React.useCallback(() => {
+		if (submitting) return;
+
+		if (!hasAnyInput) {
+			popup.confirm({
+				title: "Form belum diisi",
+				message:
+					"Anda belum mengisi apa pun pada latihan soal ini. Tetap kembali ke halaman daftar?",
+				confirmText: "Ya, kembali",
+				cancelText: "Lanjut isi",
+				onConfirm: () => router.visit(route("dosen.practices.index")),
+			});
+			return;
+		}
+
+		router.visit(route("dosen.practices.index"));
+	}, [hasAnyInput, popup, submitting]);
+
+	React.useEffect(() => {
+		registerBackHandler?.(handleBackToIndex);
+
+		return () => {
+			registerBackHandler?.(null);
+		};
+	}, [handleBackToIndex, registerBackHandler]);
 
 	const handleAddQuestion = () => {
-		setQuestions((prev) => [...prev, createEmptyQuestion()]);
+		logCreateAction("add_question", { currentCount: questions.length });
+		setQuestions((prev) => [...prev, createEmptyQuestion(selectedType)]);
 	};
 
 	const handleRemoveQuestion = (idx) => {
+		logCreateAction("remove_question", {
+			questionIndex: idx,
+			currentCount: questions.length,
+		});
 		setQuestions((prev) => {
 			if (prev.length === 1) return prev;
 			return prev.filter((_, i) => i !== idx);
@@ -134,6 +244,11 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 	const handleSubmit = (e) => {
 		e?.preventDefault();
 
+		logCreateAction("submit_create_questions", {
+			questionCount: questions.length,
+			practiceId: practice?.id,
+		});
+
 		setSubmitting(true);
 		setError("");
 
@@ -167,10 +282,25 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 			forceFormData: true,
 			onSuccess: () => {
 				setSubmitting(false);
+				console.log("[Latsol Create]", {
+					action: "submit_result",
+					success: true,
+					reason: "save_success",
+					questionCount: questions.length,
+					practiceId: practice?.id,
+				});
 			},
 			onError: (errors) => {
 				setSubmitting(false);
 				setError(errors?.questions ?? "Gagal menyimpan pertanyaan.");
+				console.error("[Latsol Create]", {
+					action: "submit_result",
+					success: false,
+					reason: "save_failed",
+					errors,
+					questionCount: questions.length,
+					practiceId: practice?.id,
+				});
 			},
 		});
 	};
@@ -190,23 +320,33 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 	};
 
 	return (
-		<AppLayout
-			title="Buat Latihan Soal"
-			label="Buat Latihan Soal"
-			backHref={route("dosen.practices.index")}
-			backLabel="Kembali ke Halaman Daftar"
-		>
-			<div className="max-w-5xl mx-auto space-y-6">
+		<div className="max-w-5xl mx-auto space-y-6">
 				<header className="space-y-4">
 					<PracticeMetaPanel
 						teacherName={teacher?.name ?? "Dosen"}
 						materialName={practice?.material?.name ?? "Pilih Materi"}
 						levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
-						typeLabel="Multiple Choice"
+						enableTypeSelect
+						selectedType={selectedType}
+						onTypeChange={setSelectedType}
+						typeOptions={[
+							{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
+							{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
+						]}
 					/>
 				</header>
 
-				{questions.map((q, idx) => (
+				{filteredQuestions.length === 0 && (
+					<div className="p-8 text-center text-sm text-slate-500">
+						Belum ada soal dengan tipe {questionTypeLabel(selectedType)}.
+					</div>
+				)}
+
+				{filteredQuestions.map((q, visibleIdx) => {
+					const idx = getQuestionIndexByLocalId(q._localId);
+					if (idx < 0) return null;
+
+					return (
 					<Card
 						key={q._localId}
 						className="border border-slate-200 bg-white/90 shadow-sm rounded-2xl backdrop-blur"
@@ -214,7 +354,7 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 						<div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
 							<div className="flex items-center gap-3">
 								<span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-[11px] font-semibold text-white">
-									{idx + 1}
+									{visibleIdx + 1}
 								</span>
 								<div>
 									<p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -270,7 +410,8 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 							/>
 						)}
 					</Card>
-				))}
+					);
+				})}
 
 				<div className="flex items-center justify-between pt-2">
 					<Button
@@ -298,7 +439,6 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 					<p className="text-[11px] text-red-500 pt-1">{error}</p>
 				)}
 			</div>
-		</AppLayout>
 	);
 }
 

@@ -7,6 +7,7 @@ use App\Models\PracticeAttemptModel;
 use App\Models\PracticeModel;
 use App\Models\PracticeQuestionModel;
 use App\Models\PracticeOptionModel;
+use App\Models\PracticeItemModel;
 use App\Models\UserPracticeAnswerModel;
 use App\Models\MaterialModel;
 use Illuminate\Http\Request;
@@ -90,18 +91,18 @@ class PracticeController extends Controller
             'difficulty_level' => $data['difficulty_level'],
         ]);
 
-        return redirect()->route('dosen.practices.edit', $practice->id)
+        return redirect()->route('dosen.practices.create', $practice->id)
             ->with('success', 'Latihan soal berhasil dibuat.');
     }
 
     /**
-     * Show question editor page for a specific practice (dosen).
+     * Show question create page for a specific practice (dosen).
      */
-    public function dosenEditPage(PracticeModel $practice)
+    public function dosenCreatePage(PracticeModel $practice)
     {
         $user = auth()->user();
 
-        $practice->load(['material:id,material_name,created_by', 'questions.options']);
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
 
         abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
 
@@ -118,13 +119,79 @@ class PracticeController extends Controller
                     'feedback_correct' => $q->feedback_correct,
                     'feedback_incorrect' => $q->feedback_incorrect,
                     'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
-                    'options' => $q->options->map(function (PracticeOptionModel $opt) {
-                        return [
-                            'id' => $opt->id,
-                            'text' => $opt->option_text,
-                            'is_correct' => (bool) $opt->is_correct,
-                        ];
-                    })->values(),
+                    'options' => (($q->options->count() > 0)
+                        ? $q->options->map(function (PracticeOptionModel $opt) {
+                            return [
+                                'id' => $opt->id,
+                                'text' => $opt->option_text,
+                                'is_correct' => (bool) $opt->is_correct,
+                            ];
+                        })
+                        : $q->items->map(function (PracticeItemModel $item) {
+                            return [
+                                'id' => $item->id,
+                                'text' => $item->item_text,
+                                'is_correct' => false,
+                            ];
+                        }))->values(),
+                ];
+            });
+
+        return Inertia::render('Dosen/Practices/Create', [
+            'practice' => [
+                'id' => $practice->id,
+                'difficulty_level' => $practice->difficulty_level,
+                'material' => [
+                    'id' => $practice->material->id,
+                    'name' => $practice->material->material_name,
+                ],
+            ],
+            'teacher' => [
+                'name' => $user->nama ?? $user->name ?? 'Dosen',
+            ],
+            'questions' => $questions,
+        ]);
+    }
+
+    /**
+     * Show question editor page for a specific practice (dosen).
+     */
+    public function dosenEditPage(PracticeModel $practice)
+    {
+        $user = auth()->user();
+
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
+
+        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+
+        $questions = $practice->questions
+            ->sortBy('id')
+            ->values()
+            ->map(function (PracticeQuestionModel $q) {
+                return [
+                    'id' => $q->id,
+                    'question_text' => $q->question_text,
+                    'type' => $q->type ?? 'multiple_choice',
+                    'points' => (int) ($q->points ?? 10),
+                    'output_code' => $q->output_code,
+                    'feedback_correct' => $q->feedback_correct,
+                    'feedback_incorrect' => $q->feedback_incorrect,
+                    'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
+                    'options' => (($q->options->count() > 0)
+                        ? $q->options->map(function (PracticeOptionModel $opt) {
+                            return [
+                                'id' => $opt->id,
+                                'text' => $opt->option_text,
+                                'is_correct' => (bool) $opt->is_correct,
+                            ];
+                        })
+                        : $q->items->map(function (PracticeItemModel $item) {
+                            return [
+                                'id' => $item->id,
+                                'text' => $item->item_text,
+                                'is_correct' => false,
+                            ];
+                        }))->values(),
                 ];
             });
 
@@ -151,7 +218,7 @@ class PracticeController extends Controller
     {
         $user = auth()->user();
 
-        $practice->load(['material:id,material_name,created_by', 'questions.options']);
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
 
         abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
 
@@ -168,13 +235,21 @@ class PracticeController extends Controller
                     'feedback_correct' => $q->feedback_correct,
                     'feedback_incorrect' => $q->feedback_incorrect,
                     'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
-                    'options' => $q->options->map(function (PracticeOptionModel $opt) {
-                        return [
-                            'id' => $opt->id,
-                            'text' => $opt->option_text,
-                            'is_correct' => (bool) $opt->is_correct,
-                        ];
-                    })->values(),
+                    'options' => (($q->options->count() > 0)
+                        ? $q->options->map(function (PracticeOptionModel $opt) {
+                            return [
+                                'id' => $opt->id,
+                                'text' => $opt->option_text,
+                                'is_correct' => (bool) $opt->is_correct,
+                            ];
+                        })
+                        : $q->items->map(function (PracticeItemModel $item) {
+                            return [
+                                'id' => $item->id,
+                                'text' => $item->item_text,
+                                'is_correct' => false,
+                            ];
+                        }))->values(),
                 ];
             });
 
@@ -471,12 +546,24 @@ class PracticeController extends Controller
 
                 // Replace options
                 $question->options()->delete();
+                $question->items()->delete();
+
                 foreach ($qData['options'] as $optData) {
                     PracticeOptionModel::create([
                         'practice_questions_id' => $question->id,
                         'option_text' => $optData['text'],
                         'is_correct' => $optData['is_correct'] ? 1 : 0,
                     ]);
+                }
+
+                if (($qData['type'] ?? 'multiple_choice') === 'drag_drop') {
+                    foreach ($qData['options'] as $itemIndex => $optData) {
+                        PracticeItemModel::create([
+                            'practice_questions_id' => $question->id,
+                            'item_text' => $optData['text'],
+                            'order_number' => $itemIndex + 1,
+                        ]);
+                    }
                 }
             }
 
