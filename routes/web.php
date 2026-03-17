@@ -122,6 +122,16 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('auth','role:dosen')->group(function () {
 
+        // ===== PRACTICE (dosen) =====
+        Route::get('/dosen/latihan-soal', [PracticeController::class, 'dosenIndexPage'])
+            ->name('dosen.practices.index');
+        Route::get('/dosen/latihan-soal/{practice}/show', [PracticeController::class, 'dosenShowPage'])
+            ->name('dosen.practices.show');
+        Route::get('/dosen/latihan-soal/{practice}', [PracticeController::class, 'dosenEditPage'])
+            ->name('dosen.practices.edit');
+        Route::post('/dosen/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])
+            ->name('dosen.practices.questions.save');
+
         // ===== KELOLA MATERI (dosen) =====
         Route::get('/dosen/materi', [MaterialController::class, 'dosenIndex'])->name('dosen.materials.index');
         Route::get('/dosen/materi/create', [MaterialController::class, 'dosenCreate'])->name('dosen.materials.create');

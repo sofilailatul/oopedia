@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { usePage } from "@inertiajs/react";
-import { usePopup } from "@/Components/Popup/PopupProvider";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 export default function InertiaErrorPopup() {
   const { errors } = usePage().props;
@@ -10,7 +10,7 @@ export default function InertiaErrorPopup() {
   const lastMsgRef = useRef(null);
 
   useEffect(() => {
-    const msg = errors?.quiz; // ✅ dari props kamu: errors.quiz
+    const msg = errors?.quiz; 
     if (!msg) return;
 
     // kalau msg sama, jangan munculin lagi

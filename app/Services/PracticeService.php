@@ -35,6 +35,38 @@ class PracticeService
         return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $anyAttempts);
     }
 
+    /**
+     * Get all practices (per level) for materials created by a specific lecturer (dosen).
+     */
+    public function getPracticesForLecturer($lecturerId)
+    {
+        $questionCounts = $this->getQuestionCounts();
+
+        $practiceRows = PracticeModel::query()
+            ->join('materials', 'materials.id', '=', 'practices.material_id')
+            ->where('materials.created_by', $lecturerId)
+            ->select('practices.*', 'materials.material_name')
+            ->orderBy('materials.material_name')
+            ->orderBy('practices.difficulty_level')
+            ->get();
+
+        return $practiceRows->map(function ($row) use ($questionCounts) {
+            // $questionCounts berisi Collection: practice_id => Collection(type => total)
+            $counts = $questionCounts->get($row->id, collect());
+            $totalQuestions = $counts instanceof \Illuminate\Support\Collection
+                ? (int) $counts->sum()
+                : 0;
+
+            return [
+                'id' => $row->id,
+                'material_id' => $row->material_id,
+                'material_name' => $row->material_name,
+                'difficulty_level' => $row->difficulty_level,
+                'total_questions' => $totalQuestions,
+            ];
+        });
+    }
+
     private function getLatestScores($userId)
     {
         $attemptTable = (new PracticeAttemptModel())->getTable();

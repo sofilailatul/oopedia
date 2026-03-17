@@ -8,7 +8,7 @@ export default function Card({
 }) {
     return (
         <div
-            className={`bg-white rounded-lg border border-[#9fc4ff] p-6 flex flex-col justify-between ${className}`}
+            className={`bg-white rounded-lg border border-[#9fc4ff] p-4 flex flex-col justify-between ${className}`}
         >
             {(title || Icon) && (
                 <div className="flex gap-3 mb-4">

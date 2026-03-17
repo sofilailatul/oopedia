@@ -1,7 +1,6 @@
 import React from "react";
 import AppLayout from "@/Layouts/AppLayout";
-import Button from "@/Components/Button";
-import { router } from "@inertiajs/react";
+import BackToListHeader from "@/Components/Shared/BackToListHeader";
 import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
 
 export default function Summary({ practice, attempt, answers, cfg }) {
@@ -13,7 +12,9 @@ export default function Summary({ practice, attempt, answers, cfg }) {
 
   return (
     <AppLayout title="Hasil Latihan Soal" label="Hasil Latihan Soal">
-      <div className="mx-auto">
+      <div className="mx-auto space-y-4">
+        <BackToListHeader href={route("practices.index")} label="Kembali ke daftar latihan soal" />
+
         <div className="bg-white rounded-2xl border shadow-sm p-6">
           <h1 className="text-xl font-bold">Hasil Latihan Soal</h1>
           <div className="mt-4 space-y-3">
@@ -42,17 +43,6 @@ export default function Summary({ practice, attempt, answers, cfg }) {
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="mt-6">
-            <Button
-              type="button"
-              variant="outline"
-              color="blue"
-              onClick={() => router.visit(route("practices.index"))}
-            >
-              Kembali ke daftar latihan soal
-            </Button>
           </div>
         </div>
       </div>

@@ -1,16 +1,12 @@
-import { Link } from '@inertiajs/react';
 import AppLayout from '@/Layouts/AppLayout';
 import ContentCard from '@/Components/ContentCard';
+import BackToListHeader from '@/Components/Shared/BackToListHeader';
 
 export default function DosenMaterialShow({ material }) {
   return (
     <AppLayout title={`Lihat Materi ${material.material_name}`} label="Kelola Materi">
       <div className="mx-auto space-y-4">
-        <Link
-          href="/dosen/materi"
-          className="text-sm text-gray-600 hover:text-gray-900"
-        > ← Kembali ke Daftar Materi
-        </Link>
+        <BackToListHeader href="/dosen/materi" label="Kembali ke Daftar Materi" />
 
         {/* Header */}
         <ContentCard className="border-[#9fc4ff]" title={null}>

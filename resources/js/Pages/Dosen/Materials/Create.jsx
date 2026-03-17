@@ -1,9 +1,9 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Link } from '@inertiajs/react';
 import Button from '@/Components/Button';
 import { usePopup } from '@/Components/PopUp/PopUpProvider';
 import { useDosenMaterialCreate } from '@/Features/materials/useDosenMaterialCreate';
 import UploadImage from '@/Components/UploadImage';
+import BackToListHeader from '@/Components/Shared/BackToListHeader';
 
 export default function CreateMaterial(props) {
 	return (
@@ -32,13 +32,7 @@ function CreateMaterialContent({ authUser }) {
 			<div className="flex-1 space-y-4">
 				{/* Back link */}
 				<div className="mb-2">
-					<Link
-						href="/dosen/materi"
-						className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
-					>
-						<span className="mr-1">&#8592;</span>
-						Kembali ke Daftar
-					</Link>
+					<BackToListHeader href="/dosen/materi" label="Kembali ke Daftar" />
 				</div>
 
 				{/* Main card: title + description */}

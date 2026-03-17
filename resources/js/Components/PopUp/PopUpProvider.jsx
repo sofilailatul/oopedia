@@ -1,28 +1,58 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import Modal from "@/Components/Modal";
+import StatusModal from "@/Components/StatusModal";
 
 const PopupContext = createContext(null);
 
 export function PopupProvider({ children }) {
   const [modal, setModal] = useState(null);
-  // modal shape:
-  // { type: "alert"|"confirm"|"custom", title, message, confirmText, cancelText, onConfirm, onCancel, content, size }
 
-  const close = useCallback(() => setModal(null), []);
+  const logModalEvent = useCallback((activeModal, result = {}) => {
+    if (!activeModal) return;
+
+    const payload = {
+      event: "modal_closed",
+      modalType: activeModal.type,
+      statusType: activeModal.statusType ?? null,
+      title: activeModal.title ?? "",
+      success: !!result.success,
+      reason: result.reason ?? "unknown",
+    };
+  }, []);
+
+  const close = useCallback((result = {}) => {
+    setModal((activeModal) => {
+      if (activeModal) {
+        logModalEvent(activeModal, result);
+      }
+      return null;
+    });
+  }, [logModalEvent]);
+
+  const resolveAlertType = useCallback((opts) => {
+    const title = String(opts?.title ?? "").toLowerCase();
+    const message = String(opts?.message ?? "").toLowerCase();
+
+    if (opts?.type === "error" || opts?.tone === "danger") return "error";
+    if (title.includes("gagal") || title.includes("error")) return "error";
+    if (message.includes("gagal") || message.includes("error")) return "error";
+    return "success";
+  }, []);
 
   const alert = useCallback((opts) => {
     const o = typeof opts === "string" ? { message: opts } : (opts ?? {});
+    const statusType = resolveAlertType(o);
+
     setModal({
       type: "alert",
+      statusType,
       title: o.title ?? "Info",
       message: o.message ?? "",
       confirmText: o.confirmText ?? "OK",
-      onConfirm: () => {
-        o.onClose?.();
-        close();
-      },
+      onConfirm: o.onClose,
       size: o.size ?? "sm",
     });
-  }, [close]);
+  }, [resolveAlertType]);
 
   const confirm = useCallback((opts) => {
     const o = opts ?? {};
@@ -32,17 +62,11 @@ export function PopupProvider({ children }) {
       message: o.message ?? "",
       confirmText: o.confirmText ?? "Ya",
       cancelText: o.cancelText ?? "Batal",
-      onConfirm: () => {
-        o.onConfirm?.();
-        close();
-      },
-      onCancel: () => {
-        o.onCancel?.();
-        close();
-      },
+      onConfirm: o.onConfirm,
+      onCancel: o.onCancel,
       size: o.size ?? "sm",
     });
-  }, [close]);
+  }, []);
 
   const open = useCallback((opts) => {
     const o = opts ?? {};
@@ -51,12 +75,9 @@ export function PopupProvider({ children }) {
       title: o.title ?? "",
       content: o.content ?? null,
       size: o.size ?? "md",
-      onCancel: () => {
-        o.onClose?.();
-        close();
-      },
+      onCancel: o.onClose,
     });
-  }, [close]);
+  }, []);
 
   const value = useMemo(() => ({ alert, confirm, open, close }), [alert, confirm, open, close]);
 
@@ -77,61 +98,94 @@ export function usePopup() {
 function PopupModal({ modal, onClose }) {
   if (!modal) return null;
 
-  const sizeClass =
-    modal.size === "sm"
-      ? "max-w-md"
-      : modal.size === "lg"
-      ? "max-w-3xl"
-      : "max-w-xl";
+  const onDismiss = () => {
+    onClose({ success: false, reason: "dismiss" });
+  };
 
-  const onBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
+  if (modal.type === "alert" || modal.type === "confirm") {
+    const handleConfirm = () => {
+      modal.onConfirm?.();
+
+      const success =
+        modal.type === "confirm"
+          ? true
+          : (modal.statusType ?? "success") !== "error";
+
+      onClose({ success, reason: "confirm_button" });
+    };
+
+    const handleCancel = () => {
+      modal.onCancel?.();
+      onClose({ success: false, reason: "cancel_button" });
+    };
+
+    return (
+      <StatusModal
+        show={!!modal}
+        type={modal.type === "confirm" ? "confirm" : (modal.statusType ?? "success")}
+        title={modal.title}
+        message={modal.message}
+        confirmText={modal.confirmText}
+        cancelText={modal.cancelText}
+        onClose={onDismiss}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    );
+  }
+
+  const maxWidth =
+    modal.size === "sm"
+      ? "md"
+      : modal.size === "lg"
+      ? "2xl"
+      : "xl";
+
+  const closeCustomFromButton = () => {
+    modal.onCancel?.();
+    onClose({ success: true, reason: "close_button" });
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center px-4 py-6 bg-slate-900/30"
-      onMouseDown={onBackdrop}
-    >
-      <div className={`w-full ${sizeClass} rounded-3xl bg-white shadow-[0_18px_55px_rgba(15,23,42,0.18)] border border-slate-200/80 overflow-hidden`}>
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div className="text-sm font-semibold text-slate-900 truncate">{modal.title}</div>
+    <Modal show={!!modal} maxWidth={maxWidth} onClose={onDismiss}>
+      <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_55px_rgba(15,23,42,0.18)]">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/70 px-6 py-4">
+          <div className="truncate text-sm font-semibold text-slate-900">{modal.title}</div>
           <button
-            onClick={onClose}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:text-slate-700 hover:bg-white transition"
+            type="button"
+            onClick={closeCustomFromButton}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
           >
-            ✕
+            X
           </button>
         </div>
 
-        <div className="px-6 py-5 bg-white">
-          {modal.type === "custom" ? (
-            modal.content
-          ) : (
-            <p className="text-sm text-slate-700 whitespace-pre-line">{modal.message}</p>
-          )}
+        <div className="bg-white px-6 py-5">
+          {modal.type === "custom" ? modal.content : <p className="whitespace-pre-line text-sm text-slate-700">{modal.message}</p>}
         </div>
 
         {modal.type !== "custom" && (
-          <div className="px-6 py-4 flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70">
+          <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 px-6 py-4">
             {modal.type === "confirm" && (
               <button
+                type="button"
                 onClick={modal.onCancel}
-                className="px-4 py-2 rounded-full border border-slate-200 bg-white text-slate-700 text-sm hover:bg-slate-50 hover:border-slate-300 transition"
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
               >
                 {modal.cancelText}
               </button>
             )}
 
             <button
+              type="button"
               onClick={modal.type === "confirm" ? modal.onConfirm : (modal.onConfirm ?? onClose)}
-              className="px-4 py-2 rounded-full bg-slate-900 text-white text-sm hover:bg-slate-800 shadow-sm transition"
+              className="rounded-full bg-slate-900 px-4 py-2 text-sm text-white shadow-sm transition hover:bg-slate-800"
             >
               {modal.confirmText ?? "OK"}
             </button>
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

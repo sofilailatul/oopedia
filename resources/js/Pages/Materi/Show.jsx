@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, router } from "@inertiajs/react";
+import { router } from "@inertiajs/react";
 import AppLayout from "@/Layouts/AppLayout";
 import ContentCard from "@/Components/ContentCard";
 import axios from "axios";
 import Button from "@/Components/Button";
+import BackToListHeader from "@/Components/Shared/BackToListHeader";
 
 export default function Show({ material }) {
     const [hasReachedBottom, setHasReachedBottom] = useState(false);
@@ -131,12 +132,7 @@ export default function Show({ material }) {
     return (
         <AppLayout title="Materi" label={`Materi | ${material.material_name}`}>
             <div className="mx-auto space-y-4">
-                <Link
-                    href="/materi"
-                    className="text-sm text-gray-600 hover:text-gray-900"
-                >
-                    ← Kembali ke Daftar Materi
-                </Link>
+                <BackToListHeader href="/materi" label="Kembali ke Daftar Materi" />
 
                 {/* Header */}
                 <ContentCard className="border-[#9fc4ff]" title={null}>

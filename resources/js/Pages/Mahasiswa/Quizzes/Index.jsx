@@ -2,6 +2,7 @@
 import React from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import { router } from "@inertiajs/react";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 import { useQuizIndex } from "@/Features/quiz/useQuizIndex";
 import QuizCard from "@/Components/Quiz/quizCard";
@@ -10,10 +11,15 @@ import QuizSidebar from "@/Components/Quiz/quizSidebar";
 export default function Index({ quizzes = [] }) {
   const vm = useQuizIndex({ quizzes });
   const { state, view, actions } = vm;
+  const popup = usePopup();
 
   const onStart = (quiz) => {
     if (quiz.end_at && new Date(quiz.end_at) < new Date()) {
-      alert("Batas Pengerjaan sudah Habis, Hubungi Dosen yang bersangkutan");
+      popup.alert({
+        title: "Waktu Habis",
+        message: "Batas pengerjaan sudah habis. Hubungi dosen yang bersangkutan.",
+        confirmText: "Tutup",
+      });
       return;
     }
     router.post(route("quizzes.attempts.start", quiz.id));

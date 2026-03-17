@@ -6,10 +6,14 @@ use App\Services\PracticeService;
 use App\Models\PracticeAttemptModel;
 use App\Models\PracticeModel;
 use App\Models\PracticeQuestionModel;
+use App\Models\PracticeOptionModel;
 use App\Models\UserPracticeAnswerModel;
+use App\Models\MaterialModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PracticeController extends Controller
@@ -31,6 +35,162 @@ class PracticeController extends Controller
 
         return Inertia::render('Practices/Index', [
             'practices' => $practices,
+        ]);
+    }
+
+    /**
+     * Display practices page for lecturers (dosen)
+     */
+    public function dosenIndexPage()
+    {
+        $userId = auth()->id();
+        $practices = $this->practiceService->getPracticesForLecturer($userId);
+
+        $materials = MaterialModel::query()
+            ->where('created_by', $userId)
+            ->orderBy('material_name')
+            ->get(['id', 'material_name']);
+
+        return Inertia::render('Dosen/Practices/Index', [
+            'practices' => $practices,
+            'materials' => $materials,
+        ]);
+    }
+
+    /**
+     * Store a new practice (per material & difficulty) for lecturer.
+     */
+    public function store(Request $request)
+    {
+        $userId = auth()->id();
+
+        $data = $request->validate([
+            'material_id' => ['required', 'integer', 'exists:materials,id'],
+            'difficulty_level' => ['required', 'in:easy,normal,hard'],
+        ]);
+
+        $material = MaterialModel::query()
+            ->where('id', $data['material_id'])
+            ->where('created_by', $userId)
+            ->firstOrFail();
+
+        $exists = PracticeModel::query()
+            ->where('material_id', $material->id)
+            ->where('difficulty_level', $data['difficulty_level'])
+            ->exists();
+
+        if ($exists) {
+            return back()->withErrors([
+                'difficulty_level' => 'Latihan untuk level ini pada materi tersebut sudah ada.',
+            ]);
+        }
+
+        $practice = PracticeModel::create([
+            'material_id' => $material->id,
+            'difficulty_level' => $data['difficulty_level'],
+        ]);
+
+        return redirect()->route('dosen.practices.edit', $practice->id)
+            ->with('success', 'Latihan soal berhasil dibuat.');
+    }
+
+    /**
+     * Show question editor page for a specific practice (dosen).
+     */
+    public function dosenEditPage(PracticeModel $practice)
+    {
+        $user = auth()->user();
+
+        $practice->load(['material:id,material_name,created_by', 'questions.options']);
+
+        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+
+        $questions = $practice->questions
+            ->sortBy('id')
+            ->values()
+            ->map(function (PracticeQuestionModel $q) {
+                return [
+                    'id' => $q->id,
+                    'question_text' => $q->question_text,
+                    'type' => $q->type ?? 'multiple_choice',
+                    'points' => (int) ($q->points ?? 10),
+                    'output_code' => $q->output_code,
+                    'feedback_correct' => $q->feedback_correct,
+                    'feedback_incorrect' => $q->feedback_incorrect,
+                    'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
+                    'options' => $q->options->map(function (PracticeOptionModel $opt) {
+                        return [
+                            'id' => $opt->id,
+                            'text' => $opt->option_text,
+                            'is_correct' => (bool) $opt->is_correct,
+                        ];
+                    })->values(),
+                ];
+            });
+
+        return Inertia::render('Dosen/Practices/Edit', [
+            'practice' => [
+                'id' => $practice->id,
+                'difficulty_level' => $practice->difficulty_level,
+                'material' => [
+                    'id' => $practice->material->id,
+                    'name' => $practice->material->material_name,
+                ],
+            ],
+            'teacher' => [
+                'name' => $user->nama ?? $user->name ?? 'Dosen',
+            ],
+            'questions' => $questions,
+        ]);
+    }
+
+    /**
+     * Show read-only detail page for a specific practice (dosen).
+     */
+    public function dosenShowPage(PracticeModel $practice)
+    {
+        $user = auth()->user();
+
+        $practice->load(['material:id,material_name,created_by', 'questions.options']);
+
+        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+
+        $questions = $practice->questions
+            ->sortBy('id')
+            ->values()
+            ->map(function (PracticeQuestionModel $q) {
+                return [
+                    'id' => $q->id,
+                    'question_text' => $q->question_text,
+                    'type' => $q->type ?? 'multiple_choice',
+                    'points' => (int) ($q->points ?? 10),
+                    'output_code' => $q->output_code,
+                    'feedback_correct' => $q->feedback_correct,
+                    'feedback_incorrect' => $q->feedback_incorrect,
+                    'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
+                    'options' => $q->options->map(function (PracticeOptionModel $opt) {
+                        return [
+                            'id' => $opt->id,
+                            'text' => $opt->option_text,
+                            'is_correct' => (bool) $opt->is_correct,
+                        ];
+                    })->values(),
+                ];
+            });
+
+        return Inertia::render('Dosen/Practices/Show', [
+            'practice' => [
+                'id' => $practice->id,
+                'difficulty_level' => $practice->difficulty_level,
+                'material' => [
+                    'id' => $practice->material->id,
+                    'name' => $practice->material->material_name,
+                ],
+            ],
+            'teacher' => [
+                'name' => $user->nama ?? $user->name ?? 'Dosen',
+            ],
+            'questions' => $questions,
         ]);
     }
 
@@ -226,6 +386,231 @@ class PracticeController extends Controller
         });
 
         return redirect()->route('practices.summary', $attempt->practices_id);
+    }
+
+    /**
+     * Save questions for a practice (bulk upsert) - dosen.
+     */
+    public function dosenSaveQuestions(Request $request, PracticeModel $practice)
+    {
+        $user = auth()->user();
+
+        $practice->load('material:id,created_by');
+
+        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+
+        $validated = $request->validate([
+            'questions' => ['required', 'array', 'min:1'],
+            'questions.*.id' => ['nullable', 'integer'],
+            'questions.*.type' => ['nullable', Rule::in(['multiple_choice', 'drag_drop'])],
+            'questions.*.question_text' => ['required', 'string'],
+            'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'questions.*.output_code' => ['nullable', 'string'],
+            'questions.*.feedback_correct' => ['nullable', 'string'],
+            'questions.*.feedback_incorrect' => ['nullable', 'string'],
+            'questions.*.image' => ['nullable', 'image', 'max:2048'],
+            'questions.*.options' => ['required', 'array', 'min:2'],
+            'questions.*.options.*.text' => ['required', 'string'],
+            'questions.*.options.*.is_correct' => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($practice, $validated, $request) {
+            $questionsInput = $validated['questions'];
+
+            $existing = $practice->questions()->with('options')->get()->keyBy('id');
+            $keptIds = [];
+
+            foreach ($questionsInput as $index => $qData) {
+                $qid = isset($qData['id']) ? (int) $qData['id'] : null;
+
+                if ($qid && $existing->has($qid)) {
+                    $question = $existing->get($qid);
+                } else {
+                    $question = new PracticeQuestionModel();
+                    $question->practices_id = $practice->id;
+                }
+
+                $question->question_text = $qData['question_text'];
+                $question->type = $qData['type'] ?? 'multiple_choice';
+                $question->points = $qData['points'] ?? 10;
+                $question->output_code = $qData['output_code'] ?? null;
+
+                $feedbackCorrect = $qData['feedback_correct'] ?? null;
+                $feedbackIncorrect = $qData['feedback_incorrect'] ?? null;
+
+                // default copy friendly message if not provided
+                if (! $feedbackCorrect && ! $question->feedback_correct) {
+                    $feedbackCorrect = 'Jawaban kamu benar.';
+                }
+
+                if ($feedbackCorrect !== null) {
+                    $question->feedback_correct = $feedbackCorrect;
+                }
+
+                if ($feedbackIncorrect !== null) {
+                    $question->feedback_incorrect = $feedbackIncorrect;
+                }
+
+                // handle image upload if present on this index (questions[index][image])
+                $imageKey = "questions.$index.image";
+                if ($request->hasFile($imageKey)) {
+                    if ($question->image_path) {
+                        Storage::disk('public')->delete($question->image_path);
+                    }
+
+                    $materialId = $practice->material_id ?? $practice->material->id ?? null;
+                    $dir = $materialId ? "practices/{$materialId}" : 'practices';
+
+                    $path = $request->file($imageKey)->store($dir, 'public');
+                    $question->image_path = $path;
+                }
+
+                $question->save();
+
+                $keptIds[] = $question->id;
+
+                // Replace options
+                $question->options()->delete();
+                foreach ($qData['options'] as $optData) {
+                    PracticeOptionModel::create([
+                        'practice_questions_id' => $question->id,
+                        'option_text' => $optData['text'],
+                        'is_correct' => $optData['is_correct'] ? 1 : 0,
+                    ]);
+                }
+            }
+
+            if (! empty($keptIds)) {
+                PracticeQuestionModel::query()
+                    ->where('practices_id', $practice->id)
+                    ->whereNotIn('id', $keptIds)
+                    ->delete();
+            }
+        });
+
+        return redirect()->route('dosen.practices.edit', $practice->id)
+            ->with('success', 'Pertanyaan latihan berhasil disimpan.');
+    }
+
+    /**
+     * Upload image for a specific practice question (dosen).
+     */
+    public function uploadQuestionImage(Request $request, PracticeQuestionModel $question)
+    {
+        $user = auth()->user();
+
+        $question->load('practice.material:id,created_by');
+
+        abort_unless(
+            $question->practice &&
+            $question->practice->material &&
+            (int) $question->practice->material->created_by === (int) $user->id,
+            403
+        );
+
+        $data = $request->validate([
+            'image' => ['required', 'image', 'max:2048'], // ~2MB
+        ]);
+
+        if ($question->image_path) {
+            Storage::disk('public')->delete($question->image_path);
+        }
+
+        $materialId = optional($question->practice)->material_id;
+        $dir = $materialId ? "practices/{$materialId}" : 'practices';
+
+        $path = $request->file('image')->store($dir, 'public');
+
+        $question->image_path = $path;
+        $question->save();
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'image_url' => asset('storage/' . $path),
+            ]);
+        }
+
+        return back()->with('success', 'Gambar soal berhasil diunggah.');
+    }
+
+    /**
+     * Delete image for a specific practice question (dosen).
+     */
+    public function deleteQuestionImage(PracticeQuestionModel $question)
+    {
+        $user = auth()->user();
+
+        $question->load('practice.material:id,created_by');
+
+        abort_unless(
+            $question->practice &&
+            $question->practice->material &&
+            (int) $question->practice->material->created_by === (int) $user->id,
+            403
+        );
+
+        if ($question->image_path) {
+            Storage::disk('public')->delete($question->image_path);
+            $question->image_path = null;
+            $question->save();
+        }
+
+        return back()->with('success', 'Gambar soal berhasil dihapus.');
+    }
+
+    /**
+     * Delete a practice and all related data (dosen).
+     */
+    public function destroy(PracticeModel $practice)
+    {
+        $user = auth()->user();
+
+        $practice->load(['material:id,created_by', 'questions', 'attempts']);
+
+        abort_unless(
+            $practice->material && (int) $practice->material->created_by === (int) $user->id,
+            403,
+        );
+
+        DB::transaction(function () use ($practice) {
+            // Hapus gambar soal dari storage
+            foreach ($practice->questions as $question) {
+                if ($question->image_path) {
+                    Storage::disk('public')->delete($question->image_path);
+                }
+            }
+
+            // Hapus jawaban user yang terkait dengan attempts latihan ini
+            $attemptIds = $practice->attempts->pluck('id')->all();
+            if (! empty($attemptIds)) {
+                UserPracticeAnswerModel::query()
+                    ->whereIn('practice_attempts_id', $attemptIds)
+                    ->delete();
+            }
+
+            // Hapus relasi pada tiap pertanyaan (options, items, answers)
+            foreach ($practice->questions as $question) {
+                $question->options()->delete();
+                $question->items()->delete();
+                $question->answers()->delete();
+            }
+
+            // Hapus attempts dan pertanyaan
+            $practice->attempts()->delete();
+            $practice->questions()->delete();
+
+            // Terakhir, hapus latihan itu sendiri
+            $practice->delete();
+        });
+
+        if (request()->wantsJson()) {
+            return response()->json(['success' => true]);
+        }
+
+        return redirect()
+            ->route('dosen.practices.index')
+            ->with('success', 'Latihan soal berhasil dihapus.');
     }
 
     public function summary(PracticeModel $practice)

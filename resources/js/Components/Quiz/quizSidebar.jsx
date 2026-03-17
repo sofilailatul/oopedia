@@ -3,6 +3,7 @@ import Button from "@/Components/Button";
 import { formatDateLabel } from "@/Features/quiz/labels";
 import Icons from "@/icons";
 import { router } from "@inertiajs/react";
+import Field from "@/Components/Field";
 
 export default function QuizSidebar({ quiz, onClose, onStart, onReview }) {
   if (!quiz) {

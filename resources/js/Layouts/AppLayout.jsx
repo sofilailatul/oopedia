@@ -1,10 +1,9 @@
-import AppShell from '@/Components/Shell/AppShell'
-import Sidebar from '@/Components/Shell/Sidebar'
-import Navbar from '@/Components/Shell/Navbar'
-import { usePage } from '@inertiajs/react'
-import { Head } from '@inertiajs/react'
-import { PopupProvider } from '@/Components/PopUp/PopupProvider' 
-import InertiaErrorPopup from '@/Components/PopUp/InertiaErrorPopup'
+import AppShell from '@/Components/Shell/AppShell';
+import Sidebar from '@/Components/Shell/Sidebar';
+import Navbar from '@/Components/Shell/Navbar';
+import { usePage, Head } from '@inertiajs/react';
+import { PopupProvider } from '@/Components/PopUp/PopUpProvider';
+import InertiaErrorPopup from '@/Components/PopUp/InertiaErrorPopup';
 
 function normalizeRole(authUser) {
   if (authUser?.role) return authUser.role
@@ -16,7 +15,15 @@ function normalizeRole(authUser) {
   return 'tamu'
 }
 
-export default function AppLayout({ children, label = 'Dashboard', title = 'Dashboard', fullHeight = true }) {
+export default function AppLayout({
+  children,
+  label = 'Dashboard',
+  title = 'Dashboard',
+  fullHeight = true,
+  backHref = '',
+  backLabel = 'Kembali',
+  onBackClick,
+}) {
   const { auth } = usePage().props
   const role = normalizeRole(auth?.user)
 
@@ -33,7 +40,11 @@ export default function AppLayout({ children, label = 'Dashboard', title = 'Dash
       <PopupProvider>
         <InertiaErrorPopup />
 
-        <AppShell sidebar={<Sidebar />} navbar={<Navbar title={title} />} fullHeight={fullHeight}>
+        <AppShell
+          sidebar={<Sidebar />}
+          navbar={<Navbar title={title} backHref={backHref} backLabel={backLabel} onBackClick={onBackClick} />}
+          fullHeight={fullHeight}
+        >
           {children}
         </AppShell>
       </PopupProvider>

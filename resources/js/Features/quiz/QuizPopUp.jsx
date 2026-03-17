@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { usePopup } from "@/Components/Popup/PopupProvider";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 import Button from "@/Components/Button";
 import Icons from "@/icons"; // kalau punya, kalau tidak ada hapus dan pakai emoji
 

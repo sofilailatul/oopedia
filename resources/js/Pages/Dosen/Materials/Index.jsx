@@ -1,8 +1,10 @@
-import AppLayout from '@/Layouts/AppLayout';
-import { Link } from '@inertiajs/react';
-import { FaPlus, FaPen, FaEye } from 'react-icons/fa';
-import Button from '@/Components/Button';
-import { useDosenMaterialsIndex } from '@/Features/materials/useDosenMaterialsIndex';
+import React from "react";
+import AppLayout from "@/Layouts/AppLayout";
+import { Link } from "@inertiajs/react";
+import { FaPlus, FaPen, FaEye } from "react-icons/fa";
+import Button from "@/Components/Button";
+import Card from "@/Components/Card";
+import { useDosenMaterialsIndex } from "@/Features/materials/useDosenMaterialsIndex";
 
 export default function KelolaMateri({ materials = [] }) {
   const { state, view, actions } = useDosenMaterialsIndex({ materials });
@@ -30,13 +32,7 @@ export default function KelolaMateri({ materials = [] }) {
         </div>
 
         {/* Table card */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-            <span className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-              Daftar Materi
-            </span>
-          </div>
-
+        <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -100,7 +96,7 @@ export default function KelolaMateri({ materials = [] }) {
               )}
             </tbody>
           </table>
-        </div>
+        </Card>
       </div>
     </AppLayout>
   );

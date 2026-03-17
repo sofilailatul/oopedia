@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
-import { FaBell, FaChevronDown, FaUser, FaSignOutAlt } from "react-icons/fa";
+import { FaChevronDown, FaUser, FaSignOutAlt, FaArrowLeft } from "react-icons/fa";
 
 function useOutsideClick(ref, handler) {
   useEffect(() => {
@@ -17,12 +17,12 @@ function useOutsideClick(ref, handler) {
   }, [ref, handler]);
 }
 
-function cap(str) {
-  const s = String(str || "");
-  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-}
-
-export default function Navbar({ title = "Dashboard" }) {
+export default function Navbar({
+  title = "Dashboard",
+  backHref = "",
+  backLabel = "Kembali",
+  onBackClick,
+}) {
   const { auth } = usePage().props;
 
   const user = auth?.user ?? null;
@@ -42,10 +42,38 @@ export default function Navbar({ title = "Dashboard" }) {
     router.post("/logout");
   };
 
+  const showBack = !!backHref || typeof onBackClick === "function";
+
   return (
     <div>
       <div className="flex  items-center justify-between px-[30px] py-[7px] relative bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
-        <h1 className="text-l tracking-[0] leading-[normal] font-semibold text-white">{title}</h1>
+        <div className="flex items-center gap-3">
+          {showBack && (
+            backHref ? (
+              <Link
+                href={backHref}
+                onClick={onBackClick}
+                aria-label={backLabel}
+                title={backLabel}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-sm text-white/90 transition hover:bg-white/10"
+              >
+                <FaArrowLeft aria-hidden="true" className="text-[14px]" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onBackClick}
+                aria-label={backLabel}
+                title={backLabel}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-sm text-white/90 transition hover:bg-white/10"
+              >
+                <FaArrowLeft aria-hidden="true" className="text-[14px]" />
+              </button>
+            )
+          )}
+
+          <h1 className="text-l tracking-[0] leading-[normal] font-semibold text-white">{title}</h1>
+        </div>
 
         {/* Right */}
         <div className="flex items-center gap-5">

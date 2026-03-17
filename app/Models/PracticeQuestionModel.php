@@ -17,6 +17,7 @@ class PracticeQuestionModel extends Model
         'type',
         'image_path',
         'points',
+        'output_code',
         'feedback_correct',
         'feedback_incorrect',
     ];

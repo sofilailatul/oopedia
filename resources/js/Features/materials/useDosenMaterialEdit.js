@@ -59,8 +59,8 @@ export function useDosenMaterialEdit({ material, authUser }) {
     );
   }
 
-  function saveMaterial(e) {
-    if (e?.preventDefault) e.preventDefault();
+  function saveMaterial(options = {}) {
+    const { onSuccess } = options;
 
     const payloadSections = sections.map((s) => ({
       id: s.id,
@@ -80,7 +80,13 @@ export function useDosenMaterialEdit({ material, authUser }) {
       },
       {
         forceFormData: true,
-        onSuccess: () => router.visit(`/dosen/materi/${material.id}`),
+        onSuccess: () => {
+          if (typeof onSuccess === "function") {
+            onSuccess();
+            return;
+          }
+          router.visit(`/dosen/materi/${material.id}`);
+        },
       },
     );
   }
