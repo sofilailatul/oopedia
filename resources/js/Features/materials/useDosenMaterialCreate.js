@@ -42,7 +42,9 @@ export function useDosenMaterialCreate({ authUser }) {
     );
   }
 
-  async function publish(e) {
+  async function publish(e, options = {}) {
+    const { onSuccess, onError } = options;
+
     if (e?.preventDefault) e.preventDefault();
     if (isSubmitting) return;
 
@@ -63,6 +65,16 @@ export function useDosenMaterialCreate({ authUser }) {
       },
       {
         forceFormData: true,
+        onSuccess: () => {
+          if (typeof onSuccess === "function") {
+            onSuccess();
+          }
+        },
+        onError: (errors) => {
+          if (typeof onError === "function") {
+            onError(errors);
+          }
+        },
         onFinish: () => setIsSubmitting(false),
       },
     );

@@ -60,7 +60,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
   }
 
   function saveMaterial(options = {}) {
-    const { onSuccess } = options;
+    const { onSuccess, onError } = options;
 
     const payloadSections = sections.map((s) => ({
       id: s.id,
@@ -86,6 +86,11 @@ export function useDosenMaterialEdit({ material, authUser }) {
             return;
           }
           router.visit(`/dosen/materi/${material.id}`);
+        },
+        onError: (errors) => {
+          if (typeof onError === "function") {
+            onError(errors);
+          }
         },
       },
     );

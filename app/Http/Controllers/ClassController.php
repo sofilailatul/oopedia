@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
 class ClassController extends Controller
@@ -66,8 +67,13 @@ class ClassController extends Controller
 
         $data = $request->validate([
             'class_name' => ['sometimes','required','string','max:255'],
+            'class_code' => ['sometimes','required','string','max:10', Rule::unique('classes', 'class_code')->ignore($class->id)],
             'description' => ['sometimes','nullable','string'],
         ]);
+
+        if (array_key_exists('class_code', $data)) {
+            $data['class_code'] = strtoupper(trim($data['class_code']));
+        }
 
         $class->update($data);
 

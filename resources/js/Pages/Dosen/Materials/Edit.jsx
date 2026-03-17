@@ -1,15 +1,20 @@
+import { useState } from 'react';
 import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
 import Button from '@/Components/Button';
-import { usePopup } from '@/Components/PopUp/PopUpProvider';
+import StatusModal from '@/Components/StatusModal';
 import { useDosenMaterialEdit } from '@/Features/materials/useDosenMaterialEdit';
 import UploadImage from '@/Components/UploadImage';
-import BackToListHeader from '@/Components/Shared/BackToListHeader';
 
 export default function EditMaterial(props) {
 	const materialTitle = props.material?.material_name ?? '';
 	return (
-		<AppLayout title={`Ubah Materi ${materialTitle}`} label="Ubah Materi">
+		<AppLayout
+			title={`Ubah Materi ${materialTitle}`}
+			label="Ubah Materi"
+			backHref={route('dosen.materials.index')}
+			backLabel="Kembali ke daftar materi"
+		>
 			<EditMaterialContent {...props} />
 		</AppLayout>
 	);
@@ -29,16 +34,46 @@ function EditMaterialContent({ material, authUser }) {
 		deleteSection,
 	} = actions;
 
-	const popup = usePopup();
+	const [showConfirm, setShowConfirm] = useState(false);
+	const [resultModal, setResultModal] = useState(null);
+
+	const extractValidationMessage = (errors, fallback) => {
+		const firstMessage = Object.values(errors || {})?.[0];
+		if (Array.isArray(firstMessage)) return firstMessage[0] || fallback;
+		if (typeof firstMessage === 'string') return firstMessage;
+		return fallback;
+	};
+
+	const handlePublish = () => {
+		saveMaterial({
+			onSuccess: () => {
+				setResultModal({
+					type: 'success',
+					title: 'Berhasil',
+					message: 'Perubahan materi berhasil disimpan.',
+					confirmText: 'Kembali ke daftar',
+					onConfirm: () => {
+						setResultModal(null);
+						router.visit('/dosen/materi');
+					},
+				});
+			},
+			onError: (errors) => {
+				setResultModal({
+					type: 'error',
+					title: 'Gagal',
+					message: extractValidationMessage(errors, 'Gagal menyimpan perubahan materi. Coba lagi.'),
+					confirmText: 'Tutup',
+					onConfirm: () => setResultModal(null),
+				});
+			},
+		});
+	};
 
 	return (
+		<>
 		<div className="max-w-6xl mx-auto flex gap-6">
 				<div className="flex-1 space-y-4">
-					{/* Back link */}
-					<div className="mb-2">
-						<BackToListHeader href="/dosen/materi" label="Kembali ke Daftar" />
-					</div>
-
 					{/* Main card: title + description */}
 					<div className="bg-white rounded-xl border border-green-400 p-5 shadow-sm">
 						<input
@@ -151,31 +186,39 @@ function EditMaterialContent({ material, authUser }) {
 						size="md"
 						color="yellow"
 						variant="solid"
-						onClick={() => {
-							popup.confirm({
-								title: 'Konfirmasi Publish',
-								message: 'Yakin akan mempublish perubahan materi ini?',
-								confirmText: 'Ya, Publish',
-								cancelText: 'Batal',
-								onConfirm: () =>
-									saveMaterial({
-										onSuccess: () => {
-											popup.alert({
-												title: 'Berhasil',
-												message: 'Perubahan materi berhasil disimpan.',
-												confirmText: 'Kembali ke daftar',
-												onClose: () => router.visit('/dosen/materi'),
-											});
-										},
-									}),
-							});
-						}}
+						onClick={() => setShowConfirm(true)}
 						className="w-full"
 					>
 						Publish Perubahan
 					</Button>
 				</aside>
 			</div>
+
+			<StatusModal
+				show={showConfirm}
+				type="confirm"
+				title="Konfirmasi Publish"
+				message="Yakin akan mempublish perubahan materi ini?"
+				confirmText="Ya, Publish"
+				cancelText="Batal"
+				onConfirm={() => {
+					setShowConfirm(false);
+					handlePublish();
+				}}
+				onCancel={() => setShowConfirm(false)}
+				onClose={() => setShowConfirm(false)}
+			/>
+
+			<StatusModal
+				show={!!resultModal}
+				type={resultModal?.type || 'success'}
+				title={resultModal?.title}
+				message={resultModal?.message}
+				confirmText={resultModal?.confirmText || 'OK'}
+				onConfirm={resultModal?.onConfirm}
+				onClose={resultModal?.onConfirm}
+			/>
+		</>
 	);
 }
 
