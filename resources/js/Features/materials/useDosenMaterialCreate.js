@@ -50,34 +50,32 @@ export function useDosenMaterialCreate({ authUser }) {
 
     setIsSubmitting(true);
 
-    const payloadSections = sections.map((s) => ({
-      title: s.title,
-      content_text: s.content,
-      image: s.imageFile || null,
-    }));
+    const formData = new FormData();
+    formData.append("material_name", title || "Untitled Learning Material");
+    if (description) formData.append("description", description);
 
-    router.post(
-      "/dosen/materi",
-      {
-        material_name: title || "Untitled Learning Material",
-        description,
-        sections: payloadSections,
-      },
-      {
-        forceFormData: true,
-        onSuccess: () => {
-          if (typeof onSuccess === "function") {
-            onSuccess();
-          }
-        },
-        onError: (errors) => {
-          if (typeof onError === "function") {
-            onError(errors);
-          }
-        },
-        onFinish: () => setIsSubmitting(false),
-      },
-    );
+    sections.forEach((s, index) => {
+      if (s.title) formData.append(`sections[${index}][title]`, s.title);
+      if (s.content) formData.append(`sections[${index}][content_text]`, s.content);
+      if (s.imageFile) {
+        formData.append(`sections[${index}][image]`, s.imageFile);
+      }
+    });
+
+    try {
+      await window.axios.post("/dosen/materi", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (typeof onSuccess === "function") {
+        onSuccess();
+      }
+    } catch (error) {
+      if (typeof onError === "function") {
+        onError(error.response?.data?.errors || { message: error.response?.data?.message || "Terjadi kesalahan" });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return {

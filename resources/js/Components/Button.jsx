@@ -11,49 +11,44 @@ export default function Button({
   ...props
 }) {
   const base =
-    "inline-flex items-center justify-center gap-3 rounded-xl font-semibold transition focus:outline-none focus:ring-4 disabled:opacity-60 disabled:cursor-not-allowed";
+    "inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]";
 
   const sizes = {
     sm: "px-4 py-2 text-xs",
     md: "px-5 py-2.5 text-sm",
-    lg: "px-6 py-3 text-sm",
+    lg: "px-7 py-3.5 text-sm",
   };
 
   const colors = {
     green: {
-      solid: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-100",
-      outline:
-        "border border-green-600 text-green-600 hover:bg-green-50 focus:ring-green-100",
+      solid: "bg-green-600 text-white hover:bg-green-700 focus:ring-green-100 shadow-sm hover:shadow-green-600/30 hover:shadow-lg hover:border-transparent",
+      outline: "border border-green-600 text-green-600 hover:bg-green-50 focus:ring-green-100",
       ghost: "text-green-600 hover:bg-green-50 focus:ring-green-100",
     },
     yellow: {
-      solid:
-        "bg-yellow-400 text-yellow-800 hover:bg-yellow-500 focus:ring-yellow-100",
-      outline:
-        "border border-yellow-400 text-yellow-600 hover:bg-yellow-50 focus:ring-yellow-100",
+      solid: "bg-yellow-400 text-yellow-900 hover:bg-yellow-500 focus:ring-yellow-100 shadow-sm hover:shadow-yellow-400/40 hover:shadow-lg hover:border-transparent",
+      outline: "border border-yellow-400 text-yellow-700 hover:bg-yellow-50 focus:ring-yellow-100",
       ghost: "text-yellow-600 hover:bg-yellow-50 focus:ring-yellow-100",
     },
     blue: {
-      solid: "bg-blue-700 text-white hover:bg-blue-800 focus:ring-blue-100",
-      outline:
-        "border border-blue-700 text-blue-700 hover:bg-blue-50 focus:ring-blue-100",
-      ghost: "text-blue-700 hover:bg-blue-50 focus:ring-blue-100",
+      solid: "bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-100 shadow-sm hover:shadow-blue-600/30 hover:shadow-lg hover:border-transparent",
+      outline: "border border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-100",
+      ghost: "text-blue-600 hover:bg-blue-50 focus:ring-blue-100",
     },
     red: {
-      solid: "bg-red-500 text-white hover:bg-red-600 focus:ring-red-100",
-      outline:
-        "border border-red-500 text-red-500 hover:bg-red-50 focus:ring-red-100",
+      solid: "bg-red-500 text-white hover:bg-red-600 focus:ring-red-100 shadow-sm hover:shadow-red-500/30 hover:shadow-lg hover:border-transparent",
+      outline: "border border-red-500 text-red-500 hover:bg-red-50 focus:ring-red-100",
       ghost: "text-red-500 hover:bg-red-50 focus:ring-red-100",
     },
     gray: {
-      solid:
-        "bg-gray-400 text-gray-800 cursor-not-allowed focus:ring-gray-200",
-      outline:
-        "border border-gray-300 text-gray-500 cursor-not-allowed focus:ring-gray-200",
-      ghost:
-        "text-gray-400 cursor-not-allowed focus:ring-gray-200",
+      solid: "bg-slate-800 text-white hover:bg-slate-900 focus:ring-slate-200 shadow-sm hover:shadow-slate-800/30 hover:shadow-lg hover:border-transparent",
+      outline: "border border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50 focus:ring-slate-100",
+      ghost: "text-slate-500 hover:bg-slate-100 focus:ring-slate-100",
     },
   };
+
+  // Alias grey -> gray untuk mengakomodasi penulisan "grey"
+  colors.grey = colors.gray;
 
   const safeColor = colors[color] ? color : "green";
   const safeVariant = colors[safeColor][variant] ? variant : "solid";
@@ -64,15 +59,14 @@ export default function Button({
       className={`
         ${base}
         ${sizes[size]}
-        ${colors[safeColor][safeVariant]}
-        ${disabled ? colors.gray.solid : ""}
+        ${!disabled ? colors[safeColor][safeVariant] : "bg-slate-100 border border-transparent text-slate-400 shadow-none hover:shadow-none hover:translate-y-0 active:scale-100"}
         ${className}
       `}
       {...props}
     >
-      {leftIcon && <span className="text-lg">{leftIcon}</span>}
+      {leftIcon && <span className="text-[1.1em]">{leftIcon}</span>}
       {children}
-      {rightIcon && <span className="text-lg">{rightIcon}</span>}
+      {rightIcon && <span className="text-[1.1em]">{rightIcon}</span>}
     </Component>
   );
 }

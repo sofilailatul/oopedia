@@ -47,24 +47,30 @@ function EditMaterialContent({ material, authUser }) {
 	const handlePublish = () => {
 		saveMaterial({
 			onSuccess: () => {
+				console.log(`[Material ID: ${material.id}] Publish SUKSES! Menampilkan modal success.`);
 				setResultModal({
 					type: 'success',
 					title: 'Berhasil',
 					message: 'Perubahan materi berhasil disimpan.',
 					confirmText: 'Kembali ke daftar',
 					onConfirm: () => {
+						console.log(`[Material ID: ${material.id}] Modal success ditutup, redirecting...`);
 						setResultModal(null);
 						router.visit('/dosen/materi');
 					},
 				});
 			},
 			onError: (errors) => {
+				console.log(`[Material ID: ${material.id}] Publish GAGAL! Menampilkan modal error. Errors:`, errors);
 				setResultModal({
 					type: 'error',
 					title: 'Gagal',
 					message: extractValidationMessage(errors, 'Gagal menyimpan perubahan materi. Coba lagi.'),
 					confirmText: 'Tutup',
-					onConfirm: () => setResultModal(null),
+					onConfirm: () => {
+						console.log(`[Material ID: ${material.id}] Modal error ditutup.`);
+						setResultModal(null);
+					},
 				});
 			},
 		});
@@ -95,7 +101,7 @@ function EditMaterialContent({ material, authUser }) {
 					{/* Sections */}
 					{sections.map((section, index) => (
 						<div
-							key={section.id ?? index}
+							key={section.id ? `db-${section.id}` : `new-${index}`}
 							className="bg-white rounded-xl border border-gray-200 p-5 shadow-[0_10px_25px_rgba(15,23,42,0.08)] space-y-4"
 						>
 							<div className="flex items-center justify-between mb-2">
@@ -148,7 +154,10 @@ function EditMaterialContent({ material, authUser }) {
 									size="sm"
 									color="red"
 									variant="outline"
-									onClick={() => deleteSection(index)}
+									onClick={() => {
+										console.log(`[Material ID: ${material.id}] Menghapus section index ${index} | Section ID: ${section.id || 'Baru ditambahkan'} | Judul: ${section.title || 'Tanpa Judul'}`);
+										deleteSection(index);
+									}}
 									className="text-xs"
 								>
 									Hapus Section
@@ -162,7 +171,10 @@ function EditMaterialContent({ material, authUser }) {
 						size="md"
 						color="blue"
 						variant="outline"
-						onClick={addSection}
+						onClick={() => {
+							console.log(`[Material ID: ${material.id}] Menambahkan section baru (Section ke-${sections.length + 1})`);
+							addSection();
+						}}
 						className="mt-2 w-full"
 					>
 						<span className="mr-2 text-lg">+</span>
@@ -186,7 +198,10 @@ function EditMaterialContent({ material, authUser }) {
 						size="md"
 						color="yellow"
 						variant="solid"
-						onClick={() => setShowConfirm(true)}
+						onClick={() => {
+							console.log(`[Material ID: ${material.id}] Tombol 'Publish Perubahan' diklik, menampilkan Modal Konfirmasi...`);
+							setShowConfirm(true);
+						}}
 						className="w-full"
 					>
 						Publish Perubahan
@@ -202,10 +217,14 @@ function EditMaterialContent({ material, authUser }) {
 				confirmText="Ya, Publish"
 				cancelText="Batal"
 				onConfirm={() => {
+					console.log(`[Material ID: ${material.id}] Modal Konfirmasi -> YAKIN PUBLISH!`);
 					setShowConfirm(false);
 					handlePublish();
 				}}
-				onCancel={() => setShowConfirm(false)}
+				onCancel={() => {
+					console.log(`[Material ID: ${material.id}] Modal Konfirmasi -> BATAL.`);
+					setShowConfirm(false);
+				}}
 				onClose={() => setShowConfirm(false)}
 			/>
 

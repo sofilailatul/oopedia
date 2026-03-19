@@ -63,10 +63,9 @@ function DosenClassesContent({ classes = [], authUser }) {
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6">
-			<div className="rounded-3xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
+			<div className="rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div className="space-y-1">
-						<p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Kelola Kelas</p>
 						<h1 className="text-xl font-semibold tracking-tight text-slate-900">Daftar Kelas</h1>
 						<p className="text-sm text-slate-500">Atur kelas, lihat detail mahasiswa, dan update informasi kelas.</p>
 					</div>

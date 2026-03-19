@@ -4,7 +4,6 @@ import AppLayout from "@/Layouts/AppLayout";
 import ContentCard from "@/Components/ContentCard";
 import axios from "axios";
 import Button from "@/Components/Button";
-import BackToListHeader from "@/Components/Shared/BackToListHeader";
 
 export default function Show({ material }) {
     const [hasReachedBottom, setHasReachedBottom] = useState(false);
@@ -130,9 +129,13 @@ export default function Show({ material }) {
     };
 
     return (
-        <AppLayout title="Materi" label={`Materi | ${material.material_name}`}>
+        <AppLayout 
+            title="Materi" 
+            label={`Materi | ${material.material_name}`}
+            backHref="/materi"
+            backLabel="Kembali ke Daftar Materi"
+        >
             <div className="mx-auto space-y-4">
-                <BackToListHeader href="/materi" label="Kembali ke Daftar Materi" />
 
                 {/* Header */}
                 <ContentCard className="border-[#9fc4ff]" title={null}>

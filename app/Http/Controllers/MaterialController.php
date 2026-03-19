@@ -27,11 +27,20 @@ class MaterialController extends Controller
             ->where('user_id', $userId)
             ->value('class_id');
 
-        $materials = MaterialModel::query()
+        $query = MaterialModel::query()
             ->select('id', 'material_name', 'description', 'order_number', 'created_by')
-            ->with(['creator:id,nama'])
-            ->orderBy('order_number')
-            ->get();
+            ->with(['creator:id,nama']);
+
+        if ($classId) {
+            $dosenId = DB::table('classes')->where('id', $classId)->value('created_by');
+            if ($dosenId) {
+                $query->where('created_by', $dosenId);
+            }
+        } elseif ($role === 'mahasiswa') {
+            $query->where('id', 0); // Hide all if student hasn't joined a class
+        }
+
+        $materials = $query->orderBy('order_number')->get();
 
         
         $progressRows = UserProgressModel::query()
@@ -315,12 +324,22 @@ class MaterialController extends Controller
         ]);
     }
 
-    public function dosenIndex()
+    public function dosenIndex(Request $request)
     {
         $materials = MaterialModel::query()
+            ->withExists('progress as is_locked')
             ->select('id', 'material_name', 'order_number')
+            ->where('created_by', $request->user()->id)
             ->orderBy('order_number')
-            ->get();
+            ->get()
+            ->map(function ($m) {
+                return [
+                    'id' => $m->id,
+                    'material_name' => $m->material_name,
+                    'order_number' => $m->order_number,
+                    'is_locked' => (bool) $m->is_locked,
+                ];
+            });
 
         return Inertia::render('Dosen/Materials/Index', [
             'materials' => $materials,
@@ -329,6 +348,10 @@ class MaterialController extends Controller
 
     public function dosenShow(Request $request, MaterialModel $material)
     {
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak. Anda tidak berhak atas materi ini.');
+        }
+
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
         }]);
@@ -360,6 +383,14 @@ class MaterialController extends Controller
 
     public function dosenEdit(Request $request, MaterialModel $material)
     {
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak. Anda tidak berhak mengedit materi ini.');
+        }
+
+        if ($material->progress()->exists()) {
+            abort(403, 'Materi tidak dapat diedit karena sudah diakses oleh mahasiswa.');
+        }
+
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
         }]);
@@ -412,6 +443,20 @@ class MaterialController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        // Otomatis tambahkan ke tabel material_class untuk semua kelas milik Dosen ini
+        $dosenClasses = \App\Models\ClassModel::where('created_by', $request->user()->id)->pluck('id');
+        if ($dosenClasses->isNotEmpty()) {
+            $syncData = [];
+            foreach ($dosenClasses as $classId) {
+                $syncData[$classId] = [
+                    'publish_date' => now(),
+                    'is_active' => 1,
+                    'actived_at' => now(),
+                ];
+            }
+            $material->classes()->sync($syncData);
+        }
+
         $sections = $data['sections'] ?? [];
         $sort = 1;
 
@@ -438,11 +483,22 @@ class MaterialController extends Controller
             ]);
         }
 
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Material created successfully', 'material' => $material], 201);
+        }
         return redirect()->route('dosen.materials.index');
     }
 
     public function dosenUpdate(Request $request, MaterialModel $material)
     {
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        if ($material->progress()->exists()) {
+            abort(403, 'Materi tidak dapat diedit karena sudah diakses oleh mahasiswa.');
+        }
+
         $data = $request->validate([
             'material_name' => ['required','string','max:255'],
             'description' => ['nullable','string'],
@@ -566,10 +622,47 @@ class MaterialController extends Controller
         return response()->json(['message' => 'deleted']);
     }
 
+    public function reorderMaterials(Request $request)
+    {
+        $data = $request->validate([
+            'material_ids' => ['required','array','min:1'],
+            'material_ids.*' => ['integer'],
+        ]);
+
+        $lockedMaterials = MaterialModel::whereIn('id', $data['material_ids'])
+            ->has('progress')
+            ->get(['id', 'order_number'])
+            ->keyBy('id');
+
+        foreach ($data['material_ids'] as $i => $id) {
+            $newOrder = $i + 1;
+            if ($lockedMaterials->has($id)) {
+                $oldOrder = $lockedMaterials->get($id)->order_number;
+                if ($oldOrder !== $newOrder) {
+                    return response()->json([
+                        'message' => 'Urutan materi tidak dapat diubah karena sudah digunakan oleh mahasiswa.',
+                        'locked' => true
+                    ], 403);
+                }
+            }
+        }
+
+        DB::transaction(function () use ($data) {
+            foreach ($data['material_ids'] as $i => $id) {
+                MaterialModel::where('id', $id)->update(['order_number' => $i + 1]);
+            }
+        });
+
+        return response()->json(['message' => 'materials reordered successfully']);
+    }
+
     
     public function storeSection(Request $request, $material)
     {
         $material = MaterialModel::findOrFail($material);
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak.');
+        }
 
         $data = $request->validate([
             'title' => ['nullable','string','max:255'],
@@ -599,6 +692,9 @@ class MaterialController extends Controller
     public function updateSection(Request $request, $material, $section)
     {
         $material = MaterialModel::findOrFail($material);
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak.');
+        }
 
         $section = MaterialContentModel::where('material_id', $material->id)
             ->findOrFail($section);
@@ -628,9 +724,12 @@ class MaterialController extends Controller
         return response()->json($section);
     }
 
-    public function deleteSection($material, $section)
+    public function deleteSection(Request $request, $material, $section)
     {
         $material = MaterialModel::findOrFail($material);
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak.');
+        }
 
         $section = MaterialContentModel::where('material_id', $material->id)
             ->findOrFail($section);
@@ -643,6 +742,9 @@ class MaterialController extends Controller
     public function reorderSections(Request $request, $material)
     {
         $material = MaterialModel::findOrFail($material);
+        if ($material->created_by !== $request->user()->id) {
+            abort(403, 'Akses ditolak.');
+        }
 
         $data = $request->validate([
             'section_ids' => ['required','array','min:1'],
