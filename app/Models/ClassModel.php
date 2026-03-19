@@ -14,6 +14,7 @@ class ClassModel extends Model
         'class_name',
         'class_code',
         'description',
+        'created_by',
     ];
 
     // Relationships

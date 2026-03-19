@@ -4,15 +4,18 @@ import InputError from "@/Components/InputError";
 import Button from "@/Components/Button";
 import TextInput from "@/Components/TextInput";
 import StatusModal from "@/Components/StatusModal";
-import { Head, Link, useForm } from "@inertiajs/react";
+import { Head, Link, useForm, router } from "@inertiajs/react";
 import AuthLayout from "@/Layouts/AuthLayout";
+import axios from "axios";
 
 export default function Login({ status }) {
-  const { data, setData, post, processing, errors, clearErrors } = useForm({
+  const { data, setData, errors, clearErrors, setError } = useForm({
     email: "",
     password: "",
     remember: false,
   });
+
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const [modalState, setModalState] = useState({
     show: false,
@@ -71,24 +74,54 @@ export default function Login({ status }) {
   }, [errors]);
 
   const closeModal = () => {
-    setModalState((prev) => ({ ...prev, show: false }));
-    if (modalState.type === "error") {
+    if (modalState.type === "success") {
+      setModalState((prev) => ({ ...prev, show: false }));
+      router.visit("/dashboard");
+    } else {
+      setModalState((prev) => ({ ...prev, show: false }));
       clearErrors();
     }
   };
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    post("/login", {
-      onSuccess: () => {
+    clearErrors();
+    setIsProcessing(true);
+
+    try {
+      await axios.post("/login", {
+        email: data.email,
+        password: data.password,
+        remember: data.remember,
+      });
+
+      setIsProcessing(false);
+      setModalState({
+        show: true,
+        type: "success",
+        title: "Login Berhasil",
+        message: "Selamat datang kembali! Klik OK untuk melanjutkan ke dashboard.",
+      });
+    } catch (error) {
+      setIsProcessing(false);
+      if (error.response && error.response.status === 422) {
+        const errs = error.response.data.errors;
+        if (errs) {
+          const newErrors = {};
+          Object.keys(errs).forEach((key) => {
+            newErrors[key] = errs[key][0];
+          });
+          setError(newErrors);
+        }
+      } else {
         setModalState({
           show: true,
-          type: "success",
-          title: "Login Berhasil",
-          message: "Selamat datang kembali! Anda sedang dialihkan ke dashboard...",
+          type: "error",
+          title: "Gagal Login",
+          message: "Terjadi kesalahan sistem. Silakan periksa koneksi Anda.",
         });
       }
-    });
+    }
   };
 
   return (
@@ -177,8 +210,8 @@ export default function Login({ status }) {
 
                 {/* Submit */}
                 <div className="flex justify-center">
-                  <Button color="blue" variant="solid" size="lg">
-                    {processing ? "Loading..." : "Masuk Ke Akun"}
+                  <Button color="blue" variant="solid" size="lg" disabled={isProcessing}>
+                    {isProcessing ? "Loading..." : "Masuk Ke Akun"}
                   </Button>
                 </div>
               </form>

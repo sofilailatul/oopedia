@@ -9,18 +9,18 @@ export default function ContentCard({
   return (
     <section
       className={`
-        rounded-lg border p-5 transition
+        rounded-3xl border p-6 transition-all shadow-sm
         ${isLocked 
-          ? "bg-gray-100 border-gray-200 opacity-60 pointer-events-none select-none"
-          : "bg-white border-[#9fc4ff]"}
+          ? "bg-slate-50 border-slate-200/60 opacity-60 pointer-events-none select-none"
+          : "bg-white border-slate-200/60 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"}
         ${className}
       `}
     >
       {title && (
         <header className="mb-4">
           <h2
-            className={`text-[12px] font-bold ${
-              isLocked ? "text-gray-400" : "text-gray-900"
+            className={`text-sm md:text-base font-bold tracking-tight ${
+              isLocked ? "text-slate-400" : "text-slate-900"
             }`}
           >
             {title}
@@ -30,15 +30,15 @@ export default function ContentCard({
 
       <div
         className={`
-          prose max-w-none text-[11px]
-          prose-p:my-1 prose-p:leading-6
-          prose-li:my-1 prose-li:leading-6
-          prose-strong:font-semibold
-          prose-headings:font-bold
+          prose max-w-none text-xs md:text-[13px] text-justify
+          prose-p:my-2 prose-p:leading-relaxed
+          prose-li:my-1 prose-li:leading-relaxed
+          prose-strong:font-bold
+          prose-headings:font-bold prose-headings:tracking-tight
           space-y-4
           ${isLocked
-            ? "text-gray-400 prose-strong:text-gray-400 prose-headings:text-gray-400"
-            : "text-gray-700 prose-strong:text-gray-900 prose-headings:text-gray-900"}
+            ? "text-slate-400 prose-strong:text-slate-400 prose-headings:text-slate-400"
+            : "text-slate-600 prose-strong:text-slate-900 prose-headings:text-slate-900"}
         `}
       >
         {children}

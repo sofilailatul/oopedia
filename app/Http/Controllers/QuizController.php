@@ -124,7 +124,15 @@ class QuizController extends Controller
             ->latest('id')
             ->first();
 
-        return Inertia::render('Mahasiswa/Quizzes/Show', [
+        // Fetch materials for this quiz from quiz_material
+        $materials = \DB::table('quiz_materials')
+            ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
+            ->where('quiz_materials.quizzes_id', $quiz->id)
+            ->orderBy('materials.order_number')
+            ->select('materials.id', 'materials.material_name')
+            ->get();
+
+        return Inertia::render('Dosen/Quizzes/Show', [
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
@@ -135,6 +143,7 @@ class QuizController extends Controller
                 'total_questions' => $quiz->questions_count ?? 0,
                 'status' => ($attempt && $attempt->finished_at) ? 'done' : 'not_done',
                 'score' => ($attempt && $attempt->finished_at) ? $attempt->total_score : null,
+                'materials' => $materials,
             ]
         ]);
     }
@@ -531,5 +540,303 @@ class QuizController extends Controller
             ->where('class_id', $classId)
             ->whereIn('material_id', $materialIds)
             ->update(['completed_quiz_at' => now()]);
+    }
+
+    public function dosenIndexPage()
+    {
+        $userId = auth()->id();
+        $quizzes = $this->quizService->getQuizzesForLecturer($userId);
+
+        $classes = \App\Models\ClassModel::query()
+            ->where('created_by', $userId)
+            ->orderBy('class_name')
+            ->get(['id', 'class_name']);
+
+        return Inertia::render('Dosen/Quizzes/Index', [
+            'quizzes' => $quizzes,
+            'classes' => $classes,
+        ]);
+    }
+
+    public function dosenShowPage(QuizModel $quiz)
+    {
+        $user = auth()->user();
+        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $quiz->load(['questions.options', 'class']);
+
+        $materials = $quiz->materials()
+            ->orderBy('material_name')
+            ->get(['materials.id', 'materials.material_name']);
+
+        $questions = $quiz->questions->map(function ($q) use ($materials) {
+            $matName = 'Tidak ada materi';
+            if ($q->material_id) {
+                $mat = $materials->firstWhere('id', $q->material_id);
+                $matName = $mat ? $mat->material_name : 'Materi Dihapus';
+            }
+
+            return [
+                'id' => $q->id,
+                'material_id' => $q->material_id,
+                'material_name' => $matName,
+                'quiz_text' => $q->quiz_text,
+                'image_path' => $q->image_path,
+                'feedback_correct' => $q->feedback_correct,
+                'feedback_incorrect' => $q->feedback_incorrect,
+                'points' => (int) ($q->pivot->points ?? 1),
+                'options' => $q->options->map(function ($opt) {
+                    return [
+                        'id' => $opt->id,
+                        'option_text' => $opt->option_text,
+                        'is_correct' => (bool) $opt->is_correct,
+                    ];
+                }),
+            ];
+        });
+
+        return Inertia::render('Dosen/Quizzes/Show', [
+            'quiz' => [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'description' => $quiz->description ?? null,
+                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+                'duration' => $quiz->duration,
+                'passing_score' => $quiz->passing_score,
+                'start_at' => $quiz->start_at,
+                'end_at' => $quiz->end_at,
+                'materials' => $materials,
+            ],
+            'questions' => $questions,
+        ]);
+    }
+
+    public function dosenCreatePage()
+    {
+        $user = auth()->user();
+
+        $classes = \App\Models\ClassModel::query()
+            ->where('created_by', $user->id)
+            ->orderBy('class_name')
+            ->get(['id', 'class_name']);
+
+        $materials = \App\Models\MaterialModel::query()
+            ->where('created_by', $user->id)
+            ->orderBy('material_name')
+            ->get(['id', 'material_name']);
+
+        return Inertia::render('Dosen/Quizzes/Create', [
+            'classes' => $classes,
+            'materials' => $materials,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $user = auth()->user();
+
+        $validated = $request->validate([
+            'class_id' => ['required', 'exists:classes,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'duration' => ['required', 'integer', 'min:1'],
+            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'start_at' => ['nullable', 'date'],
+            'end_at' => ['nullable', 'date'],
+            'material_ids' => ['required', 'array', 'min:1'],
+            'material_ids.*' => ['exists:materials,id'],
+        ]);
+
+        $quiz = QuizModel::create([
+            'class_id' => $validated['class_id'],
+            'title' => $validated['title'],
+            'duration' => $validated['duration'],
+            'passing_score' => $validated['passing_score'],
+            'start_at' => $validated['start_at'],
+            'end_at' => $validated['end_at'],
+            'created_by' => $user->id,
+        ]);
+
+        // Hubungkan kuis dengan materi yang dipilih
+        $quiz->materials()->sync($validated['material_ids']);
+
+        return redirect()->route('dosen.quizzes.show', $quiz->id)
+            ->with('success', 'Kuis berhasil dibuat. Silakan kelola pertanyaan melalui halaman ini.');
+    }
+
+    public function dosenEditPage(QuizModel $quiz)
+    {
+        $user = auth()->user();
+        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $quiz->load(['questions.options', 'class']);
+
+        $questions = $quiz->questions->map(function ($q) {
+            return [
+                'id' => $q->id,
+                'material_id' => $q->material_id,
+                'quiz_text' => $q->quiz_text,
+                'image_path' => $q->image_path,
+                'feedback_correct' => $q->feedback_correct,
+                'feedback_incorrect' => $q->feedback_incorrect,
+                'points' => (int) ($q->pivot->points ?? 1),
+                'options' => $q->options->map(function ($opt) {
+                    return [
+                        'id' => $opt->id,
+                        'option_text' => $opt->option_text,
+                        'is_correct' => (bool) $opt->is_correct,
+                    ];
+                }),
+            ];
+        });
+
+        $materials = $quiz->materials()
+            ->orderBy('material_name')
+            ->get(['materials.id', 'materials.material_name']);
+
+        return Inertia::render('Dosen/Quizzes/Edit', [
+            'materials' => $materials,
+            'quiz' => [
+                'id' => $quiz->id,
+                'title' => $quiz->title,
+                'description' => $quiz->description ?? null,
+                'class_id' => $quiz->class_id,
+                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+                'duration' => $quiz->duration,
+                'passing_score' => $quiz->passing_score,
+                'start_at' => $quiz->start_at ? \Carbon\Carbon::parse($quiz->start_at)->format('Y-m-d\TH:i') : "",
+                'end_at' => $quiz->end_at ? \Carbon\Carbon::parse($quiz->end_at)->format('Y-m-d\TH:i') : "",
+            ],
+            'questions' => $questions,
+        ]);
+    }
+
+    public function dosenSaveQuestions(Request $request, QuizModel $quiz)
+    {
+        $user = auth()->user();
+        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'duration' => ['required', 'integer', 'min:1'],
+            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'start_at' => ['nullable', 'date'],
+            'end_at' => ['nullable', 'date'],
+            
+            'questions' => ['nullable', 'array'],
+            'questions.*.id' => ['nullable', 'integer'],
+            'questions.*.material_id' => ['nullable', 'integer'],
+            'questions.*.quiz_text' => ['required', 'string'],
+            'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'questions.*.feedback_correct' => ['nullable', 'string'],
+            'questions.*.feedback_incorrect' => ['nullable', 'string'],
+            'questions.*.image' => ['nullable', 'image', 'max:2048'],
+            'questions.*.options' => ['required', 'array', 'min:2'],
+            'questions.*.options.*.text' => ['required', 'string'],
+            'questions.*.options.*.is_correct' => ['required', 'boolean'],
+        ]);
+
+        DB::transaction(function () use ($quiz, $validated, $request) {
+            $quiz->update([
+                'title' => $validated['title'],
+                'description' => $validated['description'] ?? null,
+                'duration' => $validated['duration'],
+                'passing_score' => $validated['passing_score'],
+                'start_at' => $validated['start_at'] ?? null,
+                'end_at' => $validated['end_at'] ?? null,
+            ]);
+
+            $questionsInput = $validated['questions'] ?? [];
+            
+            $existingMap = QuizMapModel::where('quiz_id', $quiz->id)->get()->keyBy('quiz_question_id');
+            $keptQuestionIds = [];
+
+            foreach ($questionsInput as $index => $qData) {
+                $qid = isset($qData['id']) ? (int) $qData['id'] : null;
+                
+                if ($qid && $existingMap->has($qid)) {
+                    $question = \App\Models\QuizQuestionsModel::find($qid);
+                    $question->material_id = $qData['material_id'] ?? $question->material_id;
+                } else {
+                    $question = new \App\Models\QuizQuestionsModel();
+                    $question->material_id = $qData['material_id'] ?? null;
+                }
+
+                $question->quiz_text = $qData['quiz_text'];
+
+                $feedbackCorrect = $qData['feedback_correct'] ?? 'Jawaban kamu benar.';
+                $feedbackIncorrect = $qData['feedback_incorrect'] ?? 'Jawaban kamu salah.';
+                
+                $question->feedback_correct = $feedbackCorrect;
+                $question->feedback_incorrect = $feedbackIncorrect;
+
+                // handle image upload
+                $imageKey = "questions.$index.image";
+                if ($request->hasFile($imageKey)) {
+                    if ($question->image_path) {
+                        \Illuminate\Support\Facades\Storage::disk('public')->delete($question->image_path);
+                    }
+                    $path = $request->file($imageKey)->store('quizzes', 'public');
+                    $question->image_path = $path;
+                }
+
+                $question->save();
+                
+                $keptQuestionIds[] = $question->id;
+
+                // Update mapped points
+                \App\Models\QuizMapModel::updateOrCreate(
+                    [
+                        'quiz_id' => $quiz->id,
+                        'quiz_question_id' => $question->id
+                    ],
+                    [
+                        'points' => $qData['points'] ?? 10
+                    ]
+                );
+
+                // Re-create options
+                $question->options()->delete();
+                foreach ($qData['options'] as $optData) {
+                    \App\Models\QuizOptionModel::create([
+                        'quiz_questions_id' => $question->id,
+                        'option_text' => $optData['text'],
+                        'is_correct' => $optData['is_correct'] ? 1 : 0,
+                    ]);
+                }
+            }
+
+            // Remove unkept mapping
+            if (!empty($keptQuestionIds)) {
+                $unkept = \App\Models\QuizMapModel::where('quiz_id', $quiz->id)
+                    ->whereNotIn('quiz_question_id', $keptQuestionIds)->get();
+                foreach($unkept as $u) {
+                    $u->delete();
+                }
+            } else {
+                \App\Models\QuizMapModel::where('quiz_id', $quiz->id)->delete();
+            }
+        });
+
+        return redirect()->route('dosen.quizzes.show', $quiz->id)
+            ->with('success', 'Kuis dan soal berhasil disimpan.');
+    }
+
+    public function update(Request $request, QuizModel $quiz)
+    {
+        $user = $request->user();
+        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'duration' => ['required', 'integer', 'min:1'],
+            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
+            'start_at' => ['nullable', 'date'],
+            'end_at' => ['nullable', 'date'],
+        ]);
+
+        $quiz->update($data);
+
+        return redirect()->route('dosen.quizzes.show', $quiz->id)->with('success', 'Quiz updated successfully');
     }
 }

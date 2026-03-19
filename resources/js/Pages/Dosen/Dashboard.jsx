@@ -6,6 +6,9 @@ import Button from '@/Components/Button';
 import { usePopup } from '@/Components/PopUp/PopUpProvider';
 import { Link, usePage, router } from '@inertiajs/react';
 import Icons from '@/icons';
+import CreateClassModal from '@/Components/CreateClassModal';
+import OverviewCard from '@/Components/OverviewCard';
+import StatCard from '@/Components/StatCard';
 
 export default function DosenDashboard(props) {
 	return (
@@ -21,17 +24,10 @@ function DosenDashboardContent({ stats = {}, classes = [], recentActivities = []
 	const user = props?.auth?.user || {};
 	const lecturerName = user.nama || user.name || 'Dosen';
 
+	const [isClassModalOpen, setIsClassModalOpen] = useState(false);
+
 	const handleOpenCreateClass = () => {
-		popup.open({
-			title: '✨ Tambah Kelas Baru',
-			size: 'lg',
-			content: (
-				<CreateClassModal
-					lecturerName={lecturerName}
-					onSuccess={() => router.reload({ only: ['stats', 'classes'] })}
-				/>
-			),
-		});
+		setIsClassModalOpen(true);
 	};
 
 	// Format current date
@@ -53,73 +49,53 @@ function DosenDashboardContent({ stats = {}, classes = [], recentActivities = []
 					</h1>
 				</div>
 				<div className="shrink-0 flex">
-					<button
+					<Button
 						onClick={handleOpenCreateClass}
 						className="inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-6 py-3.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-all hover:-translate-y-1 shadow-[0_8px_20px_rgb(0,0,0,0.12)] active:translate-y-0"
 					>
 						<Icons.Add className="w-5 h-5" />
 						Buat Kelas
-					</button>
+					</Button>
 				</div>
 			</div>
 
 			{/* Bento Grid Stats Section */}
 			<div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
-				{/* Stat Card 1 */}
-				<div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-					<div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-					<div className="flex justify-between items-start mb-4">
-						<div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-							<Icons.Class className="w-6 h-6" />
-						</div>
-					</div>
-					<div>
-						<p className="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">{stats.total_classes || 0}</p>
-						<p className="text-sm font-medium text-slate-500">Total Kelas</p>
-					</div>
-				</div>
+				<StatCard
+					icon={Icons.Class}
+					iconBg="bg-blue-50"
+					iconColor="text-blue-600"
+					gradientFrom="from-blue-50"
+					value={stats.total_classes || 0}
+					label="Total Kelas"
+				/>
 
-				{/* Stat Card 2 */}
-				<div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-					<div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-emerald-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-					<div className="flex justify-between items-start mb-4">
-						<div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-							<Icons.Users className="w-6 h-6" />
-						</div>
-					</div>
-					<div>
-						<p className="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">{stats.total_students || 0}</p>
-						<p className="text-sm font-medium text-slate-500">Mahasiswa</p>
-					</div>
-				</div>
+				<StatCard
+					icon={Icons.Users}
+					iconBg="bg-emerald-50"
+					iconColor="text-emerald-600"
+					gradientFrom="from-emerald-50"
+					value={stats.total_students || 0}
+					label="Mahasiswa"
+				/>
 
-				{/* Stat Card 3 */}
-				<div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-					<div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-violet-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-					<div className="flex justify-between items-start mb-4">
-						<div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-							<Icons.Materials className="w-6 h-6" />
-						</div>
-					</div>
-					<div>
-						<p className="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">{stats.total_materials || 0}</p>
-						<p className="text-sm font-medium text-slate-500">Total Materi</p>
-					</div>
-				</div>
+				<StatCard
+					icon={Icons.Materials}
+					iconBg="bg-violet-50"
+					iconColor="text-violet-600"
+					gradientFrom="from-violet-50"
+					value={stats.total_materials || 0}
+					label="Total Materi"
+				/>
 
-				{/* Stat Card 4 */}
-				<div className="bg-white rounded-3xl p-6 border border-slate-200/60 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] group relative overflow-hidden flex flex-col justify-between min-h-[160px]">
-					<div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-amber-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-110 transition-transform duration-500"></div>
-					<div className="flex justify-between items-start mb-4">
-						<div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-							<Icons.Quiz className="w-6 h-6" />
-						</div>
-					</div>
-					<div>
-						<p className="text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">{stats.total_quizzes || 0}</p>
-						<p className="text-sm font-medium text-slate-500">Total Quiz</p>
-					</div>
-				</div>
+				<StatCard
+					icon={Icons.Quiz}
+					iconBg="bg-amber-50"
+					iconColor="text-amber-500"
+					gradientFrom="from-amber-50"
+					value={stats.total_quizzes || 0}
+					label="Total Quiz"
+				/>
 			</div>
 
 			{/* Main Content Area */}
@@ -136,28 +112,13 @@ function DosenDashboardContent({ stats = {}, classes = [], recentActivities = []
 					{classes && classes.length > 0 ? (
 						<div className="grid sm:grid-cols-2 gap-4 md:gap-5">
 							{classes.slice(0, 4).map((classItem) => (
-								<Link
+								<OverviewCard
 									key={classItem.id}
-									href={`/classes/${classItem.id}`}
-									className="group block bg-white border border-slate-200/60 p-5 md:p-6 rounded-3xl shadow-sm hover:shadow-[0_12px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col min-h-[180px]"
-								>
-									<div className="flex flex-col h-full justify-between">
-										<div>
-											<div className="inline-block px-3 py-1 bg-slate-100 text-slate-700 text-[10px] uppercase font-bold tracking-widest rounded-full mb-3">
-												{classItem.class_code}
-											</div>
-											<h3 className="text-base md:text-lg font-bold text-slate-900 leading-snug line-clamp-2">
-												{classItem.name}
-											</h3>
-										</div>
-										<div className="mt-6 flex items-center justify-between text-slate-400">
-											<span className="text-sm font-bold group-hover:text-slate-900 transition-colors">Kelola</span>
-											<div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-slate-900 group-hover:text-white transition-colors duration-300">
-												<Icons.ChevronRight className="w-4 h-4" />
-											</div>
-										</div>
-									</div>
-								</Link>
+									href={route('dosen.classes.index')}
+									badge={classItem.class_code}
+									title={classItem.name || classItem.class_name}
+									actionText="Kelola"
+								/>
 							))}
 						</div>
 					) : (
@@ -209,106 +170,12 @@ function DosenDashboardContent({ stats = {}, classes = [], recentActivities = []
 					</div>
 				</div>
 			</div>
+			<CreateClassModal
+				show={isClassModalOpen}
+				onClose={() => setIsClassModalOpen(false)}
+				lecturerName={lecturerName}
+				onSuccess={() => router.reload({ only: ['stats', 'classes'] })}
+			/>
 		</div>
-	);
-}
-
-function CreateClassModal({ lecturerName, onSuccess }) {
-	const popup = usePopup();
-	const [name, setName] = useState('');
-	const [classCode, setClassCode] = useState('');
-	const [description, setDescription] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [error, setError] = useState('');
-
-	const handleSubmit = async (e) => {
-		e?.preventDefault();
-		if (isSubmitting) return;
-		setIsSubmitting(true);
-		setError('');
-		try {
-			await window.axios.post('/classes', {
-				class_name: name,
-				class_code: classCode,
-				description,
-			});
-			onSuccess?.();
-			popup.close();
-		} catch (err) {
-			setError('Gagal menyimpan kelas. Coba lagi.');
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
-	return (
-		<form onSubmit={handleSubmit} className="space-y-5">
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium text-slate-500">Nama Dosen</p>
-				<div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-					<span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500 mr-1">
-						👤
-					</span>
-					<span className="truncate">{lecturerName}</span>
-				</div>
-			</div>
-
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium text-slate-500">Nama Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Masukkan Nama Kelas"
-					value={name}
-					onChange={(e) => setName(e.target.value)}
-					required
-				/>
-			</div>
-
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium text-slate-500">Kode Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Masukkan Kode Kelas (contoh: IF101A)"
-					value={classCode}
-					onChange={(e) => setClassCode(e.target.value.toUpperCase())}
-					required
-				/>
-			</div>
-
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium text-slate-500">Deskripsi</p>
-				<textarea
-					className="w-full min-h-[100px] rounded-2xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Deskripsi Kelas"
-					value={description}
-					onChange={(e) => setDescription(e.target.value)}
-				/>
-			</div>
-
-			{error && <p className="text-xs text-red-500">{error}</p>}
-
-			<div className="flex items-center justify-end gap-3 pt-1">
-				<Button
-					type="button"
-					color="red"
-					variant="outline"
-					size="sm"
-					onClick={() => popup.close()}
-				>
-					Batal
-				</Button>
-				<Button
-					type="submit"
-					color="green"
-					variant="solid"
-					size="sm"
-					disabled={isSubmitting}
-				>
-					{isSubmitting ? 'Menyimpan...' : 'Simpan'}
-				</Button>
-			</div>
-		</form>
 	);
 }

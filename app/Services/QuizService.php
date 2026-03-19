@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\QuizAttemptModel;
 use App\Models\QuizQuestionModel;
+use App\Models\QuizModel;
 use App\Models\UserQuizAnswerModel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -164,5 +165,26 @@ class QuizService
 
             return $attempt;
         });
+    }
+
+    public function getQuizzesForLecturer($lecturerId)
+    {
+        return QuizModel::query()
+            ->where('created_by', $lecturerId)
+            ->with('class') // assuming relationship exists
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($quiz) {
+                return [
+                    'id' => $quiz->id,
+                    'title' => $quiz->title,
+                    'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+                    'total_questions' => $quiz->questions()->count(),
+                    'duration' => $quiz->duration,
+                    'passing_score' => $quiz->passing_score,
+                    'start_at' => $quiz->start_at,
+                    'end_at' => $quiz->end_at,
+                ];
+            });
     }
 }

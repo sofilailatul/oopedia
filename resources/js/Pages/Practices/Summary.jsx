@@ -1,6 +1,5 @@
 import React from "react";
 import AppLayout from "@/Layouts/AppLayout";
-import BackToListHeader from "@/Components/Shared/BackToListHeader";
 import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
 
 export default function Summary({ practice, attempt, answers, cfg }) {
@@ -11,9 +10,13 @@ export default function Summary({ practice, attempt, answers, cfg }) {
   const finalScore = attempt?.final_score ?? 0;
 
   return (
-    <AppLayout title="Hasil Latihan Soal" label="Hasil Latihan Soal">
+    <AppLayout 
+      title="Hasil Latihan Soal" 
+      label="Hasil Latihan Soal"
+      backHref={route("practices.index")}
+      backLabel="Kembali ke Daftar"
+    >
       <div className="mx-auto space-y-4">
-        <BackToListHeader href={route("practices.index")} label="Kembali ke daftar latihan soal" />
 
         <div className="bg-white rounded-2xl border shadow-sm p-6">
           <h1 className="text-xl font-bold">Hasil Latihan Soal</h1>

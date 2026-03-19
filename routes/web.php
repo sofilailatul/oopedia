@@ -134,8 +134,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/dosen/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])
             ->name('dosen.practices.questions.save');
 
+        // ===== QUIZZES (dosen) =====
+        Route::get('/dosen/kuis', [QuizController::class, 'dosenIndexPage'])
+            ->name('dosen.quizzes.index');
+        Route::get('/dosen/kuis/create', [QuizController::class, 'dosenCreatePage'])
+            ->name('dosen.quizzes.create');
+        Route::get('/dosen/kuis/{quiz}/show', [QuizController::class, 'dosenShowPage'])
+            ->name('dosen.quizzes.show');
+        Route::get('/dosen/kuis/{quiz}/edit', [QuizController::class, 'dosenEditPage'])
+            ->name('dosen.quizzes.edit');
+        Route::post('/dosen/kuis/{quiz}/questions', [QuizController::class, 'dosenSaveQuestions'])
+            ->name('dosen.quizzes.questions.save');
+
         // ===== KELOLA MATERI (dosen) =====
         Route::get('/dosen/materi', [MaterialController::class, 'dosenIndex'])->name('dosen.materials.index');
+        Route::put('/dosen/materi/reorder', [MaterialController::class, 'reorderMaterials'])->name('dosen.materials.reorder');
         Route::get('/dosen/materi/create', [MaterialController::class, 'dosenCreate'])->name('dosen.materials.create');
         Route::get('/dosen/materi/{material}', [MaterialController::class, 'dosenShow'])->name('dosen.materials.show');
         Route::get('/dosen/materi/{material}/edit', [MaterialController::class, 'dosenEdit'])->name('dosen.materials.edit');

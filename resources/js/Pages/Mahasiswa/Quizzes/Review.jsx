@@ -3,7 +3,6 @@ import { router } from "@inertiajs/react";
 import Text from "@/Components/text";
 import Button from "@/Components/Button";
 import Icons from "@/icons";
-import BackToListHeader from "@/Components/Shared/BackToListHeader";
 
 function colorByScore(score) {
   if (score < 60) return { bar: "bg-red-500", btn: "red", icon: "!", iconBg: "bg-red-100", iconText: "text-red-500" };
@@ -13,9 +12,13 @@ function colorByScore(score) {
 
 export default function Review({ quiz, attempt, questions, recommendations = [] }) {
     return (
-        <AppLayout title="Review Kuis" label="Review Kuis">
+        <AppLayout 
+            title="Review Kuis" 
+            label="Review Kuis"
+            backHref="/kuis"
+            backLabel="Kembali ke Daftar Kuis"
+        >
             <div className="mx-auto space-y-4">
-                <BackToListHeader href="/kuis" label="Kembali ke Daftar Kuis" />
 
                 <div className="rounded-2xl border bg-white p-5">
                     <Text variant="title" className="mb-2">{quiz.title}</Text>

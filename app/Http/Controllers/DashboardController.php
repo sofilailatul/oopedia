@@ -129,6 +129,8 @@ class DashboardController extends Controller
         * YANG BUTUH KELAS (progress material & rekomendasi)
         * ===================================================== */
         if ($hasClass) {
+            $dosenId = DB::table('classes')->where('id', $classId)->value('created_by');
+
             // MATERIAL selesai jika status unlocked (progress per kelas)
             $stats['materials_completed'] = DB::table('user_progress')
                 ->where('user_id', $userId)
@@ -136,11 +138,15 @@ class DashboardController extends Controller
                 ->where('status', 'unlocked')
                 ->count();
 
-            // total materials global
-            $stats['total_materials'] = DB::table('materials')->count();
+            // total materials global, di filter by dosen pembuat kelas
+            if ($dosenId) {
+                $stats['total_materials'] = DB::table('materials')->where('created_by', $dosenId)->count();
+            } else {
+                $stats['total_materials'] = DB::table('materials')->count();
+            }
         } else {
-            // kalau belum join kelas tetap boleh tampil total materials (opsional)
-            $stats['total_materials'] = DB::table('materials')->count();
+            // kalau belum join kelas tetap boleh tampil total materials (opsional) 0
+            $stats['total_materials'] = 0;
         }
 
         /* =====================================================
@@ -205,10 +211,9 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
-        // Get classes joined/owned by this dosen via pivot class_user
-        $classes = DB::table('class_user as cu')
-            ->join('classes as c', 'c.id', '=', 'cu.class_id')
-            ->where('cu.user_id', $user->id)
+        // Get classes created by this dosen
+        $classes = DB::table('classes as c')
+            ->where('c.created_by', $user->id)
             ->select(['c.id', 'c.class_name', 'c.class_code', 'c.created_at'])
             ->get();
 

@@ -56,6 +56,7 @@ class ClassController extends Controller
             'class_name' => $data['class_name'],
             'class_code' => $code,
             'description' => $data['description'] ?? null,
+            'created_by' => auth()->id(),
         ]);
 
         return response()->json($class, 201);

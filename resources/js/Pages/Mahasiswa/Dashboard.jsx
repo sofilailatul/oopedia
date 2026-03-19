@@ -83,7 +83,7 @@ export default function MahasiswaDashboard({ auth, stats}) {
       </div>
       <div className="grid lg:grid-cols-2 gap-6 mb-6 ">
         {/* Quick Actions */}
-        <div className="bg-white border border-[#9fc4ff] rounded-lg  p-6">
+        <div className="bg-white border rounded-2xl p-6">
           <h2 className="text-lg font-bold mb-4">Quick Actions</h2>
           <div className="space-y-3 ">
             <ActionCard

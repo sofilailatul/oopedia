@@ -106,21 +106,27 @@ function PageContent({ practices = [], materials = [] }) {
 	};
 
 	return (
-		<div className="max-w-6xl mx-auto space-y-6">
-			<div className="flex justify-end">
-				<Button
-					variant="solid"
-					color="yellow"
-					size="md"
-					className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm"
-					onClick={(e) => {
-						e.preventDefault();
-						logAction("click_create_button");
-						handleOpenCreate();
-					}}
-				>
-					+ Buat Latihan Baru
-				</Button>
+		<div className="mx-auto max-w-6xl space-y-6">
+			<div className="rounded-3xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
+				<div className="flex flex-wrap items-start justify-between gap-4">
+					<div className="space-y-1">
+						<h1 className="text-xl font-semibold tracking-tight text-slate-900">Daftar Latihan Soal</h1>
+						<p className="text-sm text-slate-500">Atur, lihat, dan Update Latihan Soal Yang Dibuat</p>
+					</div>
+					<Button
+						variant="solid"
+						color="yellow"
+						size="md"
+						className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm"
+						onClick={(e) => {
+							e.preventDefault();
+							logAction("click_create_button");
+							handleOpenCreate();
+						}}
+					>
+						+ Buat Latihan Baru
+					</Button>
+			</div>
 			</div>
 			{/* Table */}
 			<Card className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

@@ -31,6 +31,11 @@ class QuizModel extends Model
         return $this->belongsTo(UserModel::class, 'created_by');
     }
 
+    public function class()
+    {
+        return $this->belongsTo(ClassModel::class, 'class_id');
+    }
+
     public function questions()
     {
         return $this->belongsToMany(
