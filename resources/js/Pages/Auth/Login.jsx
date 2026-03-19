@@ -1,20 +1,94 @@
+import { useState, useEffect } from "react";
 import Checkbox from "@/Components/Checkbox";
 import InputError from "@/Components/InputError";
 import Button from "@/Components/Button";
 import TextInput from "@/Components/TextInput";
+import StatusModal from "@/Components/StatusModal";
 import { Head, Link, useForm } from "@inertiajs/react";
 import AuthLayout from "@/Layouts/AuthLayout";
 
 export default function Login({ status }) {
-  const { data, setData, post, processing, errors } = useForm({
+  const { data, setData, post, processing, errors, clearErrors } = useForm({
     email: "",
     password: "",
     remember: false,
   });
 
+  const [modalState, setModalState] = useState({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  useEffect(() => {
+    if (status) {
+      let successMessage = status;
+      const statusLower = status.toLowerCase();
+      
+      if (statusLower.includes("we have emailed")) {
+        successMessage = "Kami telah mengirimkan tautan untuk mereset password ke email Anda.";
+      } else if (statusLower.includes("password has been reset")) {
+        successMessage = "Password Anda berhasil diperbarui. Silakan login.";
+      } else if (statusLower.includes("success")) {
+        // Fallback untuk pesan success umum
+        successMessage = "Operasi berhasil dilakukan.";
+      }
+
+      setModalState({
+        show: true,
+        type: "success",
+        title: "Berhasil",
+        message: successMessage,
+      });
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      let errorMessage = "Silakan periksa kembali email dan password Anda.";
+      
+      if (errors.email) {
+        const emailErr = errors.email.toLowerCase();
+        if (emailErr.includes("credentials do not match")) {
+          errorMessage = "Email atau password yang Anda masukkan salah.";
+        } else if (emailErr.includes("too many login attempts")) {
+          errorMessage = "Terlalu banyak percobaan login. Silakan coba lagi nanti.";
+        } else {
+          errorMessage = errors.email;
+        }
+      } else if (errors.password) {
+        errorMessage = errors.password;
+      }
+
+      setModalState({
+        show: true,
+        type: "error",
+        title: "Gagal Login",
+        message: errorMessage,
+      });
+    }
+  }, [errors]);
+
+  const closeModal = () => {
+    setModalState((prev) => ({ ...prev, show: false }));
+    if (modalState.type === "error") {
+      clearErrors();
+    }
+  };
+
   const submit = (e) => {
     e.preventDefault();
-    post("/login"); // backend redirect ke /dashboard
+    post("/login", {
+      onSuccess: () => {
+        setModalState({
+          show: true,
+          type: "success",
+          title: "Login Berhasil",
+          message: "Selamat datang kembali! Anda sedang dialihkan ke dashboard...",
+        });
+      }
+    });
   };
 
   return (
@@ -37,12 +111,6 @@ export default function Login({ status }) {
               <h1 className="text-[#101828] text-xl font-semibold text-center">
                 Masuk ke Akun Kamu
               </h1>
-
-              {status && (
-                <div className="w-full rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-                  {status}
-                </div>
-              )}
 
               <form onSubmit={submit} className="w-full space-y-3 items-center">
                 {/* Email */}
@@ -135,6 +203,15 @@ export default function Login({ status }) {
             </div>
           </div>
         </div>
+
+        <StatusModal
+          show={modalState.show}
+          type={modalState.type}
+          title={modalState.title}
+          message={modalState.message}
+          onClose={closeModal}
+          onConfirm={closeModal}
+        />
     </AuthLayout>
   );
 }

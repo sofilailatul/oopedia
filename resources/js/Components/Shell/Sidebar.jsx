@@ -9,6 +9,8 @@ import {
   FaChartBar,
   FaUsers,
   FaUserCog,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 const NAV_BY_ROLE = {
@@ -59,49 +61,106 @@ export default function Sidebar() {
   const { url, props } = usePage();
   const role = normalizeRole(props?.auth?.user?.role);
   const items = NAV_BY_ROLE[role] || NAV_BY_ROLE.tamu;
+  const roleLabel = role === "admin" ? "superadmin" : role;
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("oopedia.sidebar.collapsed");
+    if (stored === "1") {
+      setIsCollapsed(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("oopedia.sidebar.collapsed", isCollapsed ? "1" : "0");
+  }, [isCollapsed]);
 
   return (
-    <aside className="flex flex-col w-[180px] items-start gap-5 relative bg-[#e0f1fe]">
-      <header className="flex items-center gap-[11px] px-[5px] py-[10px] self-stretch w-full border-b [border-bottom-style:solid] border-[#1e1e1e70] relative flex-[0_0_auto]">
+    <aside
+      className={[
+        "flex shrink-0 flex-col border-r border-slate-200 bg-gradient-to-b from-sky-50 to-white py-4 transition-all duration-200",
+        isCollapsed ? "w-[84px] px-2.5" : "w-[250px] px-4",
+      ].join(" ")}
+    >
+      <header
+        className={[
+          "rounded-2xl border border-slate-200 bg-white shadow-sm",
+          isCollapsed
+            ? "flex flex-col items-center gap-2 px-2 py-2.5"
+            : "flex items-center justify-between gap-3 px-3 py-3",
+        ].join(" ")}
+      >
+        <div className={isCollapsed ? "flex items-center justify-center" : "flex min-w-0 items-center gap-3"}>
         <img
-          className="relative w-[34px] h-[49px] aspect-[0.71] object-cover" src="/images/logo.png" alt="Oopedia"/>
+          className="h-10 w-7 object-contain"
+          src="/images/logo.png"
+          alt="Oopedia"
+        />
 
-        <div className="inline-flex flex-col items-start justify-center gap-[3px] relative flex-[0_0_auto]">
-          <h1 className="relative w-fit mt-[-1.00px] [ font-medium text-black text-[16px] tracking-[0] leading-[normal]">
-            OOpedia
-          </h1>
+          {!isCollapsed ? (
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold tracking-tight text-slate-900">
+                OOpedia
+              </h1>
 
-          <div className="inline-flex items-center justify-center gap-2.5 px-1 py-[3px] bg-[#ffd13ec7] rounded-[7px]">
-            <span className="relative w-fit [font-medium text-[#1e1e1e] text-[11px] tracking-[0] leading-[normal] capitalize">
-              {role}
-            </span>
-          </div>
+              <div className="mt-1 inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5">
+                <span className="text-[11px] font-medium capitalize text-sky-700">
+                  {roleLabel}
+                </span>
+              </div>
+            </div>
+          ) : null}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCollapsed((prev) => !prev)}
+          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+          aria-label={isCollapsed ? "Perbesar sidebar" : "Perkecil sidebar"}
+          title={isCollapsed ? "Perbesar sidebar" : "Perkecil sidebar"}
+        >
+          {isCollapsed ? <FaChevronRight className="text-xs" /> : <FaChevronLeft className="text-xs" />}
+        </button>
       </header>
 
-      {/* Nav */}
-    <nav className="flex flex-col items-start gap-3 relative self-stretch w-full flex-[0_0_auto]">
-      {items.map((item) => {
-        const active = isActive(url, item.href);
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={[
-              `flex items-center gap-[10px] pl-2 pr-2 py-[7px] self-stretch w-full rounded-[7px] transition`,
-              active
-                ? "bg-blue-300/70 shadow-sm"
-                : "hover:bg-blue-200/60",
-            ].join(" ")}
-          >
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-l group-hover:bg-white">
-              <Icon className="text-lg text-gray-900" />
-            </span>
+      {!isCollapsed ? (
+        <div className="mt-5 px-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Menu</p>
+        </div>
+      ) : null}
 
-              <span className="text-[13px] font-medium text-gray-900">
-                {item.label}
+      <nav className="mt-2 flex flex-1 flex-col gap-1.5">
+        {items.map((item) => {
+          const active = isActive(url, item.href);
+          const Icon = item.icon;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              title={isCollapsed ? item.label : undefined}
+              className={[
+                "group relative flex items-center rounded-xl px-2.5 py-2 transition",
+                isCollapsed ? "justify-center" : "gap-3",
+                active
+                  ? "bg-sky-100 text-sky-900 shadow-sm ring-1 ring-sky-200"
+                  : "text-slate-700 hover:bg-slate-100/80 hover:text-slate-900",
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "inline-flex h-8 w-8 items-center justify-center rounded-lg transition",
+                  active ? "bg-white text-sky-700" : "bg-slate-100 text-slate-500 group-hover:bg-white",
+                ].join(" ")}
+              >
+                <Icon className="text-sm" />
               </span>
+
+              {!isCollapsed ? <span className="truncate text-[13px] font-medium">{item.label}</span> : null}
+
+              {!isCollapsed && active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sky-500" /> : null}
             </Link>
           );
         })}
