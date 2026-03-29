@@ -1,10 +1,12 @@
-import { Head, Link, useForm } from "@inertiajs/react";
+import { Head, Link, useForm, router } from "@inertiajs/react";
 import button from "@/Components/Button";
 import Logo from "@/Components/ApplicationLogo";
-import { useState } from "react";
+import StatusModal from "@/Components/StatusModal";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
-export default function Register() {
-  const { data, setData, post, processing, errors } = useForm({
+export default function Register({ status }) {
+  const { data, setData, post, processing, errors, reset } = useForm({
     nama: "",
     email: "",
     password: "",
@@ -13,9 +15,84 @@ export default function Register() {
 
   const [showPassword, setShowPassword] = useState(false);
 
+  const [modalState, setModalState] = useState({
+    show: false,
+    type: "success",
+    title: "",
+    message: "",
+  });
+
+  useEffect(() => {
+    if (!status) return;
+
+    let successMessage = status;
+    const lower = String(status).toLowerCase();
+
+    if (lower.includes("verification link sent") || lower.includes("verification-link-sent")) {
+      successMessage = "Kami telah mengirimkan tautan verifikasi ke email kamu. Silakan cek kotak masuk atau folder spam.";
+    }
+
+    setModalState({
+      show: true,
+      type: "success",
+      title: "Pendaftaran Berhasil",
+      message: successMessage,
+    });
+  }, [status]);
+
+  useEffect(() => {
+    if (Object.keys(errors).length === 0) return;
+
+    let message = "Pendaftaran gagal. Silakan periksa kembali data yang kamu isi.";
+
+    if (errors.email) {
+      const emailErr = String(errors.email).toLowerCase();
+      if (emailErr.includes("already been taken")) {
+        message = "Email ini sudah terdaftar. Coba login atau gunakan email lain.";
+      } else {
+        message = errors.email;
+      }
+    } else if (errors.password) {
+      message = errors.password;
+    } else if (errors.nama) {
+      message = errors.nama;
+    }
+
+    setModalState({
+      show: true,
+      type: "error",
+      title: "Pendaftaran Gagal",
+      message,
+    });
+  }, [errors]);
+
+  const closeModal = () => {
+    if (modalState.type === "success") {
+      setModalState((prev) => ({ ...prev, show: false }));
+      // Biasanya redirect ke halaman verifikasi email / login
+      router.visit("/login");
+    } else {
+      setModalState((prev) => ({ ...prev, show: false }));
+    }
+  };
+
   const submit = (e) => {
     e.preventDefault();
-    post("/register");
+    post("/register", {
+      onSuccess: () => {
+        reset("password", "password_confirmation");
+        setModalState({
+          show: true,
+          type: "success",
+          title: "Pendaftaran Berhasil",
+          message:
+            "Akun kamu berhasil dibuat. Jika diminta verifikasi email, silakan cek email kamu sebelum login.",
+        });
+      },
+      onError: () => {
+        // Pesan error akan di-handle oleh useEffect errors di atas
+      },
+    });
   };
 
   return (
@@ -71,7 +148,12 @@ export default function Register() {
               </div>
             </div>
 
-            <div className="w-full max-w-[520px]">
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.45, ease: "easeOut" }}
+              className="w-full max-w-[520px]"
+            >
               {/* header */}
               <div className="mb-8 flex flex-col items-center text-center">
                 <Logo className="h-[77px] w-[55px] object-cover" />
@@ -202,10 +284,19 @@ export default function Register() {
                   Log In
                 </Link>
               </div>
-            </div>
+            </motion.div>
         </div>
         </div>
       </div>
+
+      <StatusModal
+        show={modalState.show}
+        type={modalState.type}
+        title={modalState.title}
+        message={modalState.message}
+        onClose={closeModal}
+        onConfirm={closeModal}
+      />
     </>
   );
 }

@@ -117,23 +117,59 @@ function PodiumCard({ entry, rank, isCurrentUser }) {
 }
 
 export default function Index({ rankings = [], materials = [], currentUserId, className }) {
-  const pageTitle = className ? `Ranking ${className}` : "Ranking";
+  const pageTitle = className ? `Leaderboard Kelas ${className}` : "Leaderboard Kelas";
   const [expandedUser, setExpandedUser] = useState(null);
 
   const top3 = rankings.slice(0, 3);
   const podiumOrder = [top3[1], top3[0], top3[2]].filter(Boolean); 
+
+  const myEntry = rankings.find((r) => r.user_id === currentUserId) || null;
 
   const toggleExpand = (userId) => {
     setExpandedUser(expandedUser === userId ? null : userId);
   };
 
   return (
-    <AppLayout title={pageTitle} label={pageTitle}>
-      <div className="space-y-8">
+    <AppLayout title="Leaderboard Kelas" label="Leaderboard">
+      <div className="mx-auto px-2 space-y-8">
+        {/* ── Page Header ─────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              {pageTitle}
+            </h1>
+            <p className="mt-1 text-xs text-slate-500">
+              Lihat posisi kamu dibanding teman sekelas dalam latihan dan kuis.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm min-w-[220px]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
+              <Icons.Leaderboard className="w-4 h-4" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                Posisi Kamu
+              </span>
+              {myEntry ? (
+                <span className="text-sm font-extrabold text-slate-900">
+                  #{myEntry.rank} 
+                </span>
+              ) : (
+                <span className="text-xs font-medium text-slate-500">
+                  Belum masuk leaderboard
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Podium Top 3 */}
         {top3.length > 0 && (
-          <div>
-            <Text as="h2" variant="title" className="text-center text-lg mb-6">{pageTitle}</Text>
+          <div className="rounded-3xl border border-slate-100 bg-gradient-to-r from-blue-50 via-slate-50 to-indigo-50 px-5 py-6 shadow-sm">
+            <Text as="h2" variant="title" className="text-center text-base mb-6">
+              Top 3 Skor
+            </Text>
             <div className="flex items-end justify-center gap-4">
               {podiumOrder.map((entry) =>
                 entry ? (
@@ -151,10 +187,6 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
 
         {/* Full Rankings Table */}
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100">
-            <Text as="h3" variant="title">Full Rankings</Text>
-          </div>
-
           {/* Header */}
           <div className="hidden md:grid md:grid-cols-[60px_1fr_120px_120px_60px] px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
             <div className="text-center">Rank</div>
@@ -178,8 +210,8 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
                   {/* Main Row */}
                   <div
                     className={[
-                      "grid grid-cols-[60px_1fr_120px_120px_60px] items-center px-5 py-4 border-b border-slate-50 transition cursor-pointer hover:bg-slate-50",
-                      isMe ? "bg-yellow-50" : "",
+                      "grid grid-cols-[60px_1fr_120px_120px_60px] items-center px-5 py-4 border-b border-slate-50 transition cursor-pointer hover:bg-slate-50/80",
+                      isMe ? "bg-yellow-50/80" : "",
                     ].join(" ")}
                     onClick={() => toggleExpand(entry.user_id)}
                   >

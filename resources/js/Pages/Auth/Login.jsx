@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import Checkbox from "@/Components/Checkbox";
 import InputError from "@/Components/InputError";
 import Button from "@/Components/Button";
@@ -129,7 +130,12 @@ export default function Login({ status }) {
       <Head title="Login" />
         {/* Card */}
         <div className="flex min-h-screen items-center justify-center px-4">
-          <div className="flex w-full max-w-[700px] flex-col items-center justify-center gap-3 rounded-[20px] bg-white px-[70px] py-6">
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="flex w-full max-w-[700px] flex-col items-center justify-center gap-3 rounded-[20px] bg-white px-[70px] py-6 shadow-[0_24px_80px_rgba(15,23,42,0.45)]"
+          >
             {/* Logo */}
             <div className="flex w-full flex-col items-center gap-[5px]">
               <img
@@ -234,7 +240,7 @@ export default function Login({ status }) {
                 </Link>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
 
         <StatusModal

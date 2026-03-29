@@ -20,7 +20,7 @@ export default function DosenQuizShow({ quiz, questions = [] }) {
 			backHref={route("dosen.quizzes.index")}
 			backLabel="Kembali ke daftar kuis"
 		>
-			<div className="max-w-5xl mx-auto space-y-6">
+			<div className="mx-auto space-y-6">
 				{/* Quiz Info */}
 					<div className="w-full p-1">
 						<div className="flex items-center justify-between mb-6">

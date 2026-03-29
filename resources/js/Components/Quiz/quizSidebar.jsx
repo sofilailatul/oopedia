@@ -3,7 +3,6 @@ import Button from "@/Components/Button";
 import { formatDateLabel } from "@/Features/quiz/labels";
 import Icons from "@/icons";
 import { router } from "@inertiajs/react";
-import Field from "@/Components/Field";
 
 export default function QuizSidebar({ quiz, onClose, onStart, onReview }) {
   if (!quiz) {
@@ -17,7 +16,8 @@ export default function QuizSidebar({ quiz, onClose, onStart, onReview }) {
 const hasActive = quiz?.has_active_attempt === true;
 const isDone = quiz?.can_review === true || quiz?.status === "done";
 const isExpired = quiz?.end_at && new Date(quiz.end_at) < new Date();
-const canStart = !isDone && !isExpired && quiz?.is_available !== false;
+const isAvailable = quiz?.is_available !== false;
+const canStart = !isDone && !isExpired && isAvailable;
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
@@ -65,13 +65,20 @@ const canStart = !isDone && !isExpired && quiz?.is_available !== false;
       </div>
 
       <div className="mt-auto pt-6">
-        {!isDone && !isExpired && (
+        {!isDone && !isExpired && isAvailable && (
           <div className="flex items-start gap-3 text-[12px] text-slate-700">
             <span className="text-red-500">⚠</span>
             <p>
               Pertanyaan hanya bisa dijawab sekali. Pastikan jawaban Anda sebelum menekan
               <b> "Lanjut Pertanyaan Selanjutnya"</b>.
             </p>
+          </div>
+        )}
+
+        {!isDone && !isExpired && !isAvailable && (
+          <div className="mt-4 text-[12px] text-slate-600">
+            Kuis ini terkunci. Selesaikan membaca materi dan semua latihan soal yang terkait
+            terlebih dahulu.
           </div>
         )}
 
@@ -101,7 +108,7 @@ const canStart = !isDone && !isExpired && quiz?.is_available !== false;
               disabled={!canStart}
               onClick={() => onStart?.(quiz)}
             >
-              Kerjakan Kuis Ini
+              {isAvailable ? "Kerjakan Kuis Ini" : "Terkunci"}
             </Button>
           )}
         </div>

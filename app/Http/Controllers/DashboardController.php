@@ -7,8 +7,9 @@ use Inertia\Inertia;
 use App\Models\MaterialModel;
 use App\Models\PracticeModel;
 use App\Models\QuizModel;
-use App\Models\User;
+use App\Models\UserModel;
 use App\Models\ClassModel; 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -70,7 +71,7 @@ class DashboardController extends Controller
             'total_practices' => 0,
 
             'quizzes_completed' => 0,
-            'total_quizzes' => QuizModel::count(),
+            'total_quizzes' => 0,
 
             'avg_quiz_score' => null,
             'total_time_spent_seconds' => 0,
@@ -85,17 +86,32 @@ class DashboardController extends Controller
         $recentActivities = [];
 
         /* =====================================================
-        * QUIZ (tidak tergantung kelas)
+        * QUIZ (ikut kelas jika ada)
         * ===================================================== */
-        $stats['quizzes_completed'] = DB::table('quiz_attempts')
-            ->where('user_id', $userId)
-            ->whereNotNull('finished_at')
-            ->count();
+        if ($hasClass) {
+            $quizBase = DB::table('quiz_attempts as qa')
+                ->join('quizzes as q', 'q.id', '=', 'qa.quizzes_id')
+                ->where('qa.user_id', $userId)
+                ->where('q.class_id', $classId)
+                ->whereNotNull('qa.finished_at');
 
-        $avg = DB::table('quiz_attempts')
-            ->where('user_id', $userId)
-            ->whereNotNull('finished_at')
-            ->avg('total_score');
+            $stats['quizzes_completed'] = $quizBase->count();
+            $avg = $quizBase->avg('qa.total_score');
+
+            $stats['total_quizzes'] = QuizModel::where('class_id', $classId)->count();
+        } else {
+            $stats['quizzes_completed'] = DB::table('quiz_attempts')
+                ->where('user_id', $userId)
+                ->whereNotNull('finished_at')
+                ->count();
+
+            $avg = DB::table('quiz_attempts')
+                ->where('user_id', $userId)
+                ->whereNotNull('finished_at')
+                ->avg('total_score');
+
+            $stats['total_quizzes'] = QuizModel::count();
+        }
 
         $stats['avg_quiz_score'] = $avg !== null ? round($avg, 1) : null;
 
@@ -131,11 +147,11 @@ class DashboardController extends Controller
         if ($hasClass) {
             $dosenId = DB::table('classes')->where('id', $classId)->value('created_by');
 
-            // MATERIAL selesai jika status unlocked (progress per kelas)
+            // MATERIAL selesai jika sudah dibaca (read_at tidak null) untuk kelas tersebut
             $stats['materials_completed'] = DB::table('user_progress')
                 ->where('user_id', $userId)
                 ->where('class_id', $classId)
-                ->where('status', 'unlocked')
+                ->whereNotNull('read_at')
                 ->count();
 
             // total materials global, di filter by dosen pembuat kelas
@@ -209,7 +225,7 @@ class DashboardController extends Controller
      */
     protected function dosenDashboard()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         // Get classes created by this dosen
         $classes = DB::table('classes as c')
@@ -292,16 +308,16 @@ class DashboardController extends Controller
     {
         // Overall system stats
         $stats = [
-            'total_users' => User::count(),
-            'total_students' => User::where('role', 'mahasiswa')->count(),
-            'total_teachers' => User::where('role', 'dosen')->count(),
+            'total_users' => UserModel::count(),
+            'total_students' => UserModel::where('role', 'mahasiswa')->count(),
+            'total_teachers' => UserModel::where('role', 'dosen')->count(),
             'total_classes' => DB::table('classes')->count(),
             'total_materials' => MaterialModel::count(),
             'total_quizzes' => QuizModel::count(),
         ];
 
         // User breakdown by role
-        $usersByRole = User::select('role', DB::raw('count(*) as count'))
+        $usersByRole = UserModel::select('role', DB::raw('count(*) as count'))
             ->groupBy('role')
             ->get()
             ->mapWithKeys(function ($item) {
@@ -309,7 +325,7 @@ class DashboardController extends Controller
             });
 
         // Recent registered users
-        $recentUsers = User::select(['id', 'name', 'email', 'role', 'created_at'])
+        $recentUsers = UserModel::select(['id', 'nama as name', 'email', 'role', 'created_at'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();

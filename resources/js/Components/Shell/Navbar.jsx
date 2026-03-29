@@ -46,7 +46,7 @@ export default function Navbar({
 
   return (
     <div>
-      <div className="flex  items-center justify-between px-[30px] py-[7px] relative bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
+      <div className="flex  items-center justify-between px-[30px] py-[7px] relative z-20 bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
         <div className="flex items-center gap-3">
           {showBack && (
             backHref ? (
@@ -101,7 +101,7 @@ export default function Navbar({
             </button>
 
             {open && (
-              <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-lg bg-white text-gray-900 shadow-lg ring-1 ring-black/5">
+              <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-lg bg-white text-gray-900 shadow-lg ring-1 ring-black/5 z-30">
                 <div className="px-4 py-3">
                   {/* ✅ ganti {nama} jadi {name} */}
                   <div className="text-[14px] font-medium">{nama}</div>

@@ -60,9 +60,12 @@ class ProgressService
                 ->where('material_id', $materialId)
                 ->pluck('id');
 
+            $hasPractice = $practiceIds->isNotEmpty();
+
             if ($practiceIds->isEmpty()) {
-                // Jika tidak ada practice untuk materi ini, anggap selesai
-                $practiceDone = true;
+                // Jika tidak ada practice untuk materi ini, tandai tidak ada latihan
+                // Progress latihan tidak dianggap "Selesai" agar tidak membingungkan pengguna
+                $practiceDone = false;
             } else {
                 // Hitung berapa practice yang sudah lulus
                 $passedPracticeCount = PracticeAttempt::query()
@@ -167,6 +170,7 @@ class ProgressService
                 'status' => $progress->status,
                 'readDone' => $readDone,
                 'practiceDone' => $practiceDone,
+                'has_practice' => $hasPractice,
                 'completed' => $completed,
                 'next_unlocked_material_id' => $nextUnlockedMaterialId,
                 'quiz_available' => $quizAvailable,

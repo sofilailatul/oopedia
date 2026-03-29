@@ -377,7 +377,7 @@ function PracticeEditContent({
 	};
 
 	return (
-		<div className="mx-auto max-w-5xl space-y-6">
+		<div className="mx-auto space-y-6">
 				<header className="space-y-4">
 					<PracticeMetaPanel
 						teacherName={teacher?.name ?? "Dosen"}

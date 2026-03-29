@@ -12,6 +12,7 @@ use App\Models\UserProgressModel;
 use App\Models\QuizAttemptMaterialScoreModel;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use App\Services\QuizService;
@@ -54,18 +55,48 @@ class QuizController extends Controller
             ])
             ->keyBy('quizzes_id');
 
-        $materialsByQuiz = DB::table('quiz_materials')
+        // Ambil mapping quiz -> materi (id + nama)
+        $materialsRaw = DB::table('quiz_materials')
             ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
-            ->select('quiz_materials.quizzes_id', 'materials.material_name')
+            ->select('quiz_materials.quizzes_id', 'materials.id as material_id', 'materials.material_name')
             ->whereIn('quiz_materials.quizzes_id', function ($q) use ($classIds) {
                 $q->select('id')->from('quizzes')->whereIn('class_id', $classIds);
             })
             ->orderBy('materials.order_number')
-            ->get()
+            ->get();
+
+        $materialsByQuiz = $materialsRaw
             ->groupBy('quizzes_id')
             ->map(function ($rows) {
                 return $rows->pluck('material_name')->values()->all();
             });
+
+        // Progress membaca + latihan per materi untuk user ini
+        $materialIds = $materialsRaw->pluck('material_id')->unique()->values();
+
+        $progressByClassAndMaterial = collect();
+        $materialsWithPractice = collect();
+
+        if ($materialIds->isNotEmpty()) {
+            $progressRows = DB::table('user_progress')
+                ->where('user_id', $userId)
+                ->whereIn('material_id', $materialIds)
+                ->select('class_id', 'material_id', 'read_at', 'completed_practice_at')
+                ->get();
+
+            $progressByClassAndMaterial = $progressRows
+                ->groupBy('class_id')
+                ->map(function ($rows) {
+                    return $rows->keyBy('material_id');
+                });
+
+            $materialsWithPractice = DB::table('practices')
+                ->whereIn('material_id', $materialIds)
+                ->select('material_id')
+                ->distinct()
+                ->pluck('material_id')
+                ->flip();
+        }
         
         $questionCountByQuiz = DB::table('quiz_map')
             ->select('quiz_id', DB::raw('COUNT(*) as total'))
@@ -78,7 +109,7 @@ class QuizController extends Controller
             ->orderByDesc('id')
             ->get(['id', 'title', 'duration', 'passing_score', 'start_at', 'end_at', 'class_id', 'created_by']);
 
-        $payload = $quizzes->map(function ($q) use ($latestAttempts, $materialsByQuiz, $questionCountByQuiz) {
+        $payload = $quizzes->map(function ($q) use ($latestAttempts, $materialsByQuiz, $questionCountByQuiz, $materialsRaw, $progressByClassAndMaterial, $materialsWithPractice) {
             $attempt = $latestAttempts->get($q->id);
 
             $isDone = $attempt && !is_null($attempt->finished_at);
@@ -88,6 +119,29 @@ class QuizController extends Controller
             $availableByTime = true;
             if ($q->start_at && $now->lt($q->start_at)) $availableByTime = false;
             if ($q->end_at && $now->gt($q->end_at)) $availableByTime = false;
+
+            // Cek apakah semua materi yang diuji sudah dibaca & latihan selesai
+            $requirements = $materialsRaw->where('quizzes_id', $q->id);
+
+            $progressOk = true;
+            if ($requirements->isNotEmpty()) {
+                $classProgress = $progressByClassAndMaterial->get($q->class_id, collect());
+                foreach ($requirements as $row) {
+                    $materialId = $row->material_id;
+                    $p = $classProgress->get($materialId);
+
+                    $hasRead = $p && !is_null($p->read_at);
+                    $hasPractice = $materialsWithPractice->has($materialId);
+                    $practiceDone = $hasPractice ? ($p && !is_null($p->completed_practice_at)) : true;
+
+                    if (!($hasRead && $practiceDone)) {
+                        $progressOk = false;
+                        break;
+                    }
+                }
+            }
+
+            $isAvailable = $availableByTime && $progressOk;
 
             return [
                 'id' => $q->id,
@@ -104,7 +158,7 @@ class QuizController extends Controller
                 'score' => $isDone ? (int) $attempt->total_score : null,
                 'can_review' => $isDone,
                 'attempt_id' => $isDone ? (int) $attempt->id : null,
-                'is_available' => $availableByTime,
+                'is_available' => $isAvailable,
             ];
         })->values();
 
@@ -125,7 +179,7 @@ class QuizController extends Controller
             ->first();
 
         // Fetch materials for this quiz from quiz_material
-        $materials = \DB::table('quiz_materials')
+        $materials = DB::table('quiz_materials')
             ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
             ->where('quiz_materials.quizzes_id', $quiz->id)
             ->orderBy('materials.order_number')
@@ -185,7 +239,7 @@ class QuizController extends Controller
 
     public function startAttempt(Request $request, QuizModel $quiz)
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
 
         try {
             $attempt = $this->quizService->validateAndCreateAttempt($userId, $quiz->id, [
@@ -544,7 +598,7 @@ class QuizController extends Controller
 
     public function dosenIndexPage()
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
         $quizzes = $this->quizService->getQuizzesForLecturer($userId);
 
         $classes = \App\Models\ClassModel::query()
@@ -560,7 +614,7 @@ class QuizController extends Controller
 
     public function dosenShowPage(QuizModel $quiz)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         abort_unless((int) $quiz->created_by === (int) $user->id, 403);
 
         $quiz->load(['questions.options', 'class']);
@@ -613,7 +667,7 @@ class QuizController extends Controller
 
     public function dosenCreatePage()
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $classes = \App\Models\ClassModel::query()
             ->where('created_by', $user->id)
@@ -633,7 +687,7 @@ class QuizController extends Controller
 
     public function store(Request $request)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $validated = $request->validate([
             'class_id' => ['required', 'exists:classes,id'],
@@ -665,7 +719,7 @@ class QuizController extends Controller
 
     public function dosenEditPage(QuizModel $quiz)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         abort_unless((int) $quiz->created_by === (int) $user->id, 403);
 
         $quiz->load(['questions.options', 'class']);
@@ -712,7 +766,7 @@ class QuizController extends Controller
 
     public function dosenSaveQuestions(Request $request, QuizModel $quiz)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         abort_unless((int) $quiz->created_by === (int) $user->id, 403);
 
         $validated = $request->validate([

@@ -2,7 +2,6 @@ import AppShell from '@/Components/Shell/AppShell';
 import Sidebar from '@/Components/Shell/Sidebar';
 import Navbar from '@/Components/Shell/Navbar';
 import { usePage, Head } from '@inertiajs/react';
-import { PopupProvider } from '@/Components/PopUp/PopUpProvider';
 import InertiaErrorPopup from '@/Components/PopUp/InertiaErrorPopup';
 
 function normalizeRole(authUser) {
@@ -36,18 +35,14 @@ export default function AppLayout({
   return (
     <>
       <Head title={`${label}`} />
-
-      <PopupProvider>
+      <AppShell
+        sidebar={<Sidebar />}
+        navbar={<Navbar title={title} backHref={backHref} backLabel={backLabel} onBackClick={onBackClick} />}
+        fullHeight={fullHeight}
+      >
+        {children}
         <InertiaErrorPopup />
-
-        <AppShell
-          sidebar={<Sidebar />}
-          navbar={<Navbar title={title} backHref={backHref} backLabel={backLabel} onBackClick={onBackClick} />}
-          fullHeight={fullHeight}
-        >
-          {children}
-        </AppShell>
-      </PopupProvider>
+      </AppShell>
     </>
   );
 }

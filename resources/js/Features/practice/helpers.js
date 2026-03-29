@@ -6,6 +6,9 @@ export const totalQuestions = (questionCounts, difficulty, questionType) => {
 export const canStartPractice = (selectedPractice, difficulty, questionType) => {
   if (!selectedPractice || !difficulty || !questionType) return false;
 
+  // Tidak boleh mulai jika materi terkait belum dibaca
+  if (selectedPractice.is_locked || selectedPractice.material_read === false) return false;
+
   const practiceId = selectedPractice.levels?.[difficulty];
   const total = totalQuestions(selectedPractice.question_counts, difficulty, questionType);
 

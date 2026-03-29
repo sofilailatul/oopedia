@@ -220,6 +220,7 @@ class MaterialController extends Controller
                     'status' => $result['status'],
                     'read_done' => $result['readDone'],
                     'practice_done' => $result['practiceDone'],
+                    'has_practice' => $result['has_practice'] ?? false,
                     'completed' => $result['completed'],
                     'quiz_available' => $result['quiz_available'] ?? false, 
                     'next_step' => $this->determineNextStep($result),
@@ -387,9 +388,9 @@ class MaterialController extends Controller
             abort(403, 'Akses ditolak. Anda tidak berhak mengedit materi ini.');
         }
 
-        if ($material->progress()->exists()) {
-            abort(403, 'Materi tidak dapat diedit karena sudah diakses oleh mahasiswa.');
-        }
+        // We allow editing content even if there is progress, 
+        // but order_number is intentionally ignored or locked on the frontend.
+
 
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
@@ -493,10 +494,6 @@ class MaterialController extends Controller
     {
         if ($material->created_by !== $request->user()->id) {
             abort(403, 'Akses ditolak.');
-        }
-
-        if ($material->progress()->exists()) {
-            abort(403, 'Materi tidak dapat diedit karena sudah diakses oleh mahasiswa.');
         }
 
         $data = $request->validate([

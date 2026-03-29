@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\QuizAttemptModel;
-use App\Models\QuizQuestionModel;
+use App\Models\QuizQuestionsModel;
 use App\Models\QuizModel;
 use App\Models\UserQuizAnswerModel;
 use Illuminate\Support\Facades\Auth;
@@ -13,8 +13,13 @@ class QuizService
 {
     public function validateAndCreateAttempt(int $userId, int $quizId, array $cfg = [])
     {
+        // Ambil quiz beserta informasi kelas
+        $quiz = QuizModel::findOrFail($quizId);
+
+        // ✅ Rule: materi & latihan terkait di kelas tersebut harus sudah selesai
+        $this->ensureMaterialAndPracticeCompleted($userId, $quiz);
+
         // ❌ Rule: melewati batas waktu end_at => tidak boleh mengerjakan
-        $quiz = \App\Models\QuizModel::findOrFail($quizId);
         if ($quiz->end_at && now()->gt($quiz->end_at)) {
             throw new \Exception('Batas Pengerjaan sudah Habis, Hubungi Dosen yang bersangkutan');
         }
@@ -32,6 +37,53 @@ class QuizService
 
         // ✅ Kalau belum ada sama sekali => buat attempt baru
         return $this->createAttempt($userId, $quizId, $cfg);
+    }
+
+    /**
+     * Pastikan semua materi yang diujikan di kuis sudah:
+     * - Dibaca (read_at tidak null)
+     * - Latihan soal (jika ada) sudah selesai untuk materi tersebut
+     */
+    private function ensureMaterialAndPracticeCompleted(int $userId, QuizModel $quiz): void
+    {
+        // Ambil semua materi yang terhubung dengan kuis ini
+        $materialIds = DB::table('quiz_materials')
+            ->where('quizzes_id', $quiz->id)
+            ->pluck('material_id');
+
+        if ($materialIds->isEmpty()) {
+            // Tidak ada materi yang dipetakan ke kuis ini => tidak ada syarat tambahan
+            return;
+        }
+
+        // Progress baca + latihan per materi untuk user di kelas yang sama dengan kuis
+        $progress = DB::table('user_progress')
+            ->where('user_id', $userId)
+            ->where('class_id', $quiz->class_id)
+            ->whereIn('material_id', $materialIds)
+            ->select('material_id', 'read_at', 'completed_practice_at')
+            ->get()
+            ->keyBy('material_id');
+
+        // Cek apakah materi punya latihan
+        $materialsWithPractice = DB::table('practices')
+            ->whereIn('material_id', $materialIds)
+            ->select('material_id')
+            ->distinct()
+            ->pluck('material_id')
+            ->flip();
+
+        foreach ($materialIds as $materialId) {
+            $p = $progress->get($materialId);
+
+            $hasRead = $p && !is_null($p->read_at);
+            $hasPractice = $materialsWithPractice->has($materialId);
+            $practiceDone = $hasPractice ? ($p && !is_null($p->completed_practice_at)) : true;
+
+            if (!($hasRead && $practiceDone)) {
+                throw new \Exception('Kuis ini baru bisa dikerjakan setelah kamu membaca materi dan menyelesaikan semua latihan soal (easy, normal, hard) yang terkait.');
+            }
+        }
     }
 
     private function hasFinishedAttempt(int $userId, int $quizId): bool
@@ -88,7 +140,7 @@ class QuizService
             'title' => null,
         ]);
 
-        $questions = QuizQuestionModel::query()
+        $questions = QuizQuestionsModel::query()
             ->join('quiz_map', 'quiz_map.quiz_question_id', '=', 'quiz_questions.id')
             ->where('quiz_map.quiz_id', $attempt->quizzes_id)
             ->select('quiz_questions.*', 'quiz_map.points')
@@ -124,7 +176,7 @@ class QuizService
         return DB::transaction(function () use ($attempt, $answersPayload) {
             $questionIds = array_map('intval', array_keys($answersPayload));
 
-            $questions = QuizQuestionModel::query()
+            $questions = QuizQuestionsModel::query()
                 ->join('quiz_map', 'quiz_map.quiz_question_id', '=', 'quiz_questions.id')
                 ->where('quiz_map.quiz_id', $attempt->quizzes_id)
                 ->whereIn('quiz_questions.id', $questionIds)

@@ -1,8 +1,7 @@
 import React from "react";
 import Dropdown from "@/Components/Dropdown";
-import { FaChevronDown, FaCheck } from "react-icons/fa";
+import { FaChevronDown, FaCheck, FaTimes } from "react-icons/fa";
 import Button from "@/Components/Button";
-
 import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
 import { hintToneClass, scoreBadgeClass } from "@/Features/practice/ui";
 import { calculateDifficultyRule, canSelectDifficulty } from "@/Features/practice/rules";
@@ -24,47 +23,43 @@ export default function PracticeSidebar({
   const rule = calculateDifficultyRule(scores);
   const qty = totalQuestions(questionCounts, difficulty, questionType, selectedPractice?.material_name);
 
-  const handleDifficultySelect = (level) => {
-    console.log("Dropdown Level dipilih:", level);
-    onDifficultyChange(level);
-  };
-
-  const handleQuestionTypeSelect = (type) => {
-    console.log("Dropdown Tipe Soal dipilih:", type);
-    onQuestionTypeChange(type);
-  };
-
   return (
-    <div className="bg-white rounded-2xl border shadow-sm p-5 ">
-      <div className="flex items-start justify-between">
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+      {/* Header */}
+      <div className="flex items-start justify-between pb-3">
         <div>
-          <div className="text-xs text-slate-500">Latihan Soal</div>
-          <h3 className="text-lg font-bold mt-1">
-            {selectedPractice?.material_name ?? "Pilih materi dulu"}
+          <h3 className="text-xl font-bold text-slate-900 leading-snug">
+            {selectedPractice?.material_name ?? "Pilih Materi"}
           </h3>
         </div>
-
         <button
           type="button"
           onClick={onClose}
-          className="text-slate-400 hover:text-slate-700"
+          className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
           title="Tutup"
         >
-          ✕
+          <FaTimes className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="mt-5 space-y-4">
-        <div className={`border rounded-xl px-3 py-2 text-sm ${hintToneClass(rule.tone)}`}>
-          {rule.hint}
+      <div className="space-y-6 flex-1">
+        {/* Hint / Rules */}
+        <div className={`border rounded-2xl p-4 text-[13px] leading-relaxed font-medium ${hintToneClass(rule.tone) || 'bg-slate-50 border-slate-200 text-slate-600'}`}>
+          <div className="flex items-start gap-3">
+            <span className="text-lg mt-0.5">💡</span>
+            <p>{rule.hint}</p>
+          </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="text-sm font-semibold text-slate-700">Nilai per Level</div>
-          <div className="space-y-2">
+        {/* Scores */}
+        <div className="space-y-3">
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
+            Nilai Per Level
+          </label>
+          <div className="grid grid-cols-1 gap-2">
             {["easy", "normal", "hard"].map((level) => (
-              <div key={level} className="flex items-center justify-between border rounded-xl px-3 py-2">
-                <span className="text-sm text-slate-700 font-medium">
+              <div key={level} className="flex items-center justify-between bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-3">
+                <span className="text-[12px] font-medium text-slate-700 capitalize">
                   {difficultyLabel(level)}
                 </span>
                 <ScoreBadge score={scores[level]} />
@@ -73,90 +68,116 @@ export default function PracticeSidebar({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700">Level</label>
-          <Dropdown>
-            <Dropdown.Trigger>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between border rounded-xl px-3 py-2 bg-white hover:bg-slate-50"
-              >
-                <span className="text-sm text-slate-800">{difficultyLabel(difficulty)}</span>
-                <FaChevronDown className="text-slate-500 text-xs" />
-              </button>
-            </Dropdown.Trigger>
-
-            <Dropdown.Content align="right" width="48" contentClasses="py-1 bg-white">
-              {["easy", "normal", "hard"].map((level) => {
-                const enabled = canSelectDifficulty(level, rule);
-                const selected = difficulty === level;
-
-                return (
-                  <Dropdown.Item
-                    key={level}
-                    disabled={!enabled}
-                    onClick={() => enabled && handleDifficultySelect(level)}
-                    className="flex items-center justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      {selected && <FaCheck className="text-xs" />}
-                      {difficultyLabel(level)}
-                    </span>
-                    {!enabled && <span className="text-xs text-gray-400">Terkunci</span>}
-                  </Dropdown.Item>
-                );
-              })}
-            </Dropdown.Content>
-          </Dropdown>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-slate-700">Tipe Soal</label>
-          <Dropdown>
-            <Dropdown.Trigger>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between border rounded-xl px-3 py-2 bg-white hover:bg-slate-50"
-              >
-                <span className="text-sm text-slate-800">{questionTypeLabel(questionType)}</span>
-                <FaChevronDown className="text-slate-500 text-xs" />
-              </button>
-            </Dropdown.Trigger>
-
-            <Dropdown.Content align="right" width="48" contentClasses="py-1 bg-white">
-              {["multiple_choice", "drag_drop"].map((type) => (
-                <Dropdown.Item
-                  key={type}
-                  onClick={() => handleQuestionTypeSelect(type)}
-                  className="flex items-center gap-2"
+        {/* Options */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
+              Level Kesulitan
+            </label>
+            <Dropdown>
+              <Dropdown.Trigger>
+                <Button
+                  className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
                 >
-                  {questionType === type && <FaCheck className="text-xs" />}
-                  {questionTypeLabel(type)}
-                </Dropdown.Item>
-              ))}
-            </Dropdown.Content>
-          </Dropdown>
+                  <span className="text-[12px] font-medium text-slate-700">
+                    {difficulty ? difficultyLabel(difficulty) : "Pilih Level"}
+                  </span>
+                  <FaChevronDown className="text-slate-400 text-[10px]" />
+                </Button>
+              </Dropdown.Trigger>
+              <Dropdown.Content align="left" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
+                {["easy", "normal", "hard"].map((level) => {
+                  const enabled = canSelectDifficulty(level, rule);
+                  const selected = difficulty === level;
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      disabled={!enabled}
+                      onClick={() => enabled && onDifficultyChange(level)}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${
+                        selected ? "bg-indigo-50 text-indigo-700" : (enabled ? "text-slate-700 hover:bg-slate-50" : "text-slate-300 cursor-not-allowed")
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {selected && <FaCheck className="text-[10px]" />}
+                        {difficultyLabel(level)}
+                      </span>
+                      {!enabled && <span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-md">Terkunci</span>}
+                    </button>
+                  );
+                })}
+              </Dropdown.Content>
+            </Dropdown>
+          </div>
+
+          <div className="space-y-3">
+            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
+              Tipe Soal
+            </label>
+            <Dropdown>
+              <Dropdown.Trigger>
+                <Button
+                  className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
+                >
+                  <span className="text-[12px] font-medium text-slate-700">
+                    {questionType ? questionTypeLabel(questionType) : "Pilih Tipe"}
+                  </span>
+                  <FaChevronDown className="text-slate-400 text-[10px]" />
+                </Button>
+              </Dropdown.Trigger>
+              <Dropdown.Content align="right" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
+                {["multiple_choice", "drag_drop"].map((type) => {
+                  const selected = questionType === type;
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => onQuestionTypeChange(type)}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 ${
+                        selected ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {selected && <FaCheck className="text-[10px]" />}
+                      {questionTypeLabel(type)}
+                    </button>
+                  );
+                })}
+              </Dropdown.Content>
+            </Dropdown>
+          </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          <div className="text-sm font-semibold text-slate-700">Jumlah Soal</div>
-          <div className="px-3 py-2 border rounded-xl text-sm text-slate-600 bg-slate-50">
+        {/* Summary Info */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+          <span className="text-sm font-semibold text-slate-600">Total Soal</span>
+          <div className="flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-indigo-600 shadow-sm">
             {!difficulty || !questionType ? "—" : qty}
           </div>
         </div>
 
         {difficulty && questionType && qty === 0 && (
-          <div className="text-xs text-red-600">Soal untuk level & tipe ini belum tersedia.</div>
+          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600">
+            <span className="text-sm mt-0.5">⚠️</span>
+            <p className="text-xs font-medium leading-relaxed">
+              Soal untuk level dan tipe ini belum tersedia. Silakan pilih kombinasi lain.
+            </p>
+          </div>
         )}
+      </div>
 
+      <div className="mt-8 pt-6 border-t border-slate-100">
         <Button
           disabled={!canStart}
           onClick={() => onStart(qty)}
-          variant="Solid"
-          color="blue"
-          className={`w-full ${canStart ? "Blue hover:bg-slate-600" : "bg-slate-200 text-slate-500 cursor-not-allowed"}`}
+          variant="solid"
+          color="indigo"
+          size="lg"
+          className={`w-full rounded-2xl font-bold py-4 shadow-[0_4px_14px_0_rgb(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:bg-indigo-700 disabled:shadow-none transition-all ${
+            !canStart && "bg-slate-100 text-slate-400 border border-slate-200"
+          }`}
         >
-          Mulai
+          {canStart ? "Mulai Kerjakan" : "Hubungi Dosen"}
         </Button>
       </div>
     </div>
@@ -165,10 +186,12 @@ export default function PracticeSidebar({
 
 function ScoreBadge({ score }) {
   const badgeClass = scoreBadgeClass(score);
-  const display = score == null ? "Belum mengerjakan" : score;
+  const display = score == null ? "0" : `${score} pts`;
 
   return (
-    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${badgeClass}`}>
+    <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md tracking-wider uppercase ${badgeClass} border ${
+      score == null ? "bg-slate-100 text-slate-500 border-slate-200" : badgeClass
+    }`}>
       {display}
     </span>
   );

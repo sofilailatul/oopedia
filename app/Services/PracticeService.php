@@ -19,20 +19,26 @@ class PracticeService
     
     public function getPracticesForUser($userId)
     {
-        
+        // Semua latihan soal yang tersedia
         $practiceRows = PracticeModel::query()
             ->with('material:id,material_name')
             ->orderBy('material_id')
             ->get();
 
-        
+        // Progress membaca materi per user (apakah sudah pernah selesai membaca)
+        $readProgress = DB::table('user_progress')
+            ->where('user_id', $userId)
+            ->select('material_id', DB::raw('MAX(CASE WHEN read_at IS NULL THEN 0 ELSE 1 END) as read_done'))
+            ->groupBy('material_id')
+            ->pluck('read_done', 'material_id');
+
         $scores = $this->getLatestScores($userId);
 
         $anyAttempts = $this->getAnyAttempts($userId);
 
         $questionCounts = $this->getQuestionCounts();
 
-        return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $anyAttempts);
+        return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $anyAttempts, $readProgress);
     }
 
     /**
@@ -116,11 +122,11 @@ class PracticeService
             ->keyBy('practices_id');
     }
 
-    private function groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $activeAttempts)
+    private function groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $activeAttempts, $readProgress)
     {
         $grouped = $practiceRows->groupBy('material_id');
 
-        return $grouped->map(function ($items) use ($scores, $questionCounts, $activeAttempts) {
+        return $grouped->map(function ($items) use ($scores, $questionCounts, $activeAttempts, $readProgress) {
             $material = $items->first()->material;
 
             $easy   = $items->firstWhere('difficulty_level', 'easy');
@@ -140,8 +146,11 @@ class PracticeService
                 ->sortByDesc('created_at')
                 ->first();
 
+            $materialId = $material?->id;
+            $hasRead = $materialId ? (bool) ($readProgress[$materialId] ?? 0) : false;
+
             return [
-                'material_id'   => $material?->id,
+                'material_id'   => $materialId,
                 'material_name' => $material?->material_name,
                 'levels' => [
                     'easy'   => $easyId,
@@ -158,6 +167,9 @@ class PracticeService
                     'id' => $latestActive->id,
                     'practices_id' => $latestActive->practices_id,
                 ] : null,
+                // Bisa mulai latihan hanya jika materi sudah dibaca (read_at tidak null)
+                'material_read' => $hasRead,
+                'is_locked' => !$hasRead,
                 'question_counts' => [
                     'easy' => [
                         'multiple_choice' => $easyId ? ($questionCounts[$easyId]['multiple_choice'] ?? 0) : 0,
@@ -193,12 +205,26 @@ class PracticeService
 
     private function validateLevel($userId, $practiceId, $selectedLevel)
     {
-        
         $practice = PracticeModel::findOrFail($practiceId);
-        
-        
+
+        // Pastikan user sudah menyelesaikan membaca materi sebelum bisa mengerjakan latihan
+        $this->ensureMaterialRead($userId, $practice->material_id);
+
         if ($selectedLevel !== 'normal') {
             $this->validateNormalCompleted($userId, $practice->material_id);
+        }
+    }
+
+    private function ensureMaterialRead($userId, $materialId)
+    {
+        $hasRead = DB::table('user_progress')
+            ->where('user_id', $userId)
+            ->where('material_id', $materialId)
+            ->whereNotNull('read_at')
+            ->exists();
+
+        if (!$hasRead) {
+            throw new \Exception('Kamu perlu menyelesaikan membaca materi ini terlebih dahulu.');
         }
     }
 

@@ -374,7 +374,7 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 	};
 
 	return (
-		<div className="mx-auto max-w-5xl space-y-6">
+		<div className="mx-auto space-y-6">
 			<header className="space-y-4 px-2">
 				<div className="flex items-center gap-4">
 					<div>

@@ -31,7 +31,7 @@ export default function DosenPracticeShow({ practice, teacher, questions = [] })
       backHref={route("dosen.practices.index")}
       backLabel="Kembali ke daftar latihan"
     >
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className=" mx-auto space-y-6">
         <header className="space-y-4">
           <PracticeMetaPanel
             teacherName={teacher?.name ?? "Dosen"}

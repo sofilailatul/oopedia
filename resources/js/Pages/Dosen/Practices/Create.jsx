@@ -320,7 +320,7 @@ function CreatePracticeContent({
 	};
 
 	return (
-		<div className="max-w-5xl mx-auto space-y-6">
+		<div className=" mx-auto space-y-6">
 				<header className="space-y-4">
 					<PracticeMetaPanel
 						teacherName={teacher?.name ?? "Dosen"}

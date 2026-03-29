@@ -184,6 +184,7 @@ function EditMaterialContent({ material, authUser }) {
 
 				{/* Right sidebar */}
 				<aside className="w-72 space-y-4">
+					{/* Dibuat Oleh */}
 					<div className="bg-white rounded-xl border p-4 shadow-sm">
 						<h3 className="text-sm font-semibold text-gray-800 mb-3">
 							Dibuat Oleh
@@ -192,6 +193,32 @@ function EditMaterialContent({ material, authUser }) {
 							{creatorName}
 						</div>
 					</div>
+
+					{/* Urutan Materi — read-only */}
+					<div className="bg-white rounded-xl border p-4 shadow-sm">
+						<h3 className="text-sm font-semibold text-gray-800 mb-1">
+							Urutan Materi
+						</h3>
+						<p className="text-[11px] text-slate-400 mb-3">
+							Urutan hanya bisa diubah dari halaman daftar materi.
+						</p>
+						<div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-slate-50">
+							<span className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-600">
+								{orderNumber}
+							</span>
+							<span className="text-sm text-slate-500 font-medium">Materi ke-{orderNumber}</span>
+						</div>
+					</div>
+
+					{/* Lock notice */}
+					{material?.is_locked && (
+						<div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+							<span className="text-amber-500 mt-0.5 shrink-0">🔒</span>
+							<p className="text-[11px] text-amber-700 leading-relaxed">
+								Materi ini sudah diakses mahasiswa. Konten tetap bisa diedit, namun urutan dikunci.
+							</p>
+						</div>
+					)}
 
 					<Button
 						type="button"

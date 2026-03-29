@@ -138,31 +138,18 @@ export default function KelolaMateri({ materials = [] }) {
                         >
                           Lihat
                         </Button>
-                        {!material.is_locked && (
-                          <Button
-                            as={Link}
-                            href={route("dosen.materials.edit", material.id)}
-                            color="blue"
-                            variant="outline"
-                            size="sm"
-                            leftIcon={<FaPen className="h-3 w-3" />}
-                            onClick={() => console.log('Tombol Edit diklik untuk material:', material.material_name)}
-                          >
-                            Edit
-                          </Button>
-                        )}
-                        {material.is_locked && (
-                          <Button
-                            disabled
-                            color="gray"
-                            variant="outline"
-                            size="sm"
-                            leftIcon={<FaLock className="h-3 w-3" />}
-                            title="Terkunci karena sudah diakses"
-                          >
-                            Edit
-                          </Button>
-                        )}
+                        <Button
+                          as={Link}
+                          href={route("dosen.materials.edit", material.id)}
+                          color="blue"
+                          variant="outline"
+                          size="sm"
+                          leftIcon={<FaPen className="h-3 w-3" />}
+                          title={material.is_locked ? "Konten bisa diedit, urutan tidak bisa diubah" : "Edit materi"}
+                          onClick={() => console.log('Tombol Edit diklik untuk material:', material.material_name)}
+                        >
+                          Edit
+                        </Button>
                       </div>
                     </td>
                   </tr>

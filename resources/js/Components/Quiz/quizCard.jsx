@@ -5,9 +5,11 @@ import Button from "@/Components/Button";
 
 export default function QuizCard({ quiz, onClick }) {
   const isDone = quiz?.can_review === true || quiz?.status === "done";
+  const isAvailable = quiz?.is_available !== false;
   const materialNames = Array.isArray(quiz?.material_names) ? quiz.material_names : [];
 
   const handleCardClick = () => {
+    if (!isAvailable && !isDone) return;
     onClick?.(quiz);
   };
 
@@ -22,11 +24,17 @@ export default function QuizCard({ quiz, onClick }) {
       tabIndex={0}
       onClick={handleCardClick}
       onKeyDown={(e) => (e.key === "Enter" ? handleCardClick() : null)}
-      className="text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition cursor-pointer"
+      className={`text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-6 transition ${
+        !isAvailable && !isDone
+          ? "opacity-60 cursor-not-allowed"
+          : "hover:shadow-md cursor-pointer"
+      }`}
     >
       <div className="flex items-center justify-between">
-        <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${statusBadgeClass(quiz?.status)}`}>
-          {statusLabel(quiz?.status)}
+        <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${statusBadgeClass(quiz?.status)} ${
+          !isAvailable && !isDone ? "bg-slate-100 text-slate-400 border border-slate-200" : ""
+        }`}>
+          {!isAvailable && !isDone ? "Terkunci" : statusLabel(quiz?.status)}
         </span>
       </div>
 
@@ -65,10 +73,16 @@ export default function QuizCard({ quiz, onClick }) {
           type="button"
           onClick={handleButtonClick}
           variant="solid"
-          color={isDone ? "green" : "yellow"}
+          color={isDone ? "green" : isAvailable ? "yellow" : "gray"}
+          disabled={!isAvailable && !isDone}
           className="w-full"
+          leftIcon={!isAvailable && !isDone ? <Icons.Lock className="w-3.5 h-3.5" /> : null}
         >
-          {isDone ? "Review Kuis" : "Kerjakan Kuis"}
+          {isDone
+            ? "Review Kuis"
+            : !isAvailable
+            ? "Baca materi & selesaikan latihan dulu"
+            : "Kerjakan Kuis"}
         </Button>
       </div>
     </div>
