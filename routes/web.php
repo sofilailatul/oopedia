@@ -122,6 +122,12 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('auth','role:dosen')->group(function () {
 
+        // ===== NILAI MAHASISWA (dosen) =====
+        Route::get('/dosen/nilai-mahasiswa', [ProgressController::class, 'dosenClassScoresPage'])
+            ->name('dosen.grades.index');
+        Route::get('/dosen/nilai-mahasiswa/{student}', [ProgressController::class, 'dosenStudentDetailPage'])
+            ->name('dosen.grades.show');
+
         // ===== PRACTICE (dosen) =====
         Route::get('/dosen/latihan-soal', [PracticeController::class, 'dosenIndexPage'])
             ->name('dosen.practices.index');

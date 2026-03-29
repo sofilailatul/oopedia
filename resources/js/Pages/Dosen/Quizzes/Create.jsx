@@ -3,11 +3,29 @@ import AppLayout from "@/Layouts/AppLayout";
 import { router } from "@inertiajs/react";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
+import StatusModal from "@/Components/StatusModal";
 import { FaSave } from "react-icons/fa";
+
+function getErrorReason(errors) {
+	if (!errors || typeof errors !== "object") {
+		return "Gagal membuat kuis. Periksa kembali data yang diisi.";
+	}
+
+	const values = Object.values(errors);
+	if (values.length === 0) {
+		return "Gagal membuat kuis. Periksa kembali data yang diisi.";
+	}
+
+	const first = values[0];
+	if (typeof first === "string") return first;
+	if (Array.isArray(first) && first[0]) return String(first[0]);
+
+	return "Gagal membuat kuis. Periksa kembali data yang diisi.";
+}
 
 export default function DosenQuizCreate({ classes = [], materials = [] }) {
 	const [formData, setFormData] = React.useState({
-		class_id: "",
+		class_ids: [],
 		title: "",
 		duration: 60,
 		passing_score: 60,
@@ -18,12 +36,22 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 
 	const [saving, setSaving] = React.useState(false);
 	const [error, setError] = React.useState("");
+	const [modalState, setModalState] = React.useState({
+		show: false,
+		type: "success",
+		title: "",
+		message: "",
+		confirmText: "OK",
+		cancelText: "",
+		onConfirm: null,
+		onCancel: null,
+	});
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
 
-		if (!formData.class_id || !formData.title.trim()) {
-			setError("Pilih kelas dan isi judul kuis terlebih dahulu.");
+		if (!formData.class_ids.length || !formData.title.trim()) {
+			setError("Pilih minimal satu kelas dan isi judul kuis terlebih dahulu.");
 			return;
 		}
 
@@ -38,10 +66,31 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 		router.post(route("quizzes.store"), formData, {
 			onSuccess: () => {
 				setSaving(false);
+				setModalState({
+					show: true,
+					type: "success",
+					title: "Berhasil",
+					message: "Kuis berhasil dibuat. Kamu akan dialihkan ke halaman pengaturan soal.",
+					confirmText: "Tutup",
+					cancelText: "",
+					onConfirm: null,
+					onCancel: null,
+				});
 			},
 			onError: (errors) => {
 				setSaving(false);
-				setError(errors?.title || errors?.class_id || errors?.material_ids || "Gagal membuat kuis.");
+				const reason = getErrorReason(errors);
+				setError(reason);
+				setModalState({
+					show: true,
+					type: "error",
+					title: "Gagal Membuat Kuis",
+					message: `Gagal membuat kuis. ${reason}`,
+					confirmText: "Tutup",
+					cancelText: "",
+					onConfirm: null,
+					onCancel: null,
+				});
 			},
 		});
 	};
@@ -51,6 +100,17 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 			...prev,
 			[field]: value
 		}));
+	};
+
+	const toggleClass = (id) => {
+		setFormData(prev => {
+			const currentIds = prev.class_ids;
+			if (currentIds.includes(id)) {
+				return { ...prev, class_ids: currentIds.filter(cid => cid !== id) };
+			} else {
+				return { ...prev, class_ids: [...currentIds, id] };
+			}
+		});
 	};
 
 	const toggleMaterial = (id) => {
@@ -85,20 +145,34 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 								<h3 className="text-sm font-semibold text-slate-800 border-l-4 border-blue-500 pl-3">Detail Utama</h3>
 								
 								<div className="space-y-1">
-									<label className="text-xs font-medium text-slate-700">Pilih Kelas</label>
-									<select
-										value={formData.class_id}
-										onChange={(e) => handleInputChange("class_id", e.target.value)}
-										className="w-full rounded-xl border border-slate-200 px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-slate-50/50"
-										required
-									>
-										<option value="">Pilih kelas</option>
-										{classes.map((cls) => (
-											<option key={cls.id} value={cls.id}>
-												{cls.class_name}
-											</option>
-										))}
-									</select>
+									<label className="text-xs font-medium text-slate-700">Pilih Kelas (bisa lebih dari satu)</label>
+									<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-100 rounded-xl bg-slate-50/40">
+										{classes.length === 0 ? (
+											<div className="col-span-full py-4 text-center text-[11px] text-slate-400 italic">
+												Belum ada kelas yang Anda buat.
+											</div>
+										) : (
+											classes.map((cls) => {
+												const selected = formData.class_ids.includes(cls.id);
+												return (
+													<button
+														key={cls.id}
+														type="button"
+														onClick={() => toggleClass(cls.id)}
+														className={`flex items-center justify-between rounded-xl border px-3 py-2 text-[11px] font-medium transition-all ${
+															selected
+																? "border-blue-500 bg-blue-50 text-blue-700"
+																: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+														}`}
+													>
+														<span className="truncate">{cls.class_name}</span>
+														<span className={`h-2 w-2 rounded-full ${selected ? "bg-blue-600" : "bg-slate-300"}`} />
+													</button>
+												);
+											})
+										)}
+									</div>
+									<p className="text-[10px] text-slate-400 mt-1">Minimal pilih satu kelas.</p>
 								</div>
 
 								<div className="space-y-1">
@@ -242,6 +316,24 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 						</form>
 					</div>
 				</Card>
+
+				<StatusModal
+					show={modalState.show}
+					type={modalState.type}
+					title={modalState.title}
+					message={modalState.message}
+					confirmText={modalState.confirmText}
+					cancelText={modalState.cancelText}
+					onConfirm={() => {
+						if (modalState.onConfirm) modalState.onConfirm();
+						setModalState(prev => ({ ...prev, show: false }));
+					}}
+					onCancel={() => {
+						if (modalState.onCancel) modalState.onCancel();
+						setModalState(prev => ({ ...prev, show: false }));
+					}}
+					onClose={() => setModalState(prev => ({ ...prev, show: false }))}
+				/>
 			</div>
 		</AppLayout>
 	);

@@ -31,9 +31,19 @@ class QuizController extends Controller
         $user = $request->user();
         $userId = $user->id;
 
-        
         $classIds = $user->classes()->pluck('classes.id');
-        
+
+        // Semua kuis yang bisa diakses user: class_id harus salah satu kelas user
+        $accessibleQuizIds = QuizModel::query()
+            ->whereIn('class_id', $classIds)
+            ->pluck('id');
+
+        if ($accessibleQuizIds->isEmpty()) {
+            return Inertia::render('Mahasiswa/Quizzes/Index', [
+                'quizzes' => [],
+            ]);
+        }
+
         $attemptTable = (new QuizAttemptModel())->getTable();
 
         $latestAttemptSub = QuizAttemptModel::query()
@@ -59,9 +69,7 @@ class QuizController extends Controller
         $materialsRaw = DB::table('quiz_materials')
             ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
             ->select('quiz_materials.quizzes_id', 'materials.id as material_id', 'materials.material_name')
-            ->whereIn('quiz_materials.quizzes_id', function ($q) use ($classIds) {
-                $q->select('id')->from('quizzes')->whereIn('class_id', $classIds);
-            })
+            ->whereIn('quiz_materials.quizzes_id', $accessibleQuizIds)
             ->orderBy('materials.order_number')
             ->get();
 
@@ -105,7 +113,7 @@ class QuizController extends Controller
         
         $quizzes = QuizModel::query()
             ->with(['creator:id,nama'])
-            ->whereIn('class_id', $classIds)
+            ->whereIn('id', $accessibleQuizIds)
             ->orderByDesc('id')
             ->get(['id', 'title', 'duration', 'passing_score', 'start_at', 'end_at', 'class_id', 'created_by']);
 
@@ -125,6 +133,7 @@ class QuizController extends Controller
 
             $progressOk = true;
             if ($requirements->isNotEmpty()) {
+                // Progress diambil berdasarkan class_id kuis (karena kuis hanya untuk satu kelas)
                 $classProgress = $progressByClassAndMaterial->get($q->class_id, collect());
                 foreach ($requirements as $row) {
                     $materialId = $row->material_id;
@@ -690,7 +699,8 @@ class QuizController extends Controller
         $user = Auth::user();
 
         $validated = $request->validate([
-            'class_id' => ['required', 'exists:classes,id'],
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer', 'exists:classes,id'],
             'title' => ['required', 'string', 'max:255'],
             'duration' => ['required', 'integer', 'min:1'],
             'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
@@ -700,21 +710,34 @@ class QuizController extends Controller
             'material_ids.*' => ['exists:materials,id'],
         ]);
 
-        $quiz = QuizModel::create([
-            'class_id' => $validated['class_id'],
-            'title' => $validated['title'],
-            'duration' => $validated['duration'],
-            'passing_score' => $validated['passing_score'],
-            'start_at' => $validated['start_at'],
-            'end_at' => $validated['end_at'],
-            'created_by' => $user->id,
-        ]);
+        $createdQuizzes = [];
 
-        // Hubungkan kuis dengan materi yang dipilih
-        $quiz->materials()->sync($validated['material_ids']);
+        foreach ($validated['class_ids'] as $classId) {
+            $quiz = QuizModel::create([
+                'class_id' => $classId,
+                'title' => $validated['title'],
+                'duration' => $validated['duration'],
+                'passing_score' => $validated['passing_score'],
+                'start_at' => $validated['start_at'],
+                'end_at' => $validated['end_at'],
+                'created_by' => $user->id,
+            ]);
 
-        return redirect()->route('dosen.quizzes.show', $quiz->id)
-            ->with('success', 'Kuis berhasil dibuat. Silakan kelola pertanyaan melalui halaman ini.');
+            // Hubungkan kuis dengan materi yang dipilih
+            $quiz->materials()->sync($validated['material_ids']);
+
+            $createdQuizzes[] = $quiz;
+        }
+
+        $firstQuiz = $createdQuizzes[0] ?? null;
+
+        if ($firstQuiz) {
+            return redirect()->route('dosen.quizzes.show', $firstQuiz->id)
+                ->with('success', 'Kuis berhasil dibuat untuk ' . count($createdQuizzes) . ' kelas. Silakan kelola pertanyaan melalui halaman ini.');
+        }
+
+        return redirect()->route('dosen.quizzes.index')
+            ->with('success', 'Kuis berhasil dibuat.');
     }
 
     public function dosenEditPage(QuizModel $quiz)
@@ -872,7 +895,9 @@ class QuizController extends Controller
             }
         });
 
-        return redirect()->route('dosen.quizzes.show', $quiz->id)
+        // Kembali ke halaman edit agar StatusModal di frontend bisa tampil,
+        // lalu dari modal user bisa memilih untuk kembali ke detail kuis.
+        return redirect()->route('dosen.quizzes.edit', $quiz->id)
             ->with('success', 'Kuis dan soal berhasil disimpan.');
     }
 

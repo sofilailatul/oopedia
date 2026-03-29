@@ -46,6 +46,21 @@ class QuizService
      */
     private function ensureMaterialAndPracticeCompleted(int $userId, QuizModel $quiz): void
     {
+        // Gunakan class_id langsung dari kuis
+        $classId = $quiz->class_id;
+
+        // Jika kuis terikat ke kelas tertentu, pastikan user memang anggota kelas itu
+        if ($classId) {
+            $inClass = DB::table('class_user')
+                ->where('user_id', $userId)
+                ->where('class_id', $classId)
+                ->exists();
+
+            if (!$inClass) {
+                throw new \Exception('Kuis ini tidak tersedia untuk kelasmu.');
+            }
+        }
+
         // Ambil semua materi yang terhubung dengan kuis ini
         $materialIds = DB::table('quiz_materials')
             ->where('quizzes_id', $quiz->id)
@@ -56,11 +71,17 @@ class QuizService
             return;
         }
 
-        // Progress baca + latihan per materi untuk user di kelas yang sama dengan kuis
-        $progress = DB::table('user_progress')
+        // Progress baca + latihan per materi untuk user
+        $progressQuery = DB::table('user_progress')
             ->where('user_id', $userId)
-            ->where('class_id', $quiz->class_id)
-            ->whereIn('material_id', $materialIds)
+            ->whereIn('material_id', $materialIds);
+
+        // Jika kuis terikat ke kelas, batasi progress di kelas tersebut
+        if ($classId) {
+            $progressQuery->where('class_id', $classId);
+        }
+
+        $progress = $progressQuery
             ->select('material_id', 'read_at', 'completed_practice_at')
             ->get()
             ->keyBy('material_id');
@@ -223,7 +244,7 @@ class QuizService
     {
         return QuizModel::query()
             ->where('created_by', $lecturerId)
-            ->with('class') // assuming relationship exists
+            ->with('class')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($quiz) {
