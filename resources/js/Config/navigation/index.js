@@ -114,12 +114,12 @@ export const getNavConfig = (role) => {
       },
       {
         name: 'Users',
-        href: '/admin/users',
+        href: '/superadmin/users',
         icon: Icons.Users,
       },
       {
         name: 'Leaderboard',
-        href: '/admin/leaderboard/combined',
+        href: '/superadmin/leaderboard/combined',
         icon: Icons.Leaderboard,
       },
     ],

@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import axios from "axios";
 
-export function useDosenMaterialsIndex({ materials: initialMaterials = [], onOrderSuccess, onOrderError }) {
+export function useDosenMaterialsIndex({ materials: initialMaterials = [], authUser, onOrderSuccess, onOrderError }) {
   const [perPage, setPerPage] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
   const [materials, setMaterials] = useState(initialMaterials);
@@ -89,10 +89,13 @@ export function useDosenMaterialsIndex({ materials: initialMaterials = [], onOrd
   }
 
   async function saveOrder(newMaterials, previousMaterials) {
+    const role = (authUser?.role || "").toLowerCase();
+    const baseRole = role === "superadmin" ? "superadmin" : "dosen";
+    const endpoint = baseRole === "superadmin" ? "/superadmin/materi/reorder" : "/dosen/materi/reorder";
     setIsSavingOrder(true);
     try {
       const material_ids = newMaterials.map(m => m.id);
-      await axios.put('/dosen/materi/reorder', { material_ids });
+      await axios.put(endpoint, { material_ids });
       if (onOrderSuccess) onOrderSuccess();
     } catch (error) {
       console.error('Failed to save order', error);

@@ -23,7 +23,11 @@ function getErrorReason(errors) {
 	return "Gagal membuat kuis. Periksa kembali data yang diisi.";
 }
 
-export default function DosenQuizCreate({ classes = [], materials = [] }) {
+export default function ManageQuizzesCreate({ classes = [], materials = [], authUser }) {
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const backRoute = isSuperadmin ? "superadmin.quizzes.index" : "dosen.quizzes.index";
+
 	const [formData, setFormData] = React.useState({
 		class_ids: [],
 		title: "",
@@ -63,14 +67,17 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 		setSaving(true);
 		setError("");
 
-		router.post(route("quizzes.store"), formData, {
+		const routeName = isSuperadmin ? "superadmin.quizzes.store" : "quizzes.store";
+
+		router.post(route(routeName), formData, {
 			onSuccess: () => {
 				setSaving(false);
 				setModalState({
 					show: true,
 					type: "success",
 					title: "Berhasil",
-					message: "Kuis berhasil dibuat. Kamu akan dialihkan ke halaman pengaturan soal.",
+					message:
+						"Kuis berhasil dibuat. Kamu akan dialihkan ke halaman pengaturan soal.",
 					confirmText: "Tutup",
 					cancelText: "",
 					onConfirm: null,
@@ -96,31 +103,29 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 	};
 
 	const handleInputChange = (field, value) => {
-		setFormData(prev => ({
+		setFormData((prev) => ({
 			...prev,
-			[field]: value
+			[field]: value,
 		}));
 	};
 
 	const toggleClass = (id) => {
-		setFormData(prev => {
+		setFormData((prev) => {
 			const currentIds = prev.class_ids;
 			if (currentIds.includes(id)) {
-				return { ...prev, class_ids: currentIds.filter(cid => cid !== id) };
-			} else {
-				return { ...prev, class_ids: [...currentIds, id] };
+				return { ...prev, class_ids: currentIds.filter((cid) => cid !== id) };
 			}
+			return { ...prev, class_ids: [...currentIds, id] };
 		});
 	};
 
 	const toggleMaterial = (id) => {
-		setFormData(prev => {
+		setFormData((prev) => {
 			const currentIds = prev.material_ids;
 			if (currentIds.includes(id)) {
-				return { ...prev, material_ids: currentIds.filter(mid => mid !== id) };
-			} else {
-				return { ...prev, material_ids: [...currentIds, id] };
+				return { ...prev, material_ids: currentIds.filter((mid) => mid !== id) };
 			}
+			return { ...prev, material_ids: [...currentIds, id] };
 		});
 	};
 
@@ -128,7 +133,7 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 		<AppLayout
 			title="Buat Kuis Baru"
 			label="Buat Kuis Baru"
-			backHref={route("dosen.quizzes.index")}
+			backHref={route(backRoute)}
 			backLabel="Kembali ke daftar kuis"
 		>
 			<div className="pb-10">
@@ -136,16 +141,22 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 					<div className="p-8">
 						<header className="mb-8">
 							<h1 className="text-xl font-bold text-slate-900">Buat Kuis Baru</h1>
-							<p className="text-sm text-slate-500 mt-1">Lengkapi detail kuis dan pilih materi yang akan diujikan.</p>
+							<p className="text-sm text-slate-500 mt-1">
+								Lengkapi detail kuis dan pilih materi yang akan diujikan.
+							</p>
 						</header>
 
 						<form onSubmit={handleSubmit} className="space-y-8">
 							{/* Section 1: Detail Utama */}
 							<div className="space-y-5">
-								<h3 className="text-sm font-semibold text-slate-800 border-l-4 border-blue-500 pl-3">Detail Utama</h3>
-								
+								<h3 className="text-sm font-semibold text-slate-800 border-l-4 border-blue-500 pl-3">
+									Detail Utama
+								</h3>
+
 								<div className="space-y-1">
-									<label className="text-xs font-medium text-slate-700">Pilih Kelas (bisa lebih dari satu)</label>
+									<label className="text-xs font-medium text-slate-700">
+										Pilih Kelas (bisa lebih dari satu)
+									</label>
 									<div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-slate-100 rounded-xl bg-slate-50/40">
 										{classes.length === 0 ? (
 											<div className="col-span-full py-4 text-center text-[11px] text-slate-400 italic">
@@ -166,7 +177,11 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 														}`}
 													>
 														<span className="truncate">{cls.class_name}</span>
-														<span className={`h-2 w-2 rounded-full ${selected ? "bg-blue-600" : "bg-slate-300"}`} />
+														<span
+															className={`h-2 w-2 rounded-full ${
+																selected ? "bg-blue-600" : "bg-slate-300"
+															}`}
+														/>
 													</button>
 												);
 											})
@@ -205,7 +220,9 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 										<input
 											type="number"
 											value={formData.passing_score}
-											onChange={(e) => handleInputChange("passing_score", Number(e.target.value))}
+											onChange={(e) =>
+												handleInputChange("passing_score", Number(e.target.value))
+											}
 											min="0"
 											max="100"
 											className="w-full rounded-xl border border-slate-200 px-4 py-3 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-slate-50/50"
@@ -237,15 +254,17 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 								</div>
 							</div>
 
-							{/* Section 2: Pilih Materi (Critical Part) */}
+							{/* Section 2: Pilih Materi */}
 							<div className="space-y-5 pt-4">
 								<div className="flex items-center justify-between">
-									<h3 className="text-sm font-semibold text-slate-800 border-l-4 border-emerald-500 pl-3">Pilih Materi Kuis</h3>
+									<h3 className="text-sm font-semibold text-slate-800 border-l-4 border-emerald-500 pl-3">
+										Pilih Materi Kuis
+									</h3>
 									<span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-full uppercase tracking-wider font-bold">
 										Materi Terpilih: {formData.material_ids.length}
 									</span>
 								</div>
-								
+
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-2 border border-slate-100 rounded-xl bg-slate-50/30">
 									{materials.length === 0 ? (
 										<div className="col-span-full py-8 text-center text-slate-400 text-xs italic">
@@ -255,29 +274,50 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 										materials.map((m) => {
 											const isSelected = formData.material_ids.includes(m.id);
 											return (
-												<div 
+												<div
 													key={m.id}
 													onClick={() => toggleMaterial(m.id)}
 													className={`
 														group relative flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200
-														${isSelected 
-															? 'bg-blue-50/50 border-blue-200 ring-1 ring-blue-100 shadow-sm' 
-															: 'bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50'
+														${
+															isSelected
+																? "bg-blue-50/50 border-blue-200 ring-1 ring-blue-100 shadow-sm"
+																: "bg-white border-slate-100 hover:border-slate-300 hover:bg-slate-50"
 														}
 													`}
 												>
-													<div className={`
-														flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors
-														${isSelected ? 'bg-blue-600 border-blue-600 shadow-sm' : 'border-slate-300 bg-white group-hover:border-slate-400'}
-													`}>
+													<div
+														className={`
+															flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors
+															${
+																isSelected
+																	? "bg-blue-600 border-blue-600 shadow-sm"
+																	: "border-slate-300 bg-white group-hover:border-slate-400"
+															}
+														`}
+													>
 														{isSelected && (
-															<svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-																<path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+															<svg
+																className="h-3 w-3 text-white"
+																fill="none"
+																viewBox="0 0 24 24"
+																stroke="currentColor"
+																strokeWidth="4"
+															>
+																<path
+																		strokeLinecap="round"
+																		strokeLinejoin="round"
+																		d="M5 13l4 4L19 7"
+																	/>
 															</svg>
 														)}
 													</div>
 													<div className="min-w-0 flex-1">
-														<p className={`text-[11px] font-medium truncate ${isSelected ? 'text-blue-900' : 'text-slate-700'}`}>
+														<p
+															className={`text-[11px] font-medium truncate ${
+																isSelected ? "text-blue-900" : "text-slate-700"
+															}`}
+														>
 															{m.material_name}
 														</p>
 													</div>
@@ -286,15 +326,21 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 										})
 									)}
 								</div>
-								<p className="text-[10px] text-slate-400 italic">Materi yang dipilih tidak dapat diubah setelah kuis dibuat.</p>
+								<p className="text-[10px] text-slate-400 italic">
+									Materi yang dipilih tidak dapat diubah setelah kuis dibuat.
+								</p>
 							</div>
 
 							{error && (
 								<div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
 									<div className="mt-0.5 text-red-500">
 										<svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-											<path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-										</svg>
+											<path
+													fillRule="evenodd"
+													d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+													clipRule="evenodd"
+												/>
+											</svg>
 									</div>
 									<p className="text-xs text-red-600 font-medium">{error}</p>
 								</div>
@@ -326,13 +372,13 @@ export default function DosenQuizCreate({ classes = [], materials = [] }) {
 					cancelText={modalState.cancelText}
 					onConfirm={() => {
 						if (modalState.onConfirm) modalState.onConfirm();
-						setModalState(prev => ({ ...prev, show: false }));
+						setModalState((prev) => ({ ...prev, show: false }));
 					}}
 					onCancel={() => {
 						if (modalState.onCancel) modalState.onCancel();
-						setModalState(prev => ({ ...prev, show: false }));
+						setModalState((prev) => ({ ...prev, show: false }));
 					}}
-					onClose={() => setModalState(prev => ({ ...prev, show: false }))}
+					onClose={() => setModalState((prev) => ({ ...prev, show: false }))}
 				/>
 			</div>
 		</AppLayout>

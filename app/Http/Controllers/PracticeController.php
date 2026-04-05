@@ -31,7 +31,7 @@ class PracticeController extends Controller
      */
     public function index()
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
         $practices = $this->practiceService->getPracticesForUser($userId);
 
         return Inertia::render('Practices/Index', [
@@ -44,17 +44,28 @@ class PracticeController extends Controller
      */
     public function dosenIndexPage()
     {
-        $userId = auth()->id();
-        $practices = $this->practiceService->getPracticesForLecturer($userId);
+        $user = Auth::user();
+        $userId = $user->id;
 
-        $materials = MaterialModel::query()
-            ->where('created_by', $userId)
-            ->orderBy('material_name')
-            ->get(['id', 'material_name']);
+        if ($user->role === 'superadmin') {
+            $practices = $this->practiceService->getPracticesForAdmin();
 
-        return Inertia::render('Dosen/Practices/Index', [
+            $materials = MaterialModel::query()
+                ->orderBy('material_name')
+                ->get(['id', 'material_name']);
+        } else {
+            $practices = $this->practiceService->getPracticesForLecturer($userId);
+
+            $materials = MaterialModel::query()
+                ->where('created_by', $userId)
+                ->orderBy('material_name')
+                ->get(['id', 'material_name']);
+        }
+
+        return Inertia::render('ManagePractices/Index', [
             'practices' => $practices,
             'materials' => $materials,
+            'authUser' => $user,
         ]);
     }
 
@@ -63,17 +74,21 @@ class PracticeController extends Controller
      */
     public function store(Request $request)
     {
-        $userId = auth()->id();
+        $user = Auth::user();
+        $userId = $user->id;
 
         $data = $request->validate([
             'material_id' => ['required', 'integer', 'exists:materials,id'],
             'difficulty_level' => ['required', 'in:easy,normal,hard'],
         ]);
 
-        $material = MaterialModel::query()
-            ->where('id', $data['material_id'])
-            ->where('created_by', $userId)
-            ->firstOrFail();
+        $materialQuery = MaterialModel::query()->where('id', $data['material_id']);
+
+        if ($user->role !== 'superadmin') {
+            $materialQuery->where('created_by', $userId);
+        }
+
+        $material = $materialQuery->firstOrFail();
 
         $exists = PracticeModel::query()
             ->where('material_id', $material->id)
@@ -91,7 +106,11 @@ class PracticeController extends Controller
             'difficulty_level' => $data['difficulty_level'],
         ]);
 
-        return redirect()->route('dosen.practices.create', $practice->id)
+        $routeName = $user->role === 'superadmin'
+            ? 'superadmin.practices.create'
+            : 'dosen.practices.create';
+
+        return redirect()->route($routeName, $practice->id)
             ->with('success', 'Latihan soal berhasil dibuat.');
     }
 
@@ -100,11 +119,11 @@ class PracticeController extends Controller
      */
     public function dosenCreatePage(PracticeModel $practice)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
-
-        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+        $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $questions = $practice->questions
             ->sortBy('id')
@@ -137,7 +156,7 @@ class PracticeController extends Controller
                 ];
             });
 
-        return Inertia::render('Dosen/Practices/Create', [
+        return Inertia::render('ManagePractices/Create', [
             'practice' => [
                 'id' => $practice->id,
                 'difficulty_level' => $practice->difficulty_level,
@@ -150,6 +169,7 @@ class PracticeController extends Controller
                 'name' => $user->nama ?? $user->name ?? 'Dosen',
             ],
             'questions' => $questions,
+            'authUser' => $user,
         ]);
     }
 
@@ -158,11 +178,11 @@ class PracticeController extends Controller
      */
     public function dosenEditPage(PracticeModel $practice)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
-
-        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+        $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $questions = $practice->questions
             ->sortBy('id')
@@ -195,7 +215,7 @@ class PracticeController extends Controller
                 ];
             });
 
-        return Inertia::render('Dosen/Practices/Edit', [
+        return Inertia::render('ManagePractices/Edit', [
             'practice' => [
                 'id' => $practice->id,
                 'difficulty_level' => $practice->difficulty_level,
@@ -208,6 +228,7 @@ class PracticeController extends Controller
                 'name' => $user->nama ?? $user->name ?? 'Dosen',
             ],
             'questions' => $questions,
+            'authUser' => $user,
         ]);
     }
 
@@ -216,11 +237,11 @@ class PracticeController extends Controller
      */
     public function dosenShowPage(PracticeModel $practice)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
-
-        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+        $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $questions = $practice->questions
             ->sortBy('id')
@@ -253,7 +274,7 @@ class PracticeController extends Controller
                 ];
             });
 
-        return Inertia::render('Dosen/Practices/Show', [
+        return Inertia::render('ManagePractices/Show', [
             'practice' => [
                 'id' => $practice->id,
                 'difficulty_level' => $practice->difficulty_level,
@@ -266,12 +287,13 @@ class PracticeController extends Controller
                 'name' => $user->nama ?? $user->name ?? 'Dosen',
             ],
             'questions' => $questions,
+            'authUser' => $user,
         ]);
     }
 
     public function startAttempt(Request $request, PracticeModel $practice)
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
 
         $data = $request->validate([
             'level' => ['required','in:easy,normal,hard'],
@@ -326,16 +348,16 @@ class PracticeController extends Controller
         ]);
 
         logger()->info('startAttempt', [
-            'auth_id' => auth()->id(),
-            'attempt_count' => \App\Models\PracticeAttemptModel::where('user_id', auth()->id())->count(),
-            ]);
+            'auth_id' => $userId,
+            'attempt_count' => \App\Models\PracticeAttemptModel::where('user_id', $userId)->count(),
+        ]);
 
         return redirect()->route('practice_attempts.show', $attempt->id);
     }
 
     public function attemptDetail(PracticeAttemptModel $attempt)
     {
-        abort_unless($attempt->user_id === auth()->id(), 403);
+        abort_unless($attempt->user_id === Auth::id(), 403);
 
         $attempt->load(['practice.material']);
 
@@ -373,7 +395,7 @@ class PracticeController extends Controller
 
     public function submitAnswers(Request $request, PracticeAttemptModel $attempt)
     {
-        abort_unless($attempt->user_id === auth()->id(), 403);
+        abort_unless($attempt->user_id === Auth::id(), 403);
 
         $data = $request->validate([
             'answers' => ['required','array'],
@@ -468,11 +490,11 @@ class PracticeController extends Controller
      */
     public function dosenSaveQuestions(Request $request, PracticeModel $practice)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $practice->load('material:id,created_by');
-
-        abort_unless($practice->material && (int) $practice->material->created_by === (int) $user->id, 403);
+        $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $validated = $request->validate([
             'questions' => ['required', 'array', 'min:1'],
@@ -584,16 +606,15 @@ class PracticeController extends Controller
      */
     public function uploadQuestionImage(Request $request, PracticeQuestionModel $question)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $question->load('practice.material:id,created_by');
 
-        abort_unless(
-            $question->practice &&
+        $isOwner = $question->practice &&
             $question->practice->material &&
-            (int) $question->practice->material->created_by === (int) $user->id,
-            403
-        );
+            (int) $question->practice->material->created_by === (int) $user->id;
+
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $data = $request->validate([
             'image' => ['required', 'image', 'max:2048'], // ~2MB
@@ -626,16 +647,15 @@ class PracticeController extends Controller
      */
     public function deleteQuestionImage(PracticeQuestionModel $question)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $question->load('practice.material:id,created_by');
 
-        abort_unless(
-            $question->practice &&
+        $isOwner = $question->practice &&
             $question->practice->material &&
-            (int) $question->practice->material->created_by === (int) $user->id,
-            403
-        );
+            (int) $question->practice->material->created_by === (int) $user->id;
+
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         if ($question->image_path) {
             Storage::disk('public')->delete($question->image_path);
@@ -651,7 +671,7 @@ class PracticeController extends Controller
      */
     public function destroy(PracticeModel $practice)
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         $practice->load(['material:id,created_by', 'questions', 'attempts']);
 
@@ -702,7 +722,7 @@ class PracticeController extends Controller
 
     public function summary(PracticeModel $practice)
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
 
         $practice->load('material');
 

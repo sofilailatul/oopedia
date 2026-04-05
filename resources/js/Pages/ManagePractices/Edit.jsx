@@ -50,10 +50,10 @@ function normalizeInitialQuestions(initial = []) {
 			options:
 				Array.isArray(q.options) && q.options.length
 					? q.options.map((opt) => ({
-							id: opt.id ?? null,
-							text: opt.text ?? "",
-							is_correct: !!opt.is_correct,
-						}))
+						id: opt.id ?? null,
+						text: opt.text ?? "",
+						is_correct: !!opt.is_correct,
+					}))
 					: base.options,
 			_localId: Math.random().toString(36).slice(2),
 		};
@@ -130,12 +130,16 @@ function getQuestionsSnapshot(items = []) {
 	);
 }
 
-export default function DosenPracticeEdit({
+export default function ManagePracticesEdit({
 	practice,
 	teacher,
 	questions: initialQuestions = [],
+	authUser,
 }) {
 	const backHandlerRef = React.useRef(null);
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const backRoute = isSuperadmin ? "superadmin.practices.index" : "dosen.practices.index";
 
 	const registerBackHandler = React.useCallback((handler) => {
 		backHandlerRef.current = handler;
@@ -145,7 +149,7 @@ export default function DosenPracticeEdit({
 		<AppLayout
 			title="Edit Latihan Soal"
 			label="Edit Latihan Soal"
-			backHref={route("dosen.practices.index")}
+			backHref={route(backRoute)}
 			backLabel="Kembali ke Halaman Daftar"
 			onBackClick={(e) => {
 				e?.preventDefault?.();
@@ -157,6 +161,8 @@ export default function DosenPracticeEdit({
 				teacher={teacher}
 				initialQuestions={initialQuestions}
 				registerBackHandler={registerBackHandler}
+				backRoute={backRoute}
+				authUser={authUser}
 			/>
 		</AppLayout>
 	);
@@ -167,6 +173,8 @@ function PracticeEditContent({
 	teacher,
 	initialQuestions = [],
 	registerBackHandler,
+	backRoute,
+	authUser,
 }) {
 	const initialSnapshot = React.useMemo(
 		() => getQuestionsSnapshot(normalizeInitialQuestions(initialQuestions)),
@@ -200,7 +208,7 @@ function PracticeEditContent({
 		if (submitting) return;
 
 		if (!isDirty) {
-			router.visit(route("dosen.practices.index"));
+			router.visit(route(backRoute));
 			return;
 		}
 
@@ -210,9 +218,9 @@ function PracticeEditContent({
 				"Ada perubahan pada latihan soal yang belum disimpan. Tetap kembali ke daftar?",
 			confirmText: "Ya, kembali",
 			cancelText: "Lanjut edit",
-			onConfirm: () => router.visit(route("dosen.practices.index")),
+			onConfirm: () => router.visit(route(backRoute)),
 		});
-	}, [isDirty, popup, submitting]);
+	}, [isDirty, popup, submitting, backRoute]);
 
 	React.useEffect(() => {
 		registerBackHandler?.(handleBackToIndex);
@@ -299,7 +307,7 @@ function PracticeEditContent({
 							imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
 						}
 					: q,
-			),
+				),
 		);
 	};
 
@@ -341,7 +349,11 @@ function PracticeEditContent({
 			}
 		});
 
-		router.post(route("dosen.practices.questions.save", practice.id), formData, {
+		const saveRouteName = (authUser?.role || "").toLowerCase() === "superadmin"
+			? "superadmin.practices.questions.save"
+			: "dosen.practices.questions.save";
+
+		router.post(route(saveRouteName, practice.id), formData, {
 			forceFormData: true,
 			onSuccess: () => {
 				setSubmitting(false);
@@ -353,7 +365,7 @@ function PracticeEditContent({
 					title: "Berhasil",
 					message: "Perubahan latihan soal berhasil disimpan.",
 					confirmText: "Kembali ke daftar",
-					onClose: () => router.visit(route("dosen.practices.index")),
+					onClose: () => router.visit(route(backRoute)),
 				});
 			},
 			onError: (errors) => {
@@ -378,32 +390,32 @@ function PracticeEditContent({
 
 	return (
 		<div className="mx-auto space-y-6">
-				<header className="space-y-4">
-					<PracticeMetaPanel
-						teacherName={teacher?.name ?? "Dosen"}
-						materialName={practice?.material?.name ?? "Pilih Materi"}
-						levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
-						enableTypeSelect
-						selectedType={selectedType}
-						onTypeChange={setSelectedType}
-						typeOptions={[
-							{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
-							{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
-						]}
-					/>
-				</header>
+			<header className="space-y-4">
+				<PracticeMetaPanel
+					teacherName={teacher?.name ?? "Dosen"}
+					materialName={practice?.material?.name ?? "Pilih Materi"}
+					levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
+					enableTypeSelect
+					selectedType={selectedType}
+					onTypeChange={setSelectedType}
+					typeOptions={[
+						{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
+						{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
+					]}
+				/>
+			</header>
 
-				{filteredQuestions.length === 0 && (
-					<div className=" p-8 text-center text-sm text-slate-500">
-						Belum ada soal dengan tipe {questionTypeLabel(selectedType)}.
-					</div>
-				)}
+			{filteredQuestions.length === 0 && (
+				<div className=" p-8 text-center text-sm text-slate-500">
+					Belum ada soal dengan tipe {questionTypeLabel(selectedType)}.
+				</div>
+			)}
 
-				{filteredQuestions.map((q, visibleIdx) => {
-					const idx = getQuestionIndexByLocalId(q._localId);
-					if (idx < 0) return null;
+			{filteredQuestions.map((q, visibleIdx) => {
+				const idx = getQuestionIndexByLocalId(q._localId);
+				if (idx < 0) return null;
 
-					return (
+				return (
 					<Card
 						key={q._localId}
 						className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm backdrop-blur"
@@ -419,8 +431,8 @@ function PracticeEditContent({
 									</p>
 									<p className="text-[11px] text-slate-400">
 										{(q.type || QUESTION_TYPE.MC) === QUESTION_TYPE.DRAG
-											? "Atur teks, item, dan feedback drag-drop"
-											: "Atur teks, gambar, dan feedback"}
+												? "Atur teks, item, dan feedback drag-drop"
+												: "Atur teks, gambar, dan feedback"}
 									</p>
 								</div>
 							</div>
@@ -473,30 +485,30 @@ function PracticeEditContent({
 							/>
 						)}
 					</Card>
-					);
-				})}
+				);
+			})}
 
-				<div className="flex items-center justify-between pt-2">
-					<Button
-						type="button"
-						variant="outline"
-						color="blue"
-						size="sm"
-						onClick={handleAddQuestion}
-					>
-						+ Tambah Pertanyaan
-					</Button>
-					<Button
-						type="button"
-						variant="solid"
-						color="green"
-						size="sm"
-						disabled={submitting}
-						onClick={handleSubmit}
-					>
-						{submitting ? "Menyimpan..." : "Simpan Perubahan"}
-					</Button>
-				</div>
+			<div className="flex items-center justify-between pt-2">
+				<Button
+					type="button"
+					variant="outline"
+					color="blue"
+					size="sm"
+					onClick={handleAddQuestion}
+				>
+					+ Tambah Pertanyaan
+				</Button>
+				<Button
+					type="button"
+					variant="solid"
+					color="green"
+					size="sm"
+					disabled={submitting}
+					onClick={handleSubmit}
+				>
+					{submitting ? "Menyimpan..." : "Simpan Perubahan"}
+				</Button>
+			</div>
 
 			{error && <p className="pt-1 text-[11px] text-red-500">{error}</p>}
 		</div>

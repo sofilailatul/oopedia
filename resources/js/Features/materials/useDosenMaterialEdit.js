@@ -62,6 +62,10 @@ export function useDosenMaterialEdit({ material, authUser }) {
   function saveMaterial(options = {}) {
     const { onSuccess, onError } = options;
 
+    const role = (authUser?.role || "").toLowerCase();
+    const baseRole = role === "superadmin" ? "superadmin" : "dosen";
+    const basePath = baseRole === "superadmin" ? "/superadmin/materi" : "/dosen/materi";
+
     const payloadSections = sections.map((s) => ({
       id: s.id,
       title: s.title,
@@ -70,7 +74,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
     }));
 
     router.post(
-      `/dosen/materi/${material.id}`,
+      `${basePath}/${material.id}`,
       {
         _method: "put",
         material_name: title || "Untitled Learning Material",
@@ -85,7 +89,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
             onSuccess();
             return;
           }
-          router.visit(`/dosen/materi/${material.id}`);
+          router.visit(`${basePath}/${material.id}`);
         },
         onError: (errors) => {
           if (typeof onError === "function") {

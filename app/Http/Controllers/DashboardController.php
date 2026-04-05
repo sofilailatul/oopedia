@@ -26,7 +26,7 @@ class DashboardController extends Controller
 
             'dosen' => $this->dosenDashboard(),
 
-            'superadmin' => Inertia::render('SuperAdmin/Dashboard'),
+            'superadmin' => $this->superadminDashboard(),
 
             'mahasiswa' => $this->mahasiswaDashboard($user),
 
@@ -304,7 +304,7 @@ class DashboardController extends Controller
     /**
      * Dashboard untuk SUPERADMIN
      */
-    protected function adminDashboard()
+    protected function superadminDashboard()
     {
         // Overall system stats
         $stats = [
@@ -313,6 +313,7 @@ class DashboardController extends Controller
             'total_teachers' => UserModel::where('role', 'dosen')->count(),
             'total_classes' => DB::table('classes')->count(),
             'total_materials' => MaterialModel::count(),
+            'total_exercises' => PracticeModel::count(),
             'total_quizzes' => QuizModel::count(),
         ];
 
@@ -331,21 +332,21 @@ class DashboardController extends Controller
             ->get();
 
         // System activity (latest quiz attempts across all classes)
-        $recentActivities = DB::table('quiz_attempts')
-            ->join('users', 'quiz_attempts.user_id', '=', 'users.id')
-            ->join('quizzes', 'quiz_attempts.quizzes_id', '=', 'quizzes.id')
-            ->where('quiz_attempts.is_finished', true)
+        $recentActivities = DB::table('quiz_attempts as qa')
+            ->join('users as u', 'qa.user_id', '=', 'u.id')
+            ->join('quizzes as q', 'qa.quizzes_id', '=', 'q.id')
+            ->whereNotNull('qa.finished_at')
             ->select([
-                'users.name as student_name',
-                'quizzes.title as quiz_title',
-                'quiz_attempts.total_score',
-                'quiz_attempts.finished_at',
+                'u.nama as student_name',
+                'q.title as quiz_title',
+                'qa.total_score',
+                'qa.finished_at',
             ])
-            ->orderBy('quiz_attempts.finished_at', 'desc')
+            ->orderBy('qa.finished_at', 'desc')
             ->limit(10)
             ->get();
 
-        return Inertia::render('Admin/Dashboard', [
+        return Inertia::render('SuperAdmin/Dashboard', [
             'stats' => $stats,
             'usersByRole' => $usersByRole,
             'recentUsers' => $recentUsers,

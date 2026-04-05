@@ -24,7 +24,7 @@ class CheckRole
         if (!in_array($userRole, $allowedRoles)) {
             // Redirect berdasarkan role
             return match ($userRole) {
-                'superadmin', 'admin' => redirect()->route('admin.users.index'),
+                'superadmin' => redirect()->route('superadmin.users.index'),
                 'dosen' => redirect()->route('classes.index'),
                 'mahasiswa' => redirect()->route('dashboard'),
                 'tamu' => redirect()->route('dashboard'),

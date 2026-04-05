@@ -195,7 +195,7 @@ class QuizController extends Controller
             ->select('materials.id', 'materials.material_name')
             ->get();
 
-        return Inertia::render('Dosen/Quizzes/Show', [
+        return Inertia::render('Mahasiswa/Quizzes/Show', [
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
@@ -607,24 +607,40 @@ class QuizController extends Controller
 
     public function dosenIndexPage()
     {
-        $userId = Auth::id();
-        $quizzes = $this->quizService->getQuizzesForLecturer($userId);
+        $user = Auth::user();
 
-        $classes = \App\Models\ClassModel::query()
-            ->where('created_by', $userId)
-            ->orderBy('class_name')
-            ->get(['id', 'class_name']);
+        if ($user && $user->role === 'superadmin') {
+            $quizzes = $this->quizService->getQuizzesForAdmin();
 
-        return Inertia::render('Dosen/Quizzes/Index', [
+            $classes = \App\Models\ClassModel::query()
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
+        } else {
+            $userId = $user?->id;
+
+            $quizzes = $this->quizService->getQuizzesForLecturer($userId);
+
+            $classes = \App\Models\ClassModel::query()
+                ->where('created_by', $userId)
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
+        }
+
+        return Inertia::render('ManageQuizzes/Index', [
             'quizzes' => $quizzes,
             'classes' => $classes,
+            'authUser' => $user,
         ]);
     }
 
     public function dosenShowPage(QuizModel $quiz)
     {
         $user = Auth::user();
-        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
 
         $quiz->load(['questions.options', 'class']);
 
@@ -645,6 +661,7 @@ class QuizController extends Controller
                 'material_name' => $matName,
                 'quiz_text' => $q->quiz_text,
                 'image_path' => $q->image_path,
+                'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
                 'feedback_correct' => $q->feedback_correct,
                 'feedback_incorrect' => $q->feedback_incorrect,
                 'points' => (int) ($q->pivot->points ?? 1),
@@ -658,7 +675,7 @@ class QuizController extends Controller
             ];
         });
 
-        return Inertia::render('Dosen/Quizzes/Show', [
+        return Inertia::render('ManageQuizzes/Show', [
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
@@ -671,6 +688,7 @@ class QuizController extends Controller
                 'materials' => $materials,
             ],
             'questions' => $questions,
+            'authUser' => $user,
         ]);
     }
 
@@ -678,19 +696,30 @@ class QuizController extends Controller
     {
         $user = Auth::user();
 
-        $classes = \App\Models\ClassModel::query()
-            ->where('created_by', $user->id)
-            ->orderBy('class_name')
-            ->get(['id', 'class_name']);
+        if ($user && $user->role === 'superadmin') {
+            $classes = \App\Models\ClassModel::query()
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
 
-        $materials = \App\Models\MaterialModel::query()
-            ->where('created_by', $user->id)
-            ->orderBy('material_name')
-            ->get(['id', 'material_name']);
+            $materials = \App\Models\MaterialModel::query()
+                ->orderBy('material_name')
+                ->get(['id', 'material_name']);
+        } else {
+            $classes = \App\Models\ClassModel::query()
+                ->where('created_by', $user->id)
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
 
-        return Inertia::render('Dosen/Quizzes/Create', [
+            $materials = \App\Models\MaterialModel::query()
+                ->where('created_by', $user->id)
+                ->orderBy('material_name')
+                ->get(['id', 'material_name']);
+        }
+
+        return Inertia::render('ManageQuizzes/Create', [
             'classes' => $classes,
             'materials' => $materials,
+            'authUser' => $user,
         ]);
     }
 
@@ -743,9 +772,24 @@ class QuizController extends Controller
     public function dosenEditPage(QuizModel $quiz)
     {
         $user = Auth::user();
-        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
 
         $quiz->load(['questions.options', 'class']);
+
+        if ($user && $user->role === 'superadmin') {
+            $classes = \App\Models\ClassModel::query()
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
+        } else {
+            $classes = \App\Models\ClassModel::query()
+                ->where('created_by', $user->id)
+                ->orderBy('class_name')
+                ->get(['id', 'class_name']);
+        }
 
         $questions = $quiz->questions->map(function ($q) {
             return [
@@ -770,8 +814,9 @@ class QuizController extends Controller
             ->orderBy('material_name')
             ->get(['materials.id', 'materials.material_name']);
 
-        return Inertia::render('Dosen/Quizzes/Edit', [
+        return Inertia::render('ManageQuizzes/Edit', [
             'materials' => $materials,
+            'classes' => $classes,
             'quiz' => [
                 'id' => $quiz->id,
                 'title' => $quiz->title,
@@ -784,15 +829,20 @@ class QuizController extends Controller
                 'end_at' => $quiz->end_at ? \Carbon\Carbon::parse($quiz->end_at)->format('Y-m-d\TH:i') : "",
             ],
             'questions' => $questions,
+            'authUser' => $user,
         ]);
     }
 
     public function dosenSaveQuestions(Request $request, QuizModel $quiz)
     {
         $user = Auth::user();
-        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
 
         $validated = $request->validate([
+            'class_id' => ['required', 'integer', 'exists:classes,id'],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'duration' => ['required', 'integer', 'min:1'],
@@ -815,6 +865,7 @@ class QuizController extends Controller
 
         DB::transaction(function () use ($quiz, $validated, $request) {
             $quiz->update([
+            'class_id' => $validated['class_id'],
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? null,
                 'duration' => $validated['duration'],
@@ -897,14 +948,21 @@ class QuizController extends Controller
 
         // Kembali ke halaman edit agar StatusModal di frontend bisa tampil,
         // lalu dari modal user bisa memilih untuk kembali ke detail kuis.
-        return redirect()->route('dosen.quizzes.edit', $quiz->id)
+        $routeName = $user->role === 'superadmin'
+            ? 'superadmin.quizzes.edit'
+            : 'dosen.quizzes.edit';
+
+        return redirect()->route($routeName, $quiz->id)
             ->with('success', 'Kuis dan soal berhasil disimpan.');
     }
 
     public function update(Request $request, QuizModel $quiz)
     {
         $user = $request->user();
-        abort_unless((int) $quiz->created_by === (int) $user->id, 403);
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -916,6 +974,91 @@ class QuizController extends Controller
 
         $quiz->update($data);
 
-        return redirect()->route('dosen.quizzes.show', $quiz->id)->with('success', 'Quiz updated successfully');
+        $routeName = $user->role === 'superadmin'
+            ? 'superadmin.quizzes.show'
+            : 'dosen.quizzes.show';
+
+        return redirect()->route($routeName, $quiz->id)->with('success', 'Quiz updated successfully');
+    }
+
+    public function duplicateToClasses(Request $request, QuizModel $quiz)
+    {
+        $user = $request->user();
+
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
+
+        $data = $request->validate([
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer', 'exists:classes,id'],
+        ]);
+
+        $classIds = collect($data['class_ids'])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->reject(fn ($id) => $id === (int) $quiz->class_id)
+            ->values();
+
+        if ($classIds->isEmpty()) {
+            return back()->with('success', 'Tidak ada kelas baru yang dipilih untuk duplikasi.');
+        }
+
+        $quiz->load(['materials', 'questions.options']);
+
+        DB::transaction(function () use ($quiz, $classIds, $user) {
+            $materialIds = $quiz->materials->pluck('id')->all();
+            $questions = $quiz->questions;
+
+            foreach ($classIds as $classId) {
+                // Untuk dosen, pastikan hanya boleh ke kelas yang dia buat
+                if ($user->role !== 'superadmin') {
+                    $ownsClass = \App\Models\ClassModel::where('id', $classId)
+                        ->where('created_by', $user->id)
+                        ->exists();
+
+                    if (! $ownsClass) {
+                        continue;
+                    }
+                }
+
+                $newQuiz = QuizModel::create([
+                    'class_id' => $classId,
+                    'title' => $quiz->title,
+                    'description' => $quiz->description,
+                    'duration' => $quiz->duration,
+                    'passing_score' => $quiz->passing_score,
+                    'start_at' => $quiz->start_at,
+                    'end_at' => $quiz->end_at,
+                    'created_by' => $user->id,
+                ]);
+
+                if (! empty($materialIds)) {
+                    $newQuiz->materials()->sync($materialIds);
+                }
+
+                foreach ($questions as $question) {
+                    $newQuestion = $question->replicate();
+                    $newQuestion->push();
+
+                    QuizMapModel::create([
+                        'quiz_id' => $newQuiz->id,
+                        'quiz_question_id' => $newQuestion->id,
+                        'points' => (int) ($question->pivot->points ?? 10),
+                    ]);
+
+                    foreach ($question->options as $opt) {
+                        QuizOptionModel::create([
+                            'quiz_questions_id' => $newQuestion->id,
+                            'option_text' => $opt->option_text,
+                            'is_correct' => (int) $opt->is_correct,
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return back()->with('success', 'Kuis berhasil diduplikasi ke kelas yang dipilih.');
     }
 }

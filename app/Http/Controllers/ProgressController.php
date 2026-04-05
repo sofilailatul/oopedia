@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
+use App\Models\MaterialModel;
 use App\Models\PracticeAttemptModel;
 use App\Models\QuizAttemptModel;
 use App\Models\QuizModel;
@@ -31,28 +32,38 @@ class ProgressController extends Controller
     {
         $user = $request->user();
 
-        $classes = ClassModel::withCount([
+        $isSuperadmin = $user->role === 'superadmin';
+
+        $classesQuery = ClassModel::withCount([
             'users as students_count' => function ($q) {
                 $q->where('role', 'mahasiswa');
             },
         ])
-            ->where('created_by', $user->id)
-            ->orderBy('class_name')
-            ->get(['id', 'class_name', 'class_code']);
+            ->orderBy('class_name');
+
+        if (! $isSuperadmin) {
+            $classesQuery->where('created_by', $user->id);
+        }
+
+        $classes = $classesQuery->get(['id', 'class_name', 'class_code']);
 
         $selectedClassId = $request->integer('class_id') ?: ($classes->first()->id ?? null);
         $classDetail = null;
 
         if ($selectedClassId) {
-            $class = ClassModel::with([
+            $classQuery = ClassModel::with([
                 'users' => function ($q) {
-                $q->where('role', 'mahasiswa')
-                    ->orderBy('nama');
+                    $q->where('role', 'mahasiswa')
+                        ->orderBy('nama');
                 },
                 'materials',
-            ])
-                ->where('created_by', $user->id)
-                ->findOrFail($selectedClassId);
+            ]);
+
+            if (! $isSuperadmin) {
+                $classQuery->where('created_by', $user->id);
+            }
+
+            $class = $classQuery->findOrFail($selectedClassId);
 
             $quizzes = QuizModel::where('class_id', $class->id)
                 ->where('created_by', $user->id)
@@ -62,7 +73,7 @@ class ProgressController extends Controller
             $studentIds = $class->users->pluck('id');
             $quizIds = $quizzes->pluck('id');
 
-            // Hard-level practice summary per student (best final_score across class materials)
+            // Practice summary per student (best final_score across class materials, all levels)
             $materialIds = $class->materials->pluck('id');
             $hardMap = [];
 
@@ -70,7 +81,6 @@ class ProgressController extends Controller
                 $hardScores = DB::table('practice_attempts')
                     ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
                     ->whereIn('practice_attempts.user_id', $studentIds)
-                    ->where('practices.difficulty_level', 'hard')
                     ->whereIn('practices.material_id', $materialIds)
                     ->whereNotNull('practice_attempts.finished_at')
                     ->select('practice_attempts.user_id', DB::raw('MAX(practice_attempts.final_score) as best_score'))
@@ -146,10 +156,11 @@ class ProgressController extends Controller
             ];
         }
 
-        return Inertia::render('Dosen/Leaderboard/Index', [
+        return Inertia::render('ManageLeaderboard/Index', [
             'classes' => $classes,
             'selectedClassId' => $selectedClassId,
             'classDetail' => $classDetail,
+            'authUser' => $user,
         ]);
     }
 
@@ -162,49 +173,95 @@ class ProgressController extends Controller
             abort(404);
         }
 
-        $class = ClassModel::with(['materials', 'users' => function ($q) {
+        $isSuperadmin = $lecturer->role === 'superadmin';
+
+        $classQuery = ClassModel::with(['materials', 'users' => function ($q) {
             $q->where('role', 'mahasiswa');
-        }])
-            ->where('created_by', $lecturer->id)
-            ->findOrFail($classId);
+        }]);
+
+        if (! $isSuperadmin) {
+            $classQuery->where('created_by', $lecturer->id);
+        }
+
+        $class = $classQuery->findOrFail($classId);
 
         $isMember = $class->users->contains('id', $student->id);
         abort_unless($isMember, 404);
 
-        $materialIds = $class->materials->pluck('id');
-        $attemptsByLevel = [
-            'easy' => [],
-            'normal' => [],
-            'hard' => [],
-        ];
+        // Build per-material summary (easy/normal/hard/quiz) for this student
+        $practiceScores = DB::table('practice_attempts')
+            ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
+            ->join('materials', 'materials.id', '=', 'practices.material_id')
+            ->where('practice_attempts.user_id', $student->id)
+            ->whereNotNull('practice_attempts.finished_at')
+            ->when(! $isSuperadmin, function ($q) use ($lecturer) {
+                $q->where('materials.created_by', $lecturer->id);
+            })
+            ->select(
+                'practices.material_id',
+                'practices.difficulty_level',
+                DB::raw('MAX(practice_attempts.final_score) as best_score')
+            )
+            ->groupBy('practices.material_id', 'practices.difficulty_level')
+            ->get();
 
-        if ($materialIds->isNotEmpty()) {
-            $attempts = PracticeAttemptModel::where('user_id', $student->id)
-                ->whereHas('practice', function ($q) use ($materialIds) {
-                    $q->whereIn('material_id', $materialIds);
-                })
-                ->with(['practice' => function ($q) {
-                    $q->select('id', 'material_id', 'difficulty_level');
-                }])
-                ->whereNotNull('finished_at')
-                ->orderBy('finished_at')
-                ->get(['id', 'user_id', 'practices_id', 'finished_at', 'final_score']);
-
-            foreach ($attempts as $attempt) {
-                $level = $attempt->practice->difficulty_level ?? 'normal';
-                if (!array_key_exists($level, $attemptsByLevel)) {
-                    $attemptsByLevel[$level] = [];
-                }
-
-                $attemptsByLevel[$level][] = [
-                    'id' => $attempt->id,
-                    'score' => (int) $attempt->final_score,
-                    'finished_at' => optional($attempt->finished_at)->toDateTimeString(),
-                ];
-            }
+        $practiceMap = [];
+        foreach ($practiceScores as $row) {
+            $practiceMap[$row->material_id][$row->difficulty_level] = (int) $row->best_score;
         }
 
-        return Inertia::render('Dosen/Leaderboard/Show', [
+        $quizScores = DB::table('quiz_attempt_material_scores')
+            ->join('quiz_attempts', 'quiz_attempts.id', '=', 'quiz_attempt_material_scores.quiz_attempts_id')
+            ->join('materials', 'materials.id', '=', 'quiz_attempt_material_scores.material_id')
+            ->where('quiz_attempts.user_id', $student->id)
+            ->whereNotNull('quiz_attempts.finished_at')
+            ->when(! $isSuperadmin, function ($q) use ($lecturer) {
+                $q->where('materials.created_by', $lecturer->id);
+            })
+            ->select(
+                'quiz_attempt_material_scores.material_id',
+                DB::raw('SUM(quiz_attempt_material_scores.earned_score) as total_quiz_score')
+            )
+            ->groupBy('quiz_attempt_material_scores.material_id')
+            ->get();
+
+        $quizMap = [];
+        foreach ($quizScores as $row) {
+            $quizMap[$row->material_id] = (int) $row->total_quiz_score;
+        }
+
+        $materialIds = collect(array_merge(
+            array_keys($practiceMap),
+            array_keys($quizMap)
+        ))->unique()->values();
+
+        $materials = MaterialModel::whereIn('id', $materialIds)
+            ->orderBy('order_number')
+            ->get(['id', 'material_name']);
+
+        $materialStats = [];
+        foreach ($materials as $mat) {
+            $easy   = $practiceMap[$mat->id]['easy'] ?? 0;
+            $normal = $practiceMap[$mat->id]['normal'] ?? 0;
+            $hard   = $practiceMap[$mat->id]['hard'] ?? 0;
+            $quiz   = $quizMap[$mat->id] ?? 0;
+
+            $total  = $easy + $normal + $hard + $quiz;
+
+            $materialStats[] = [
+                'material_id' => $mat->id,
+                'material_name' => $mat->material_name,
+                'easy' => $easy,
+                'normal' => $normal,
+                'hard' => $hard,
+                'quiz' => $quiz,
+                'total' => $total,
+            ];
+        }
+
+        $backRouteName = $isSuperadmin ? 'grades.index' : 'dosen.grades.index';
+
+        return Inertia::render('ManageLeaderboard/Show', [
             'class' => [
                 'id' => $class->id,
                 'class_name' => $class->class_name,
@@ -215,7 +272,9 @@ class ProgressController extends Controller
                 'nama' => $student->nama,
                 'email' => $student->email,
             ],
-            'attemptsByLevel' => $attemptsByLevel,
+            'materialStats' => $materialStats,
+            'backRouteName' => $backRouteName,
+            'authUser' => $lecturer,
         ]);
     }
 }

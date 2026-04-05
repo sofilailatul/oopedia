@@ -46,6 +46,11 @@ class ClassModel extends Model
         return $this->hasMany(UserProgressModel::class, 'class_id');
     }
     
+    public function lecturer()
+    {
+        return $this->belongsTo(UserModel::class, 'created_by');
+    }
+    
     public function scopeJoinedBy($query, int $userId)
     {
         return $query->whereHas('users', function($q) use ($userId) {

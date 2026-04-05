@@ -46,7 +46,8 @@ function normalizeInitialQuestions(initial = []) {
 			...q,
 			type: q.type ?? base.type,
 			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
-			feedbackIncorrect: q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
+			feedbackIncorrect:
+				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
 			outputCode: q.output_code ?? q.outputCode ?? base.outputCode,
 			imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
 			options:
@@ -62,18 +63,22 @@ function normalizeInitialQuestions(initial = []) {
 	});
 }
 
-export default function DosenPracticeCreate({ practice, teacher, questions: initialQuestions = [] }) {
+export default function ManagePracticesCreate({ practice, teacher, questions: initialQuestions = [], authUser }) {
 	const backHandlerRef = React.useRef(null);
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
 
 	const registerBackHandler = React.useCallback((handler) => {
 		backHandlerRef.current = handler;
 	}, []);
 
+	const backRoute = isSuperadmin ? "superadmin.practices.index" : "dosen.practices.index";
+
 	return (
 		<AppLayout
 			title="Buat Latihan Soal"
 			label="Buat Latihan Soal"
-			backHref={route("dosen.practices.index")}
+			backHref={route(backRoute)}
 			backLabel="Kembali ke Halaman Daftar"
 			onBackClick={(e) => {
 				e?.preventDefault?.();
@@ -85,6 +90,7 @@ export default function DosenPracticeCreate({ practice, teacher, questions: init
 				teacher={teacher}
 				initialQuestions={initialQuestions}
 				registerBackHandler={registerBackHandler}
+				authUser={authUser}
 			/>
 		</AppLayout>
 	);
@@ -95,6 +101,7 @@ function CreatePracticeContent({
 	teacher,
 	initialQuestions = [],
 	registerBackHandler,
+	authUser,
 }) {
 	const [questions, setQuestions] = React.useState(() =>
 		normalizeInitialQuestions(initialQuestions),
@@ -103,6 +110,9 @@ function CreatePracticeContent({
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
 	const popup = usePopup();
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const backRoute = isSuperadmin ? "superadmin.practices.index" : "dosen.practices.index";
 	const filteredQuestions = React.useMemo(() => {
 		if (!selectedType) return questions;
 		return questions.filter((q) => (q.type || QUESTION_TYPE.MC) === selectedType);
@@ -153,13 +163,13 @@ function CreatePracticeContent({
 					"Anda belum mengisi apa pun pada latihan soal ini. Tetap kembali ke halaman daftar?",
 				confirmText: "Ya, kembali",
 				cancelText: "Lanjut isi",
-				onConfirm: () => router.visit(route("dosen.practices.index")),
+				onConfirm: () => router.visit(route(backRoute)),
 			});
 			return;
 		}
 
-		router.visit(route("dosen.practices.index"));
-	}, [hasAnyInput, popup, submitting]);
+		router.visit(route(backRoute));
+	}, [hasAnyInput, popup, submitting, backRoute]);
 
 	React.useEffect(() => {
 		registerBackHandler?.(handleBackToIndex);
@@ -260,7 +270,10 @@ function CreatePracticeContent({
 			formData.append(`questions[${index}][points]`, q.points ?? "");
 			formData.append(`questions[${index}][output_code]`, q.outputCode ?? "");
 			formData.append(`questions[${index}][feedback_correct]`, q.feedbackCorrect ?? "");
-			formData.append(`questions[${index}][feedback_incorrect]`, q.feedbackIncorrect ?? "");
+			formData.append(
+				`questions[${index}][feedback_incorrect]`,
+				q.feedbackIncorrect ?? "",
+			);
 
 			q.options.forEach((opt, optIdx) => {
 				formData.append(
@@ -278,7 +291,11 @@ function CreatePracticeContent({
 			}
 		});
 
-		router.post(route("dosen.practices.questions.save", practice.id), formData, {
+		const saveRouteName = (authUser?.role || "").toLowerCase() === "superadmin"
+			? "superadmin.practices.questions.save"
+			: "dosen.practices.questions.save";
+
+		router.post(route(saveRouteName, practice.id), formData, {
 			forceFormData: true,
 			onSuccess: () => {
 				setSubmitting(false);
@@ -310,10 +327,10 @@ function CreatePracticeContent({
 			prev.map((q, i) =>
 				i === qIdx
 					? {
-						...q,
-						imageFile: file || null,
-						imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
-					}
+							...q,
+							imageFile: file || null,
+							imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
+						}
 					: q,
 				),
 		);
@@ -321,32 +338,32 @@ function CreatePracticeContent({
 
 	return (
 		<div className=" mx-auto space-y-6">
-				<header className="space-y-4">
-					<PracticeMetaPanel
-						teacherName={teacher?.name ?? "Dosen"}
-						materialName={practice?.material?.name ?? "Pilih Materi"}
-						levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
-						enableTypeSelect
-						selectedType={selectedType}
-						onTypeChange={setSelectedType}
-						typeOptions={[
-							{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
-							{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
-						]}
-					/>
-				</header>
+			<header className="space-y-4">
+				<PracticeMetaPanel
+					teacherName={teacher?.name ?? "Dosen"}
+					materialName={practice?.material?.name ?? "Pilih Materi"}
+					levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
+					enableTypeSelect
+					selectedType={selectedType}
+					onTypeChange={setSelectedType}
+					typeOptions={[
+						{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
+						{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
+					]}
+				/>
+			</header>
 
-				{filteredQuestions.length === 0 && (
-					<div className="p-8 text-center text-sm text-slate-500">
-						Belum ada soal dengan tipe {questionTypeLabel(selectedType)}.
-					</div>
-				)}
+			{filteredQuestions.length === 0 && (
+				<div className="p-8 text-center text-sm text-slate-500">
+					Belum ada soal dengan tipe {questionTypeLabel(selectedType)}.
+				</div>
+			)}
 
-				{filteredQuestions.map((q, visibleIdx) => {
-					const idx = getQuestionIndexByLocalId(q._localId);
-					if (idx < 0) return null;
+			{filteredQuestions.map((q, visibleIdx) => {
+				const idx = getQuestionIndexByLocalId(q._localId);
+				if (idx < 0) return null;
 
-					return (
+				return (
 					<Card
 						key={q._localId}
 						className="border border-slate-200 bg-white/90 shadow-sm rounded-2xl backdrop-blur"
@@ -358,7 +375,9 @@ function CreatePracticeContent({
 								</span>
 								<div>
 									<p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-										{q.type === QUESTION_TYPE.DRAG ? "Soal Drag & Drop" : "Soal Pilihan Ganda"}
+										{q.type === QUESTION_TYPE.DRAG
+												? "Soal Drag & Drop"
+												: "Soal Pilihan Ganda"}
 									</p>
 									<p className="text-[11px] text-slate-400">
 										Atur teks, gambar, dan feedback
@@ -410,35 +429,32 @@ function CreatePracticeContent({
 							/>
 						)}
 					</Card>
-					);
-				})}
+				);
+			})}
 
-				<div className="flex items-center justify-between pt-2">
-					<Button
-						type="button"
-						variant="outline"
-						color="blue"
-						size="sm"
-						onClick={handleAddQuestion}
-					>
-						+ Tambah Pertanyaan
-					</Button>
-					<Button
-						type="button"
-						variant="solid"
-						color="green"
-						size="sm"
-						disabled={submitting}
-						onClick={handleSubmit}
-					>
-						{submitting ? "Menyimpan..." : "Simpan"}
-					</Button>
-				</div>
-
-				{error && (
-					<p className="text-[11px] text-red-500 pt-1">{error}</p>
-				)}
+			<div className="flex items-center justify-between pt-2">
+				<Button
+					type="button"
+					variant="outline"
+					color="blue"
+					size="sm"
+					onClick={handleAddQuestion}
+				>
+					+ Tambah Pertanyaan
+				</Button>
+				<Button
+					type="button"
+					variant="solid"
+					color="green"
+					size="sm"
+					disabled={submitting}
+					onClick={handleSubmit}
+				>
+					{submitting ? "Menyimpan..." : "Simpan"}
+				</Button>
 			</div>
+
+			{error && <p className="text-[11px] text-red-500 pt-1">{error}</p>}
+		</div>
 	);
 }
-

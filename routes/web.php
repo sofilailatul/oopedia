@@ -50,12 +50,12 @@ Route::middleware('auth')->group(function () {
     | MATERI 
     |--------------------------------------------------------------------------
     */
-    Route::get('/materi', [MaterialController::class, 'index'])->name('materials.index');
+    Route::get('/materi', [MaterialController::class, 'IndexMahasiswa'])->name('materials.index');
     Route::get('/materi/{material}', [MaterialController::class, 'show'])->name('materials.show');
     Route::post('/materi/{material}/finish-read',[MaterialController::class, 'finishRead']);
     Route::get('/materi/{material}/finish-read', function () {
-    abort(405, 'Finish-read hanya boleh POST');
-});
+        abort(405, 'Finish-read hanya boleh POST');
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -151,33 +151,22 @@ Route::middleware('auth')->group(function () {
             ->name('dosen.quizzes.edit');
         Route::post('/dosen/kuis/{quiz}/questions', [QuizController::class, 'dosenSaveQuestions'])
             ->name('dosen.quizzes.questions.save');
+        Route::post('/dosen/kuis/{quiz}/duplicate', [QuizController::class, 'duplicateToClasses'])
+            ->name('dosen.quizzes.duplicate');
 
-        // ===== KELOLA MATERI (dosen) =====
-        Route::get('/dosen/materi', [MaterialController::class, 'dosenIndex'])->name('dosen.materials.index');
-        Route::put('/dosen/materi/reorder', [MaterialController::class, 'reorderMaterials'])->name('dosen.materials.reorder');
-        Route::get('/dosen/materi/create', [MaterialController::class, 'dosenCreate'])->name('dosen.materials.create');
-        Route::get('/dosen/materi/{material}', [MaterialController::class, 'dosenShow'])->name('dosen.materials.show');
-        Route::get('/dosen/materi/{material}/edit', [MaterialController::class, 'dosenEdit'])->name('dosen.materials.edit');
-        Route::post('/dosen/materi', [MaterialController::class, 'dosenStore'])->name('dosen.materials.store');
-        Route::put('/dosen/materi/{material}', [MaterialController::class, 'dosenUpdate'])->name('dosen.materials.update');
+        // ===== MATERI (dosen) =====
+        Route::prefix('dosen/materi')->name('dosen.materials.')->group(function () {
+            Route::get('/', [MaterialController::class, 'manageIndex'])->name('index');
+            Route::put('/reorder', [MaterialController::class, 'reorderMaterials'])->name('reorder');
+            Route::get('/create', [MaterialController::class, 'manageCreate'])->name('create');
+            Route::get('/{material}/show', [MaterialController::class, 'manageShow'])->name('show');
+            Route::get('/{material}/edit', [MaterialController::class, 'manageEdit'])->name('edit');
+            Route::post('/', [MaterialController::class, 'manageStore'])->name('store');
+            Route::put('/{material}', [MaterialController::class, 'manageUpdate'])->name('update');
+        });
 
-        // ===== KELAS =====
-        Route::get('/dosen/kelas', [ClassController::class, 'dosenIndexPage'])->name('dosen.classes.index');
-        Route::get('/classes', [ClassController::class, 'index'])->name('classes.index');
-        Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
-        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
-        Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
-        Route::delete('/classes/{class}', [ClassController::class, 'destroy'])->name('classes.destroy');
-
-        // ===== MATERI =====
-        Route::post('/materials', [MaterialController::class, 'store'])->name('materials.store');
-        Route::put('/materials/{material}', [MaterialController::class, 'update'])->name('materials.update');
-        Route::delete('/materials/{material}', [MaterialController::class, 'destroy'])->name('materials.destroy');
-
-        Route::post('/materials/{material}/sections', [MaterialController::class, 'storeSection'])->name('materials.sections.store');
-        Route::put('/materials/{material}/sections/{section}', [MaterialController::class, 'updateSection'])->name('materials.sections.update');
-        Route::delete('/materials/{material}/sections/{section}', [MaterialController::class, 'deleteSection'])->name('materials.sections.delete');
-        Route::put('/materials/{material}/sections-reorder', [MaterialController::class, 'reorderSections'])->name('materials.sections.reorder');
+        // ===== KELAS (halaman ManageClasses untuk dosen) =====
+        Route::get('/dosen/kelas', [ClassController::class, 'manageIndex'])->name('dosen.classes.index');
 
         // ===== PRACTICE =====
         Route::post('/practices', [PracticeController::class, 'store'])->name('practices.store');
@@ -207,25 +196,88 @@ Route::middleware('auth')->group(function () {
 
     });
 
+    // API kelas (dipakai di halaman ManageClasses) untuk dosen & superadmin
+    Route::middleware('auth','role:dosen,superadmin')->group(function () {
+        Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
+        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
+        Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
+        Route::delete('/classes/{class}', [ClassController::class, 'destroy'])->name('classes.destroy');
+    });
+
     /*
     |--------------------------------------------------------------------------
-    | SUPERADMIN
+    | SUPERADMIN (semua route admin digabung di sini)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('role:superadmin')->prefix('admin')->name('admin.')->group(function () {
+    Route::middleware('auth','role:superadmin')->group(function () {
 
-        // manage user (controller khusus admin biar rapi)
-        Route::get('/users', [UserController::class, 'index'])->name('users.index');
-        Route::get('/users/{user}', [UserController::class, 'show'])->name('users.show');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
-        Route::put('/users/{user}/role', [UserController::class, 'updateRole'])->name('users.role');
 
+    // Kelola User (superadmin)
+        Route::get('/users', [UserController::class, 'index'])->name('superadmin.users.index');
+        Route::get('/users/create', [UserController::class, 'create'])->name('superadmin.users.create');
+        Route::get('/users/{user}', [UserController::class, 'show'])->name('superadmin.users.show');
+        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('superadmin.users.edit');
+        Route::post('/users', [UserController::class, 'store'])->name('superadmin.users.store');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('superadmin.users.update');
+        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('superadmin.users.destroy');
+        Route::put('/users/{user}/role', [UserController::class, 'updateRole'])->name('superadmin.users.role');
+
+        // Leaderboard (superadmin)
         Route::prefix('leaderboard')->name('leaderboard.')->group(function () {
             Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
             Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
             Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
         });
+
+        // Kelola Materi (superadmin) -> gunakan halaman ManageMaterial dengan method controller yang sama dg dosen
+        Route::prefix('superadmin/materials')->name('superadmin.materials.')->group(function () {
+            Route::get('/', [MaterialController::class, 'manageIndex'])->name('index');
+            Route::put('/reorder', [MaterialController::class, 'reorderMaterials'])->name('reorder');
+            Route::get('/create', [MaterialController::class, 'manageCreate'])->name('create');
+            Route::get('/{material}/show', [MaterialController::class, 'manageShow'])->name('show');
+            Route::get('/{material}/edit', [MaterialController::class, 'manageEdit'])->name('edit');
+            Route::post('/', [MaterialController::class, 'manageStore'])->name('store');
+            Route::put('/{material}', [MaterialController::class, 'manageUpdate'])->name('update');
+        });
+
+        // ===== KELAS (halaman ManageClasses untuk superadmin) =====
+        Route::get('/superadmin/kelas', [ClassController::class, 'manageIndex'])->name('superadmin.classes.index');
+
+        // Kelola Latihan Soal (superadmin) -> gunakan halaman ManagePractices (method sama dg dosen)
+        Route::get('/superadmin/latihan-soal', [PracticeController::class, 'dosenIndexPage'])
+            ->name('superadmin.practices.index');
+
+        Route::get('/superadmin/latihan-soal/{practice}/show', [PracticeController::class, 'dosenShowPage'])
+            ->name('superadmin.practices.show');
+        Route::get('/superadmin/latihan-soal/{practice}/create', [PracticeController::class, 'dosenCreatePage'])
+            ->name('superadmin.practices.create');
+        Route::get('/superadmin/latihan-soal/{practice}', [PracticeController::class, 'dosenEditPage'])
+            ->name('superadmin.practices.edit');
+
+        // Simpan soal latihan (superadmin) menggunakan method yang sama dengan dosen
+        Route::post('/superadmin/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])
+            ->name('superadmin.practices.questions.save');
+
+        // Kelola Kuis (superadmin) -> gunakan halaman ManageQuizzes
+        Route::prefix('superadmin/kuis')->name('superadmin.quizzes.')->group(function () {
+            Route::get('/', [QuizController::class, 'dosenIndexPage'])->name('index');
+            Route::get('/create', [QuizController::class, 'dosenCreatePage'])->name('create');
+            Route::get('/{quiz}/show', [QuizController::class, 'dosenShowPage'])->name('show');
+            Route::get('/{quiz}/edit', [QuizController::class, 'dosenEditPage'])->name('edit');
+            Route::post('/', [QuizController::class, 'store'])->name('store');
+            Route::post('/{quiz}/questions', [QuizController::class, 'dosenSaveQuestions'])->name('questions.save');
+            Route::post('/{quiz}/duplicate', [QuizController::class, 'duplicateToClasses'])->name('duplicate');
+            Route::delete('/{quiz}', [QuizController::class, 'destroy'])->name('destroy');
+        });
+
+        // Nilai Mahasiswa (superadmin) -> gunakan halaman ManageLeaderboard
+        Route::get('/superadmin/nilai-mahasiswa', [ProgressController::class, 'dosenClassScoresPage'])
+            ->name('grades.index');
+        Route::get('/superadmin/nilai-mahasiswa/{student}', [ProgressController::class, 'dosenStudentDetailPage'])
+            ->name('grades.show');
+
+        // Kelola Kelas (superadmin) -> gunakan halaman ManageClasses (method sama dg dosen)
+        Route::get('/superadmin/kelas', [ClassController::class, 'manageIndex'])
+            ->name('classes.index');
     });
 });

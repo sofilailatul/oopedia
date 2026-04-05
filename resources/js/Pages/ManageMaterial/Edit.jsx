@@ -6,21 +6,27 @@ import StatusModal from '@/Components/StatusModal';
 import { useDosenMaterialEdit } from '@/Features/materials/useDosenMaterialEdit';
 import UploadImage from '@/Components/UploadImage';
 
-export default function EditMaterial(props) {
-	const materialTitle = props.material?.material_name ?? '';
+export default function ManageMaterialEdit(props) {
+	const { material, authUser } = props;
+	const materialTitle = material?.material_name ?? '';
+	const role = (authUser?.role || '').toLowerCase();
+	const baseRole = role === 'superadmin' ? 'superadmin' : 'dosen';
+	const indexRouteName = `${baseRole}.materials.index`;
+	const indexUrl = route(indexRouteName);
+
 	return (
 		<AppLayout
 			title={`Ubah Materi ${materialTitle}`}
 			label="Ubah Materi"
-			backHref={route('dosen.materials.index')}
+			backHref={indexUrl}
 			backLabel="Kembali ke daftar materi"
 		>
-			<EditMaterialContent {...props} />
+			<EditMaterialContent material={material} authUser={authUser} indexUrl={indexUrl} />
 		</AppLayout>
 	);
 }
 
-function EditMaterialContent({ material, authUser }) {
+function EditMaterialContent({ material, authUser, indexUrl }) {
 	const { state, actions } = useDosenMaterialEdit({ material, authUser });
 	const { title, description, orderNumber, sections, creatorName } = state;
 	const {
@@ -56,7 +62,7 @@ function EditMaterialContent({ material, authUser }) {
 					onConfirm: () => {
 						console.log(`[Material ID: ${material.id}] Modal success ditutup, redirecting...`);
 						setResultModal(null);
-						router.visit('/dosen/materi');
+						router.visit(indexUrl);
 					},
 				});
 			},
@@ -78,7 +84,7 @@ function EditMaterialContent({ material, authUser }) {
 
 	return (
 		<>
-		<div className="max-w-6xl mx-auto flex gap-6">
+			<div className="max-w-6xl mx-auto flex gap-6">
 				<div className="flex-1 space-y-4">
 					{/* Main card: title + description */}
 					<div className="bg-white rounded-xl border border-green-400 p-5 shadow-sm">
@@ -155,7 +161,11 @@ function EditMaterialContent({ material, authUser }) {
 									color="red"
 									variant="outline"
 									onClick={() => {
-										console.log(`[Material ID: ${material.id}] Menghapus section index ${index} | Section ID: ${section.id || 'Baru ditambahkan'} | Judul: ${section.title || 'Tanpa Judul'}`);
+										console.log(
+											`[Material ID: ${material.id}] Menghapus section index ${index} | Section ID: ${
+												section.id || 'Baru ditambahkan'
+											} | Judul: ${section.title || 'Tanpa Judul'}`,
+										);
 										deleteSection(index);
 									}}
 									className="text-xs"
@@ -172,7 +182,11 @@ function EditMaterialContent({ material, authUser }) {
 						color="blue"
 						variant="outline"
 						onClick={() => {
-							console.log(`[Material ID: ${material.id}] Menambahkan section baru (Section ke-${sections.length + 1})`);
+							console.log(
+								`[Material ID: ${material.id}] Menambahkan section baru (Section ke-${
+									sections.length + 1
+								})`,
+							);
 							addSection();
 						}}
 						className="mt-2 w-full"
@@ -186,9 +200,7 @@ function EditMaterialContent({ material, authUser }) {
 				<aside className="w-72 space-y-4">
 					{/* Dibuat Oleh */}
 					<div className="bg-white rounded-xl border p-4 shadow-sm">
-						<h3 className="text-sm font-semibold text-gray-800 mb-3">
-							Dibuat Oleh
-						</h3>
+						<h3 className="text-sm font-semibold text-gray-800 mb-3">Dibuat Oleh</h3>
 						<div className="border rounded-lg px-3 py-2 text-sm text-gray-700 bg-gray-50">
 							{creatorName}
 						</div>
@@ -196,12 +208,8 @@ function EditMaterialContent({ material, authUser }) {
 
 					{/* Urutan Materi — read-only */}
 					<div className="bg-white rounded-xl border p-4 shadow-sm">
-						<h3 className="text-sm font-semibold text-gray-800 mb-1">
-							Urutan Materi
-						</h3>
-						<p className="text-[11px] text-slate-400 mb-3">
-							Urutan hanya bisa diubah dari halaman daftar materi.
-						</p>
+						<h3 className="text-sm font-semibold text-gray-800 mb-1">Urutan Materi</h3>
+						<p className="text-[11px] text-slate-400 mb-3">Urutan hanya bisa diubah dari halaman daftar materi.</p>
 						<div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-slate-50">
 							<span className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-600">
 								{orderNumber}
@@ -226,7 +234,9 @@ function EditMaterialContent({ material, authUser }) {
 						color="yellow"
 						variant="solid"
 						onClick={() => {
-							console.log(`[Material ID: ${material.id}] Tombol 'Publish Perubahan' diklik, menampilkan Modal Konfirmasi...`);
+							console.log(
+								`[Material ID: ${material.id}] Tombol 'Publish Perubahan' diklik, menampilkan Modal Konfirmasi...`,
+							);
 							setShowConfirm(true);
 						}}
 						className="w-full"
@@ -267,4 +277,3 @@ function EditMaterialContent({ material, authUser }) {
 		</>
 	);
 }
-

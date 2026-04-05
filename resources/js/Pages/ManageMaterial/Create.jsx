@@ -7,8 +7,14 @@ import { useDosenMaterialCreate } from '@/Features/materials/useDosenMaterialCre
 import UploadImage from '@/Components/UploadImage';
 import { FaPlus, FaCheck, FaBookOpen } from 'react-icons/fa';
 
-export default function CreateMaterial(props) {
-	const { state, actions } = useDosenMaterialCreate({ authUser: props.authUser });
+export default function ManageMaterialCreate(props) {
+	const { authUser } = props;
+	const role = (authUser?.role || '').toLowerCase();
+	const baseRole = role === 'superadmin' ? 'superadmin' : 'dosen';
+	const indexRouteName = `${baseRole}.materials.index`;
+	const indexUrl = route(indexRouteName);
+
+	const { state, actions } = useDosenMaterialCreate({ authUser });
 	const { title, description, sections, isSubmitting, creatorName } = state;
 	const {
 		setTitle,
@@ -29,15 +35,19 @@ export default function CreateMaterial(props) {
 
 	const autoResize = (ref) => {
 		if (ref.current) {
-			ref.current.style.height = "auto";
-			ref.current.style.height = ref.current.scrollHeight + "px";
+			ref.current.style.height = 'auto';
+			ref.current.style.height = ref.current.scrollHeight + 'px';
 		}
 	};
 
-	useEffect(() => { autoResize(titleRef); }, [title]);
-	useEffect(() => { autoResize(descriptionRef); }, [description]);
+	useEffect(() => {
+		autoResize(titleRef);
+	}, [title]);
+	useEffect(() => {
+		autoResize(descriptionRef);
+	}, [description]);
 
-	const hasChanges = title || description || sections.some(s => s.title || s.content || s.imageFile);
+	const hasChanges = title || description || sections.some((s) => s.title || s.content || s.imageFile);
 
 	const handleBackClick = (e) => {
 		if (hasChanges && !isSubmitting) {
@@ -46,7 +56,7 @@ export default function CreateMaterial(props) {
 			}
 			setShowBackConfirm(true);
 		} else {
-			router.visit('/dosen/materi');
+			router.visit(indexUrl);
 		}
 	};
 
@@ -75,7 +85,7 @@ export default function CreateMaterial(props) {
 			return;
 		}
 
-		const hasValidSection = sections.some(s => {
+		const hasValidSection = sections.some((s) => {
 			const textFilled = s.content && s.content.trim() !== '';
 			const titleFilled = s.title && s.title.trim() !== '';
 			const hasImage = !!s.imageFile;
@@ -115,7 +125,7 @@ export default function CreateMaterial(props) {
 					confirmText: 'Kembali ke daftar',
 					onConfirm: () => {
 						setShowResult(false);
-						router.visit('/dosen/materi');
+						router.visit(indexUrl);
 					},
 				});
 				setShowResult(true);
@@ -137,15 +147,13 @@ export default function CreateMaterial(props) {
 		<AppLayout
 			title="Buat Materi Baru"
 			label="Buat Materi"
-			backHref={hasChanges ? "" : route('dosen.materials.index')}
+			backHref={hasChanges ? '' : indexUrl}
 			onBackClick={handleBackClick}
 			backLabel="Kembali"
 		>
 			<div className="mx-auto flex flex-col lg:flex-row gap-4 pb-16 px-2">
-				
 				{/* -- Form Area -- */}
 				<div className="flex-1 w-full space-y-4">
-					
 					{/* Header Text Input */}
 					<div className="px-2 py-2">
 						<textarea
@@ -202,23 +210,23 @@ export default function CreateMaterial(props) {
 								{/* Hidden / Subtle Image Upload */}
 								<div className="mt-2">
 									<UploadImage
-										label="Tambah Visual/Gambar"
-										helper="Tarik file gambar ke sini atau klik."
-										subHelper="Format PNG/JPG, maks 2MB."
-										file={section.imageFile}
-										url={section.previewUrl}
-										onFileChange={(file) => updateSectionImage(section.id, file)}
-										className="rounded-2xl border-dashed border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
-									/>
-									{section.previewUrl && (
-										<div className="mt-4 rounded-2xl overflow-hidden border border-slate-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.05)] inline-block">
-											<img
-												src={section.previewUrl}
-												alt={section.title || `Preview gambar section ${index + 1}`}
-												className="max-h-72 object-cover object-center w-full block hover:scale-105 transition-transform duration-500"
-											/>
-										</div>
-									)}
+											label="Tambah Visual/Gambar"
+											helper="Tarik file gambar ke sini atau klik."
+											subHelper="Format PNG/JPG, maks 2MB."
+											file={section.imageFile}
+											url={section.previewUrl}
+											onFileChange={(file) => updateSectionImage(section.id, file)}
+											className="rounded-2xl border-dashed border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+										/>
+										{section.previewUrl && (
+											<div className="mt-4 rounded-2xl overflow-hidden border border-slate-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.05)] inline-block">
+												<img
+													src={section.previewUrl}
+													alt={section.title || `Preview gambar section ${index + 1}`}
+													className="max-h-72 object-cover object-center w-full block hover:scale-105 transition-transform duration-500"
+												/>
+											</div>
+										)}
 								</div>
 							</div>
 						))}
@@ -226,8 +234,8 @@ export default function CreateMaterial(props) {
 
 					{/* Ghost Add Section Button */}
 					<Button
-						color='grey'
-						variant='outline'
+						color="grey"
+						variant="outline"
 						onClick={addSection}
 						className="w-full py-6 rounded-3xl border-2 border-dashed border-slate-200/80 text-slate-400 font-bold hover:border-slate-300 hover:text-slate-600 hover:bg-slate-50/50 transition-all flex flex-col items-center justify-center gap-3 group"
 					>
@@ -241,11 +249,10 @@ export default function CreateMaterial(props) {
 				{/* -- Sticky Publish Controller (Sidebar) -- */}
 				<aside className="w-full lg:w-[320px] shrink-0">
 					<div className="sticky top-[100px] space-y-5">
-						
 						{/* Publish Card Area */}
 						<div className="bg-white rounded-3xl border border-slate-200/60 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.06)] relative overflow-hidden group">
-							<div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-125 transition-transform duration-700"></div>
-							
+							<div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-bl from-blue-50 to-transparent rounded-bl-full -z-10 opacity-50 group-hover:scale-125 transition-transform duration-700" />
+
 							<div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
 								<FaBookOpen className="w-5 h-5" />
 							</div>
@@ -256,7 +263,7 @@ export default function CreateMaterial(props) {
 							</p>
 
 							<Button
-								color='blue'
+								color="blue"
 								className="w-full"
 								onClick={handlePrePublishValidate}
 								disabled={isSubmitting}
@@ -282,7 +289,6 @@ export default function CreateMaterial(props) {
 								<p className="text-sm font-bold text-slate-800 line-clamp-1">{creatorName}</p>
 							</div>
 						</div>
-
 					</div>
 				</aside>
 			</div>
@@ -312,7 +318,7 @@ export default function CreateMaterial(props) {
 				cancelText="Tetap di Sini"
 				onConfirm={() => {
 					setShowBackConfirm(false);
-					router.visit('/dosen/materi');
+					router.visit(indexUrl);
 				}}
 				onCancel={() => setShowBackConfirm(false)}
 				onClose={() => setShowBackConfirm(false)}

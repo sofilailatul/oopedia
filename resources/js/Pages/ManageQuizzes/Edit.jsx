@@ -6,7 +6,6 @@ import Button from "@/Components/Button";
 import Field from "@/Components/Field";
 import StatusModal from "@/Components/StatusModal";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
-import QuizMetaPanel from "@/Features/quiz/QuizMetaPanel";
 import Dropdown from "@/Components/Dropdown";
 
 function createEmptyQuestion() {
@@ -41,7 +40,8 @@ function normalizeInitialQuestions(initial = []) {
 			material_id: q.material_id ?? base.material_id,
 			question_text: q.quiz_text ?? q.question_text ?? base.question_text,
 			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
-			feedbackIncorrect: q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
+			feedbackIncorrect:
+				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
 			imageUrl: q.image_url ?? q.image_path ?? q.imageUrl ?? base.imageUrl,
 			options:
 				Array.isArray(q.options) && q.options.length
@@ -49,7 +49,7 @@ function normalizeInitialQuestions(initial = []) {
 							id: opt.id ?? null,
 							text: opt.option_text ?? opt.text ?? "",
 							is_correct: !!opt.is_correct,
-						}))
+					  }))
 					: base.options,
 			_localId: Math.random().toString(36).slice(2),
 		};
@@ -67,7 +67,7 @@ function getErrorReason(errors) {
 		message: String(value || "").toLowerCase(),
 	}));
 
-	const hasKeyOrMessage = (pattern) =>
+const hasKeyOrMessage = (pattern) =>
 		normalized.some((item) => pattern.test(item.key) || pattern.test(item.message));
 
 	if (hasKeyOrMessage(/title|judul/)) {
@@ -136,8 +136,17 @@ function getQuestionsSnapshot(items = []) {
 	);
 }
 
-export default function DosenQuizEdit({ quiz, questions: initialQuestions = [], materials = [] }) {
+export default function ManageQuizzesEdit({
+	quiz,
+	questions: initialQuestions = [],
+	materials = [],
+	classes = [],
+	authUser,
+}) {
 	const backHandlerRef = React.useRef(null);
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const baseRouteName = isSuperadmin ? "superadmin.quizzes" : "dosen.quizzes";
 
 	const registerBackHandler = React.useCallback((handler) => {
 		backHandlerRef.current = handler;
@@ -147,7 +156,7 @@ export default function DosenQuizEdit({ quiz, questions: initialQuestions = [], 
 		<AppLayout
 			title="Edit Kuis"
 			label="Edit Kuis"
-			backHref={route("dosen.quizzes.show", quiz.id)}
+			backHref={route(`${baseRouteName}.show`, quiz.id)}
 			backLabel="Kembali ke detail kuis"
 			onBackClick={(e) => {
 				e?.preventDefault?.();
@@ -158,13 +167,22 @@ export default function DosenQuizEdit({ quiz, questions: initialQuestions = [], 
 				quiz={quiz}
 				initialQuestions={initialQuestions}
 				materials={materials}
+				classes={classes}
+				authUser={authUser}
 				registerBackHandler={registerBackHandler}
 			/>
 		</AppLayout>
 	);
 }
 
-function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandler }) {
+function QuizEditContent({
+	quiz,
+	initialQuestions,
+	materials,
+	classes = [],
+	authUser,
+	registerBackHandler,
+}) {
 	const [modalState, setModalState] = React.useState({
 		show: false,
 		type: "success",
@@ -186,6 +204,7 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 	);
 
 	const [formData, setFormData] = React.useState({
+		class_id: quiz.class_id || "",
 		title: quiz.title || "",
 		description: quiz.description || "",
 		duration: quiz.duration || 30,
@@ -195,6 +214,7 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 	});
 
 	const [submitting, setSubmitting] = React.useState(false);
+	const [duplicating, setDuplicating] = React.useState(false);
 	const [error, setError] = React.useState("");
 
 	const isDirty = React.useMemo(
@@ -202,39 +222,54 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 		[questions, initialSnapshot],
 	);
 
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const baseRouteName = isSuperadmin ? "superadmin.quizzes" : "dosen.quizzes";
+	const saveRouteName = isSuperadmin
+		? "superadmin.quizzes.questions.save"
+		: "dosen.quizzes.questions.save";
+
 	const handleBack = React.useCallback(() => {
 		if (submitting) return;
 
 		if (isDirty) {
-            setModalState({
-                show: true,
-                type: "confirm",
-                title: "Perubahan belum disimpan",
-                message: "Ada perubahan pada kuis yang belum disimpan. Tetap kembali ke detail?",
-                confirmText: "Ya, kembali",
-                cancelText: "Lanjut edit",
-                onConfirm: () => router.visit(route("dosen.quizzes.show", quiz.id)),
-                onCancel: () => setModalState(prev => ({ ...prev, show: false }))
-            });
-            return;
-        }
+			setModalState({
+				show: true,
+				type: "confirm",
+				title: "Perubahan belum disimpan",
+				message:
+					"Ada perubahan pada kuis yang belum disimpan. Tetap kembali ke detail?",
+				confirmText: "Ya, kembali",
+				cancelText: "Lanjut edit",
+				onConfirm: () => router.visit(route(`${baseRouteName}.show`, quiz.id)),
+				onCancel: () => setModalState((prev) => ({ ...prev, show: false })),
+			});
+			return;
+		}
 
-        if (!initialQuestions || initialQuestions.length === 0) {
-            setModalState({
-                show: true,
-                type: "confirm",
-                title: "Kuis Masih Kosong",
-                message: "Anda belum menyimpan satupun soal untuk kuis ini. Apakah Anda yakin ingin meninggalkan halaman ini?",
-                confirmText: "Tinggalkan Halaman",
-                cancelText: "Buat Soal Sekarang",
-                onConfirm: () => router.visit(route("dosen.quizzes.show", quiz.id)),
-                onCancel: () => setModalState(prev => ({ ...prev, show: false }))
-            });
-            return;
-        }
+		if (!initialQuestions || initialQuestions.length === 0) {
+			setModalState({
+				show: true,
+				type: "confirm",
+				title: "Kuis Masih Kosong",
+				message:
+					"Anda belum menyimpan satupun soal untuk kuis ini. Apakah Anda yakin ingin meninggalkan halaman ini?",
+				confirmText: "Tinggalkan Halaman",
+				cancelText: "Buat Soal Sekarang",
+				onConfirm: () => router.visit(route(`${baseRouteName}.show`, quiz.id)),
+				onCancel: () => setModalState((prev) => ({ ...prev, show: false })),
+			});
+			return;
+		}
 
-        router.visit(route("dosen.quizzes.show", quiz.id));
-	}, [isDirty, submitting, quiz.id, initialQuestions?.length]);
+		router.visit(route(`${baseRouteName}.show`, quiz.id));
+	}, [
+		isDirty,
+		submitting,
+		quiz.id,
+		initialQuestions?.length,
+		baseRouteName,
+	]);
 
 	React.useEffect(() => {
 		registerBackHandler?.(handleBack);
@@ -292,10 +327,12 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 					? {
 							...q,
 							imageFile: file || null,
-							imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
+							imageUrl: file
+								? URL.createObjectURL(file)
+								: q.imageUrl ?? null,
 						}
 					: q,
-			),
+				),
 		);
 	};
 
@@ -306,18 +343,25 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 		setError("");
 
 		const formDataPost = new FormData();
-		
-		formDataPost.append('title', formData.title);
-		formDataPost.append('description', formData.description || "");
-		formDataPost.append('duration', formData.duration);
-		formDataPost.append('passing_score', formData.passing_score);
-		formDataPost.append('start_at', formData.start_at || "");
-		formDataPost.append('end_at', formData.end_at || "");
+
+		formDataPost.append("class_id", formData.class_id || "");
+		formDataPost.append("title", formData.title);
+		formDataPost.append("description", formData.description || "");
+		formDataPost.append("duration", formData.duration);
+		formDataPost.append("passing_score", formData.passing_score);
+		formDataPost.append("start_at", formData.start_at || "");
+		formDataPost.append("end_at", formData.end_at || "");
 
 		questions.forEach((q, index) => {
 			formDataPost.append(`questions[${index}][id]`, q.id ?? "");
-			formDataPost.append(`questions[${index}][material_id]`, q.material_id ?? "");
-			formDataPost.append(`questions[${index}][quiz_text]`, q.question_text ?? "");
+			formDataPost.append(
+				`questions[${index}][material_id]`,
+				q.material_id ?? "",
+			);
+			formDataPost.append(
+				`questions[${index}][quiz_text]`,
+				q.question_text ?? "",
+			);
 			formDataPost.append(`questions[${index}][points]`, q.points ?? "");
 			formDataPost.append(
 				`questions[${index}][feedback_correct]`,
@@ -344,7 +388,7 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 			}
 		});
 
-		router.post(route("dosen.quizzes.questions.save", quiz.id), formDataPost, {
+		router.post(route(saveRouteName, quiz.id), formDataPost, {
 			forceFormData: true,
 			onSuccess: () => {
 				setSubmitting(false);
@@ -354,7 +398,7 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 					title: "Berhasil",
 					message: "Kuis dan soal berhasil disimpan.",
 					confirmText: "Kembali ke detail",
-					onConfirm: () => router.visit(route("dosen.quizzes.show", quiz.id)),
+					onConfirm: () => router.visit(route(`${baseRouteName}.show`, quiz.id)),
 				});
 			},
 			onError: (errors) => {
@@ -373,13 +417,94 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 		});
 	};
 
+	const handleDuplicate = () => {
+		// Pilih kelas lain selain kelas utama kuis saat ini
+		const availableClassIds = classes
+			.filter((c) => c.id !== formData.class_id)
+			.map((c) => c.id);
+
+		if (!availableClassIds.length) {
+			setModalState({
+				show: true,
+				type: "error",
+				title: "Tidak Ada Kelas Lain",
+				message:
+					"Tidak ada kelas lain yang tersedia untuk duplikasi. Tambah kelas baru terlebih dahulu.",
+				confirmText: "Tutup",
+			});
+			return;
+		}
+
+		const classIds = window.prompt(
+			"Masukkan ID kelas tujuan, pisahkan dengan koma (contoh: 2,3).\n\n" +
+				"Kelas yang sekarang: " +
+				(classes.find((c) => c.id === formData.class_id)?.class_name || "(belum dipilih)"),
+		);
+
+		if (!classIds) return;
+
+		const parsed = String(classIds)
+			.split(",")
+			.map((v) => Number(v.trim()))
+			.filter((v) => Number.isInteger(v) && v > 0);
+
+		if (!parsed.length) {
+			setModalState({
+				show: true,
+				type: "error",
+				title: "Input Tidak Valid",
+				message: "Format ID kelas tidak valid.",
+				confirmText: "Tutup",
+			});
+			return;
+		}
+
+		setDuplicating(true);
+
+		const role = (authUser?.role || "").toLowerCase();
+		const isSuperadmin = role === "superadmin";
+		const baseRouteName = isSuperadmin ? "superadmin.quizzes" : "dosen.quizzes";
+
+		router.post(
+			route(`${baseRouteName}.duplicate`, quiz.id),
+			{ class_ids: parsed },
+			{
+				onFinish: () => setDuplicating(false),
+				onSuccess: () => {
+					setModalState({
+						show: true,
+						type: "success",
+						title: "Berhasil Diduplikasi",
+						message:
+							"Kuis berhasil diduplikasi ke kelas yang dipilih. Cek halaman daftar kuis untuk melihat hasilnya.",
+						confirmText: "Tutup",
+					});
+				},
+				onError: (errors) => {
+					const reason = getErrorReason(errors);
+					setModalState({
+						show: true,
+						type: "error",
+						title: "Gagal Duplikasi",
+						message: `Gagal menduplikasi kuis. ${reason}`,
+						confirmText: "Tutup",
+					});
+				},
+			},
+		);
+	};
+
 	return (
 		<div className="mx-auto space-y-6">
 			<header className="space-y-4 px-2">
 				<div className="flex items-center gap-4">
 					<div>
-						<h1 className="text-xl font-bold text-slate-900">{formData.title || quiz.title}</h1>
-						<p className="text-xs text-slate-600">Kelas: {quiz.class_name}</p>
+						<h1 className="text-xl font-bold text-slate-900">
+							{formData.title || quiz.title}
+						</h1>
+						<p className="text-xs text-slate-600">
+							Kelas: {classes.find((c) => c.id === formData.class_id)?.class_name || quiz.class_name}
+						</p>
 					</div>
 				</div>
 			</header>
@@ -388,9 +513,36 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 			<Card className="rounded-3xl border border-slate-200/80 bg-slate-50/65 p-5 shadow-sm">
 				<div className="mb-4">
 					<h3 className="text-sm font-semibold text-slate-800">Pengaturan Kuis</h3>
-					<p className="text-[11px] text-slate-500">Ubah detail utama kuis Anda.</p>
+					<p className="text-[11px] text-slate-500">
+						Ubah detail utama kuis Anda.
+					</p>
 				</div>
 				<div className="grid gap-4">
+					<div className="space-y-1">
+						<label className="text-xs font-medium text-slate-700">
+							Kelas yang Bisa Mengikuti
+						</label>
+						<select
+							value={formData.class_id}
+							onChange={(e) =>
+								setFormData({
+									...formData,
+									class_id: Number(e.target.value) || "",
+								})
+							}
+							className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+						>
+							<option value="">Pilih kelas</option>
+							{classes.map((cls) => (
+								<option key={cls.id} value={cls.id}>
+									{cls.class_name}
+								</option>
+							))}
+						</select>
+						<p className="mt-1 text-[10px] text-slate-400">
+							Mahasiswa di kelas ini yang akan melihat dan mengerjakan kuis.
+						</p>
+					</div>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field
 							as="input"
@@ -406,7 +558,12 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 								label="Durasi (Menit)"
 								min="1"
 								value={formData.duration}
-								onChange={(e) => setFormData({ ...formData, duration: Number(e.target.value) || 0 })}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+											duration: Number(e.target.value) || 0,
+										})
+								}
 							/>
 							<Field
 								as="input"
@@ -415,7 +572,12 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 								min="0"
 								max="100"
 								value={formData.passing_score}
-								onChange={(e) => setFormData({ ...formData, passing_score: Number(e.target.value) || 0 })}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+											passing_score: Number(e.target.value) || 0,
+										})
+								}
 							/>
 						</div>
 					</div>
@@ -424,7 +586,9 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 						label="Deskripsi Kuis (Opsional)"
 						rows={3}
 						value={formData.description}
-						onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+						onChange={(e) =>
+							setFormData({ ...formData, description: e.target.value })
+						}
 						placeholder="Tambahkan instruksi kuis atau capaian belajar jika perlu..."
 					/>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -433,16 +597,54 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 							type="datetime-local"
 							label="Mulai (Opsional)"
 							value={formData.start_at}
-							onChange={(e) => setFormData({ ...formData, start_at: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, start_at: e.target.value })
+							}
 						/>
 						<Field
 							as="input"
 							type="datetime-local"
 							label="Selesai (Opsional)"
 							value={formData.end_at}
-							onChange={(e) => setFormData({ ...formData, end_at: e.target.value })}
+							onChange={(e) =>
+								setFormData({ ...formData, end_at: e.target.value })
+							}
 						/>
 					</div>
+				</div>
+			</Card>
+
+			<Card className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-5 shadow-sm">
+				<div className="mb-3 flex items-center justify-between gap-3">
+					<div>
+						<h3 className="text-sm font-semibold text-slate-800">
+							Duplikasikan Kuis ke Kelas Lain
+						</h3>
+						<p className="text-[11px] text-slate-500">
+							Salin kuis beserta soal-soalnya ke kelas lain tanpa mengubah kuis ini.
+						</p>
+					</div>
+				</div>
+				<div className="text-[11px] text-slate-500">
+					<p>
+						Ketik ID kelas tujuan saat diminta. Kamu bisa memasukkan lebih dari satu ID
+						dengan koma, misalnya: <span className="font-mono">2,3,5</span>.
+					</p>
+					<p className="mt-1">
+						Untuk melihat ID kelas, buka halaman daftar kelas terlebih dahulu.
+					</p>
+				</div>
+				<div className="mt-3 flex justify-end">
+					<Button
+						type="button"
+						variant="outline"
+						color="blue"
+						size="xs"
+						disabled={duplicating}
+						onClick={handleDuplicate}
+					>
+						{duplicating ? "Menduplikasi..." : "Duplikasikan ke Kelas Lain"}
+					</Button>
 				</div>
 			</Card>
 
@@ -478,15 +680,18 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 								<Dropdown className="w-32">
 									<Dropdown.Trigger>
 										<div className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 bg-white cursor-pointer">
-											{materials.find(m => m.id === q.material_id)?.material_name || "Pilih materi"}
+											{materials.find((m) => m.id === q.material_id)?.material_name ||
+													"Pilih materi"}
 										</div>
 									</Dropdown.Trigger>
 									<Dropdown.Content align="left" width="48">
-										{materials.map(m => (
+										{materials.map((m) => (
 											<Dropdown.Item
-												key={m.id}
-												onClick={() => updateQuestionField(idx, "material_id", m.id)}
-												className={q.material_id === m.id ? "bg-blue-100 text-blue-900" : ""}
+													key={m.id}
+													onClick={() => updateQuestionField(idx, "material_id", m.id)}
+													className={
+														q.material_id === m.id ? "bg-blue-100 text-blue-900" : ""
+													}
 											>
 												{m.material_name}
 											</Dropdown.Item>
@@ -560,13 +765,13 @@ function QuizEditContent({ quiz, initialQuestions, materials, registerBackHandle
 				cancelText={modalState.cancelText}
 				onConfirm={() => {
 					if (modalState.onConfirm) modalState.onConfirm();
-					setModalState(prev => ({ ...prev, show: false }));
+					setModalState((prev) => ({ ...prev, show: false }));
 				}}
 				onCancel={() => {
 					if (modalState.onCancel) modalState.onCancel();
-					setModalState(prev => ({ ...prev, show: false }));
+					setModalState((prev) => ({ ...prev, show: false }));
 				}}
-				onClose={() => setModalState(prev => ({ ...prev, show: false }))}
+				onClose={() => setModalState((prev) => ({ ...prev, show: false }))}
 			/>
 		</div>
 	);

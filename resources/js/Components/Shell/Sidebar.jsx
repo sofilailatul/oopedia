@@ -16,12 +16,11 @@ import {
 const NAV_BY_ROLE = {
   admin: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },
-    { label: "Kelola Materi", href: "/superadmin/materi", icon: FaBook },
+    { label: "Kelola Materi", href: "/superadmin/materials", icon: FaBook },
     { label: "Kelola Latihan Soal", href: "/superadmin/latihan-soal", icon: FaClipboardList },
     { label: "Kelola Kuis", href: "/superadmin/kuis", icon: FaFileAlt },
-    { label: "Leaderboard", href: "/superadmin/leaderboard", icon: FaTrophy },
-    { label: "Nilai Mahasiswa", href: "/superadmin/nilai-mahasiswa", icon: FaChartBar },
-    { label: "Kelola User", href: "/superadmin/users", icon: FaUserCog },
+    { label: "Leaderboard", href: "/superadmin/nilai-mahasiswa", icon: FaTrophy },
+    { label: "Kelola User", href: "/users", icon: FaUserCog },
     { label: "Kelola Kelas", href: "/superadmin/kelas", icon: FaUsers },
   ],
   dosen: [

@@ -260,4 +260,24 @@ class QuizService
                 ];
             });
     }
+
+    public function getQuizzesForAdmin()
+    {
+        return QuizModel::query()
+            ->with('class')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($quiz) {
+                return [
+                    'id' => $quiz->id,
+                    'title' => $quiz->title,
+                    'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+                    'total_questions' => $quiz->questions()->count(),
+                    'duration' => $quiz->duration,
+                    'passing_score' => $quiz->passing_score,
+                    'start_at' => $quiz->start_at,
+                    'end_at' => $quiz->end_at,
+                ];
+            });
+    }
 }

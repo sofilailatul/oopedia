@@ -4,7 +4,10 @@ import Card from "@/Components/Card";
 import Button from "@/Components/Button";
 import { router, Link } from "@inertiajs/react";
 
-export default function DosenClassScoresPage({ classes = [], selectedClassId = null, classDetail = null }) {
+export default function ManageLeaderboardIndex({ authUser, classes = [], selectedClassId = null, classDetail = null }) {
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+
 	return (
 		<AppLayout title="Nilai Mahasiswa" label="Nilai Mahasiswa">
 			<div className="mx-auto max-w-7xl space-y-6 pb-10">
@@ -13,6 +16,7 @@ export default function DosenClassScoresPage({ classes = [], selectedClassId = n
 					classes={classes}
 					selectedClassId={selectedClassId}
 					classDetail={classDetail}
+					isSuperadmin={isSuperadmin}
 				/>
 			</div>
 		</AppLayout>
@@ -22,7 +26,7 @@ export default function DosenClassScoresPage({ classes = [], selectedClassId = n
 function HeaderSection() {
 	return (
 		<Card className="rounded-2xl border border-slate-200/80 bg-white px-6 py-5 shadow-sm">
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 				<div className="space-y-1">
 					<p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-500">Insight Kelas</p>
 					<h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Nilai Mahasiswa per Kelas</h1>
@@ -35,7 +39,7 @@ function HeaderSection() {
 	);
 }
 
-function ContentSection({ classes, selectedClassId, classDetail }) {
+function ContentSection({ classes, selectedClassId, classDetail, isSuperadmin }) {
 	if (!classes || classes.length === 0) {
 		return (
 			<Card className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 py-14 text-center">
@@ -49,16 +53,18 @@ function ContentSection({ classes, selectedClassId, classDetail }) {
 
 	return (
 		<div className="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,2fr)]">
-			<ClassList classes={classes} selectedClassId={selectedClassId} />
-			<ScoreTable classDetail={classDetail} />
+			<ClassList classes={classes} selectedClassId={selectedClassId} isSuperadmin={isSuperadmin} />
+			<ScoreTable classDetail={classDetail} isSuperadmin={isSuperadmin} />
 		</div>
 	);
 }
 
-function ClassList({ classes, selectedClassId }) {
+function ClassList({ classes, selectedClassId, isSuperadmin }) {
 	const handleSelect = (id) => {
 		if (!id || id === selectedClassId) return;
-		router.get(route("dosen.grades.index"), { class_id: id }, {
+
+		const routeName = isSuperadmin ? "grades.index" : "dosen.grades.index";
+		router.get(route(routeName), { class_id: id }, {
 			preserveScroll: true,
 			preserveState: true,
 		});
@@ -85,7 +91,7 @@ function ClassList({ classes, selectedClassId }) {
 							type="button"
 							onClick={() => handleSelect(cls.id)}
 							className={[
-								"flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-xs transition-all",
+								"flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-xs transition-all",
 								isActive
 									? "border-slate-900 bg-slate-900 text-white shadow-sm"
 									: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -113,7 +119,7 @@ function ClassList({ classes, selectedClassId }) {
 	);
 }
 
-function ScoreTable({ classDetail }) {
+function ScoreTable({ classDetail, isSuperadmin }) {
 	if (!classDetail) {
 		return (
 			<Card className="h-full rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center text-sm text-slate-500">
@@ -124,10 +130,12 @@ function ScoreTable({ classDetail }) {
 
 	const quizzes = classDetail.quizzes || [];
 	const students = classDetail.students || [];
+	const classRouteName = isSuperadmin ? "classes.index" : "dosen.classes.index";
+	const gradeShowRouteName = isSuperadmin ? "grades.show" : "dosen.grades.show";
 
 	return (
-		<Card className="h-full rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-			<div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+		<Card className="h-full rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+			<div className="mb-1 flex flex-wrap items-center justify-between gap-3">
 				<div>
 					<h2 className="text-sm font-semibold text-slate-900">{classDetail.class_name}</h2>
 					<p className="text-[11px] text-slate-500">
@@ -139,18 +147,18 @@ function ScoreTable({ classDetail }) {
 					variant="outline"
 					color="slate"
 					className="rounded-full border-slate-300 px-3 py-1 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50"
-					href={route("dosen.classes.index")}
+					href={route(classRouteName)}
 				>
 					Kelola kelas
 				</Button>
 			</div>
-			<div className="mt-2 overflow-x-auto">
+			<div className="mt-0 overflow-x-auto">
 				<table className="min-w-full border-separate border-spacing-y-1 text-xs">
 					<thead>
 						<tr>
 							<th className="sticky left-0 z-10 rounded-l-xl bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Mahasiswa</th>
 							<th className="bg-slate-50 px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">Email</th>
-							<th className="bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nilai Hard</th>
+							<th className="bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Nilai Latihan</th>
 							<th className="bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Kuis Selesai</th>
 							<th className="bg-slate-50 px-3 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rata-rata Quiz</th>
 							{quizzes.map((quiz) => (
@@ -218,7 +226,7 @@ function ScoreTable({ classDetail }) {
 									<td className="px-3 py-2 text-center text-[11px]">
 										<Link
 											className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-[11px] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50"
-											href={route("dosen.grades.show", { student: student.id, class_id: classDetail.id })}
+											href={route(gradeShowRouteName, { student: student.id, class_id: classDetail.id })}
 										>
 											Detail
 										</Link>
@@ -232,4 +240,3 @@ function ScoreTable({ classDetail }) {
 		</Card>
 	);
 }
-

@@ -1,9 +1,10 @@
 import React from "react";
 import AppLayout from "@/Layouts/AppLayout";
-import { Link, router } from "@inertiajs/react";
+import { Link, router, usePage } from "@inertiajs/react";
 import Button from "@/Components/Button";
 import Card from "@/Components/Card";
 import { FaEye, FaPen, FaTrash } from "react-icons/fa";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 function logAction(action, detail = {}) {
 	console.log("[Quiz]", { action, ...detail });
@@ -20,19 +21,33 @@ function getQuizLogContext(quiz) {
 	};
 }
 
-export default function DosenQuizzesIndex({ quizzes = [], classes = [] }) {
+export default function ManageQuizzesIndex({ quizzes = [], classes = [], authUser }) {
+	const page = usePage();
+	const user = authUser || page.props?.auth?.user || {};
+	const role = (user.role || "").toLowerCase();
+
 	return (
 		<AppLayout title="Kelola Kuis" label="Kelola Kuis">
-			<PageContent quizzes={quizzes} classes={classes} />
+			<PageContent
+				quizzes={quizzes}
+				classes={classes}
+				role={role}
+			/>
 		</AppLayout>
 	);
 }
 
-function PageContent({ quizzes = [], classes = [] }) {
+function PageContent({ quizzes = [], classes = [], role }) {
+	const isDosen = role === "dosen";
+	const isSuperadmin = role === "superadmin";
 	const [deleting, setDeleting] = React.useState(false);
+	const popup = usePopup();
+
+	const baseRouteName = isSuperadmin ? "superadmin.quizzes" : "dosen.quizzes";
+	const destroyRouteName = isSuperadmin ? "superadmin.quizzes.destroy" : "quizzes.destroy";
 
 	const handleOpenCreate = () => {
-		router.visit(route("dosen.quizzes.create"));
+		router.visit(route(`${baseRouteName}.create`));
 	};
 
 	const handleConfirmDelete = (quizToDelete) => {
@@ -42,7 +57,7 @@ function PageContent({ quizzes = [], classes = [] }) {
 		});
 
 		setDeleting(true);
-		router.delete(route("quizzes.destroy", quizToDelete.id), {
+		router.delete(route(destroyRouteName, quizToDelete.id), {
 			onSuccess: () => {
 				setDeleting(false);
 				console.log("[Quiz]", {
@@ -86,6 +101,9 @@ function PageContent({ quizzes = [], classes = [] }) {
 		});
 	};
 
+	const showRouteName = `${baseRouteName}.show`;
+	const editRouteName = `${baseRouteName}.edit`;
+
 	return (
 		<div className="mx-auto max-w-6xl space-y-6">
 			<div className="rounded-3xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
@@ -94,16 +112,18 @@ function PageContent({ quizzes = [], classes = [] }) {
 						<h1 className="text-lg font-semibold tracking-tight text-slate-900">Daftar Kuis</h1>
 						<p className="text-xs text-slate-500">Atur, lihat, dan Update Kuis Yang Dibuat</p>
 					</div>
-					<Button
-						as={Link}
-						href={route("dosen.quizzes.create")}
-						variant="solid"
-						color="yellow"
-						size="md"
-						className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm"
-					>
-						+ Buat Kuis Baru
-					</Button>
+					{(isDosen || isSuperadmin) && (
+						<Button
+							as={Link}
+							href={route(`${baseRouteName}.create`)}
+							variant="solid"
+							color="yellow"
+							size="md"
+							className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm"
+						>
+							+ Buat Kuis Baru
+						</Button>
+					)}
 				</div>
 			</div>
 			{/* Table */}
@@ -151,51 +171,57 @@ function PageContent({ quizzes = [], classes = [] }) {
 									</td>
 									<td className="px-5 py-3 align-middle">
 										<div className="flex items-center justify-center gap-2">
-											<Button
-												as={Link}
-												href={route("dosen.quizzes.show", quiz.id)}
-												color="blue"
-												variant="ghost"
-												size="sm"
-												leftIcon={<FaEye className="h-3 w-3" />}
-												onClick={() =>
-													logAction("open_quiz_detail", {
-														...getQuizLogContext(quiz),
-													})
-												}
-											>
-												Lihat
-											</Button>
-											<Button
-												as={Link}
-												href={route("dosen.quizzes.edit", quiz.id)}
-												color="blue"
-												variant="outline"
-												size="sm"
-												leftIcon={<FaPen className="h-3 w-3" />}
-												onClick={() =>
-													logAction("open_quiz_edit", {
-														...getQuizLogContext(quiz),
-													})
-												}
-											>
-												Edit
-											</Button>
-											<Button
-												type="button"
-												color="red"
-												variant="outline"
-												size="sm"
-												leftIcon={<FaTrash className="h-3 w-3" />}
-												onClick={() => {
-													logAction("click_delete", {
-														...getQuizLogContext(quiz),
-													});
-													handleOpenDelete(quiz);
-												}}
-											>
-												Hapus
-											</Button>
+											{isDosen || isSuperadmin ? (
+												<>
+													<Button
+														as={Link}
+														href={route(showRouteName, quiz.id)}
+														color="blue"
+														variant="ghost"
+														size="sm"
+														leftIcon={<FaEye className="h-3 w-3" />}
+														onClick={() =>
+															logAction("open_quiz_detail", {
+																...getQuizLogContext(quiz),
+															})
+														}
+													>
+														Lihat
+													</Button>
+													<Button
+														as={Link}
+														href={route(editRouteName, quiz.id)}
+														color="blue"
+														variant="outline"
+														size="sm"
+														leftIcon={<FaPen className="h-3 w-3" />}
+														onClick={() =>
+															logAction("open_quiz_edit", {
+																...getQuizLogContext(quiz),
+															})
+														}
+													>
+														Edit
+													</Button>
+													<Button
+														type="button"
+														color="red"
+														variant="outline"
+														size="sm"
+														leftIcon={<FaTrash className="h-3 w-3" />}
+														onClick={() => {
+															logAction("click_delete", {
+																...getQuizLogContext(quiz),
+															});
+															handleOpenDelete(quiz);
+														}}
+													>
+														Hapus
+													</Button>
+												</>
+											) : (
+												<span className="text-xs text-slate-400">Aksi hanya untuk pengguna berwenang</span>
+											)}
 										</div>
 									</td>
 								</tr>

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\MaterialModel;
 use App\Models\UserProgressModel;
 use App\Models\MaterialContentModel;
+use App\Models\UserModel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -16,13 +17,14 @@ use App\Models\QuizMapModel;
 
 class MaterialController extends Controller
 {
-    public function index(Request $request)
+    // Halaman daftar materi untuk MAHASISWA
+    public function IndexMahasiswa (Request $request)
     {
         $user = $request->user();
         $role = strtolower($user->role ?? 'tamu');
         $userId = $user->id;
 
-        
+        // Cari class_id aktif user (jika sudah join kelas)
         $classId = DB::table('class_user')
             ->where('user_id', $userId)
             ->value('class_id');
@@ -37,18 +39,18 @@ class MaterialController extends Controller
                 $query->where('created_by', $dosenId);
             }
         } elseif ($role === 'mahasiswa') {
-            $query->where('id', 0); // Hide all if student hasn't joined a class
+            // Jika mahasiswa belum join kelas, sembunyikan semua materi
+            $query->where('id', 0);
         }
 
         $materials = $query->orderBy('order_number')->get();
 
-        
+        // Ambil progress per materi untuk user & class aktif
         $progressRows = UserProgressModel::query()
             ->where('user_id', $userId)
             ->where('class_id', $classId)
             ->get(['material_id', 'status', 'completed_practice_at', 'completed_quiz_at', 'read_at']);
 
-        
         $progressMap = $progressRows->keyBy('material_id');
 
         $materials = $materials->values()->map(function ($m, $idx) use ($progressMap, $materials) {
@@ -56,24 +58,20 @@ class MaterialController extends Controller
 
             $rawStatus = $row?->status ?? 'locked';
 
-            
-            
-            
+            // Materi pertama selalu minimal unlocked, selanjutnya ikut status materi sebelumnya
             if ($idx === 0) {
                 $effectiveStatus = ($rawStatus === 'locked') ? 'unlocked' : $rawStatus;
             } else {
                 $prevMaterialId = $materials[$idx - 1]->id;
                 $prevRow = $progressMap->get($prevMaterialId);
 
-                $prevCompleted = ($prevRow?->status === 'completed') || !is_null($prevRow?->completed_practice_at) || !is_null($prevRow?->completed_quiz_at);
+                $prevCompleted = ($prevRow?->status === 'completed')
+                    || !is_null($prevRow?->completed_practice_at)
+                    || !is_null($prevRow?->completed_quiz_at);
 
-                if ($prevCompleted) {
-                    
-                    $effectiveStatus = ($rawStatus === 'locked') ? 'unlocked' : $rawStatus;
-                } else {
-                    
-                    $effectiveStatus = 'locked';
-                }
+                $effectiveStatus = $prevCompleted
+                    ? (($rawStatus === 'locked') ? 'unlocked' : $rawStatus)
+                    : 'locked';
             }
 
             return [
@@ -83,9 +81,8 @@ class MaterialController extends Controller
                 'order_number' => $m->order_number,
                 'author' => $m->creator?->name ?? $m->creator?->nama ?? '—',
 
-                
-                'progress' => $effectiveStatus,      
-                'raw_progress' => $rawStatus,        
+                'progress' => $effectiveStatus,
+                'raw_progress' => $rawStatus,
                 'read_at' => $row?->read_at,
                 'completed_practice_at' => $row?->completed_practice_at,
                 'completed_quiz_at' => $row?->completed_quiz_at,
@@ -318,56 +315,83 @@ class MaterialController extends Controller
         };
     }
 
-    public function dosenCreate(Request $request)
+    // Halaman form kelola materi (dipakai Dosen & Superadmin)
+    public function manageCreate(Request $request)
     {
-        return Inertia::render('Dosen/Materials/Create', [
-            'authUser' => $request->user(),
-        ]);
-    }
+        $user = $request->user();
 
-    public function dosenIndex(Request $request)
-    {
-        $materials = MaterialModel::query()
-            ->withExists('progress as is_locked')
-            ->select('id', 'material_name', 'order_number')
-            ->where('created_by', $request->user()->id)
-            ->orderBy('order_number')
-            ->get()
-            ->map(function ($m) {
-                return [
-                    'id' => $m->id,
-                    'material_name' => $m->material_name,
-                    'order_number' => $m->order_number,
-                    'is_locked' => (bool) $m->is_locked,
-                ];
-            });
-
-        return Inertia::render('Dosen/Materials/Index', [
-            'materials' => $materials,
-        ]);
-    }
-
-    public function dosenShow(Request $request, MaterialModel $material)
-    {
-        if ($material->created_by !== $request->user()->id) {
-            abort(403, 'Akses ditolak. Anda tidak berhak atas materi ini.');
+        $lecturers = [];
+        if (strtolower($user->role) === 'superadmin') {
+            $lecturers = UserModel::where('role', 'dosen')
+                ->orderBy('nama')
+                ->get(['id', 'nama', 'email']);
         }
+
+        // Satu halaman Inertia ManageMaterial/Create, React akan pilih layout berdasarkan role
+        return Inertia::render('ManageMaterial/Create', [
+            'authUser' => $user,
+            'lecturers' => $lecturers,
+        ]);
+    }
+
+    public function manageIndex(Request $request)
+    {
+        $user = $request->user();
+        $role = strtolower($user->role ?? '');
+
+        $query = MaterialModel::query()
+            ->withExists('progress as is_locked')
+            ->with(['creator:id,nama,email'])
+            ->select('id', 'material_name', 'order_number', 'created_by')
+            ->orderBy('order_number');
+
+        // Dosen hanya melihat materi yang ia buat sendiri,
+        // Superadmin melihat semua materi yang ada di sistem.
+        if ($role !== 'superadmin') {
+            $query->where('created_by', $user->id);
+        }
+
+        $materials = $query->get()->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'material_name' => $m->material_name,
+                'order_number' => $m->order_number,
+                'is_locked' => (bool) $m->is_locked,
+                'lecturer_name' => $m->creator?->name
+                    ?? $m->creator?->nama
+                    ?? '—',
+            ];
+        });
+
+        return Inertia::render('ManageMaterial/Index', [
+            'materials' => $materials,
+            'authUser' => $user,
+        ]);
+    }
+
+    // Halaman detail materi untuk pengelolaan (bukan halaman belajar mahasiswa)
+    public function manageShow(Request $request, MaterialModel $material)
+    {
+        $user = $request->user();
+        $role = strtolower($user->role ?? '');
+
 
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
         }]);
 
         $author = $material->creator?->name
-                ?? $material->creator?->nama
-                ?? '—';
+            ?? $material->creator?->nama
+            ?? '—';
 
-        return Inertia::render('Dosen/Materials/Show', [
+        return Inertia::render('ManageMaterial/Show', [
             'authUser' => $request->user(),
             'material' => [
                 'id' => $material->id,
                 'material_name' => $material->material_name,
                 'description' => $material->description,
                 'order_number' => $material->order_number,
+                'created_at' => $material->created_at,
                 'author' => $author,
                 'contents' => $material->contents->map(function ($c) {
                     return [
@@ -382,16 +406,13 @@ class MaterialController extends Controller
         ]);
     }
 
-    public function dosenEdit(Request $request, MaterialModel $material)
+    public function manageEdit(Request $request, MaterialModel $material)
     {
-        if ($material->created_by !== $request->user()->id) {
+        $user = $request->user();
+        if (strtolower($user->role) !== 'superadmin' && $material->created_by !== $user->id) {
             abort(403, 'Akses ditolak. Anda tidak berhak mengedit materi ini.');
         }
 
-        // We allow editing content even if there is progress, 
-        // but order_number is intentionally ignored or locked on the frontend.
-
-
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
         }]);
@@ -400,7 +421,8 @@ class MaterialController extends Controller
                 ?? $material->creator?->nama
                 ?? '—';
 
-        return Inertia::render('Dosen/Materials/Edit', [
+        // Satu halaman Inertia ManageMaterial/Edit, React akan pilih layout berdasarkan role
+        return Inertia::render('ManageMaterial/Edit', [
             'authUser' => $request->user(),
             'material' => [
                 'id' => $material->id,
@@ -421,9 +443,9 @@ class MaterialController extends Controller
         ]);
     }
 
-    public function dosenStore(Request $request)
+    public function manageStore(Request $request)
     {
-        $data = $request->validate([
+        $baseRules = [
             'material_name' => ['required','string','max:255'],
             'description' => ['nullable','string'],
             'order_number' => ['nullable','integer','min:1'],
@@ -431,21 +453,35 @@ class MaterialController extends Controller
             'sections.*.title' => ['nullable','string','max:255'],
             'sections.*.content_text' => ['nullable','string'],
             'sections.*.image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
-        ]);
+        ];
+
+        if (strtolower($request->user()->role) === 'superadmin') {
+            $baseRules['lecturer_id'] = ['required', 'integer', 'exists:users,id'];
+        }
+
+        $data = $request->validate($baseRules);
 
         $nextOrder = $data['order_number']
             ?? ((MaterialModel::max('order_number') ?? 0) + 1);
+
+        $creatorId = $request->user()->id;
+        if (strtolower($request->user()->role) === 'superadmin') {
+            $lecturer = UserModel::where('id', $data['lecturer_id'] ?? null)
+                ->where('role', 'dosen')
+                ->firstOrFail();
+            $creatorId = $lecturer->id;
+        }
 
         $material = MaterialModel::create([
             'material_name' => $data['material_name'],
             'description' => $data['description'] ?? null,
             'content' => null,
             'order_number' => $nextOrder,
-            'created_by' => $request->user()->id,
+            'created_by' => $creatorId,
         ]);
 
         // Otomatis tambahkan ke tabel material_class untuk semua kelas milik Dosen ini
-        $dosenClasses = \App\Models\ClassModel::where('created_by', $request->user()->id)->pluck('id');
+        $dosenClasses = \App\Models\ClassModel::where('created_by', $creatorId)->pluck('id');
         if ($dosenClasses->isNotEmpty()) {
             $syncData = [];
             foreach ($dosenClasses as $classId) {
@@ -484,15 +520,18 @@ class MaterialController extends Controller
             ]);
         }
 
-        if ($request->wantsJson()) {
-            return response()->json(['message' => 'Material created successfully', 'material' => $material], 201);
+        $role = strtolower($request->user()->role ?? '');
+        if ($role === 'superadmin') {
+            return redirect()->route('superadmin.materials.index');
         }
+
         return redirect()->route('dosen.materials.index');
     }
 
-    public function dosenUpdate(Request $request, MaterialModel $material)
+    public function manageUpdate(Request $request, MaterialModel $material)
     {
-        if ($material->created_by !== $request->user()->id) {
+        $user = $request->user();
+        if (strtolower($user->role ?? '') !== 'superadmin' && $material->created_by !== $user->id) {
             abort(403, 'Akses ditolak.');
         }
 
@@ -571,10 +610,15 @@ class MaterialController extends Controller
             MaterialContentModel::where('material_id', $material->id)->delete();
         }
 
+        $role = strtolower($user->role ?? '');
+        if ($role === 'superadmin') {
+            return redirect()->route('superadmin.materials.show', $material->id);
+        }
+
         return redirect()->route('dosen.materials.show', $material->id);
     }
 
-    public function store(Request $request)
+    public function apiStore(Request $request)
     {
         $data = $request->validate([
             'material_name' => ['required','string','max:255'],
@@ -591,7 +635,8 @@ class MaterialController extends Controller
         return response()->json($material, 201);
     }
 
-    public function update(Request $request, $material)
+    // Endpoint API generik untuk update materi (digunakan route /materials/{material})
+    public function apiUpdate(Request $request, $material)
     {
         $material = MaterialModel::findOrFail($material);
 
@@ -604,14 +649,11 @@ class MaterialController extends Controller
 
         $material->update($data);
 
-        if ($request->wantsJson()) {
-            return response()->json($material);
-        }
-
-        return redirect()->route('dosen.materials.index');
+        return response()->json($material);
     }
 
-    public function destroy($material)
+    // Endpoint API generik untuk menghapus materi (digunakan route /materials/{material})
+    public function apiDestroy($material)
     {
         $material = MaterialModel::findOrFail($material);
         $material->delete();

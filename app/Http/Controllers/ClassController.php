@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
+use App\Models\UserModel;
 use App\Models\UserProgressModel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -14,18 +15,33 @@ use Illuminate\Support\Str;
 
 class ClassController extends Controller
 {
-    // DOSEN: Inertia page for managing classes
-    public function dosenIndexPage(Request $request)
+    // Halaman Inertia untuk mengelola kelas (dipakai Dosen & Superadmin)
+    public function manageIndex(Request $request)
     {
         $user = $request->user();
 
-        $classes = ClassModel::withCount('users')
+        $classes = ClassModel::with(['lecturer'])
+            ->withCount('users')
             ->latest()
-            ->get(['id', 'class_name', 'class_code', 'description', 'created_at']);
+            ->get(['id', 'class_name', 'class_code', 'description', 'created_at', 'created_by']);
 
-        return Inertia::render('Dosen/Classes/Index', [
+        $lecturers = [];
+        $role = strtolower($user->role ?? '');
+        if ($role === 'superadmin') {
+            // Ambil semua user yang rolenya dosen (baik dari kolom role maupun Spatie roles)
+            $lecturers = UserModel::query()
+                ->where('role', 'dosen')
+                ->orWhereHas('roles', function ($q) {
+                    $q->where('name', 'dosen');
+                })
+                ->orderBy('nama')
+                ->get(['id', 'nama', 'email']);
+        }
+
+        return Inertia::render('ManageClasses/Index', [
             'classes' => $classes,
             'authUser' => $user,
+            'lecturers' => $lecturers,
         ]);
     }
 
@@ -43,20 +59,32 @@ class ClassController extends Controller
 
     public function store(Request $request)
     {
+        $user = $request->user();
+
         $data = $request->validate([
             'class_name' => ['required','string','max:255'],
             'class_code' => ['required','string','max:10','unique:classes,class_code'],
             'description' => ['nullable','string'],
+            'lecturer_id' => ['nullable','integer','exists:users,id'],
         ]);
 
         // normalisasi kode ke huruf besar
         $code = strtoupper(trim($data['class_code']));
 
+        $role = strtolower($user->role ?? '');
+
+        $createdBy = $user->id;
+        if ($role === 'superadmin' && !empty($data['lecturer_id'])) {
+            // Pastikan lecturer_id benar-benar dosen
+            $lecturer = UserModel::where('role', 'dosen')->findOrFail($data['lecturer_id']);
+            $createdBy = $lecturer->id;
+        }
+
         $class = ClassModel::create([
             'class_name' => $data['class_name'],
             'class_code' => $code,
             'description' => $data['description'] ?? null,
-            'created_by' => auth()->id(),
+            'created_by' => $createdBy,
         ]);
 
         return response()->json($class, 201);

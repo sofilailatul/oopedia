@@ -17,7 +17,9 @@ function getApiErrorMessage(err, fallbackMessage) {
 	return fallbackMessage;
 }
 
-export default function DosenClassesIndex(props) {
+export default function ManageClassesIndex(props) {
+	const { authUser } = props;
+
 	return (
 		<AppLayout title="Kelola Kelas" label="Kelola Kelas">
 			<DosenClassesContent {...props} />
@@ -25,36 +27,45 @@ export default function DosenClassesIndex(props) {
 	);
 }
 
-function DosenClassesContent({ classes = [], authUser }) {
+function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 	const popup = usePopup();
 	const { props } = usePage();
 	const user = authUser || props?.auth?.user || {};
 	const lecturerName = user.nama || user.name || 'Dosen';
+	const role = String(user.role || '').toLowerCase();
+	const isSuperadmin = role === 'superadmin';
 
 	const handleOpenCreate = () => {
 		popup.open({
 			title: 'Tambah Kelas',
 			size: 'lg',
-			content: <CreateClassModal lecturerName={lecturerName} onSuccess={() => router.reload({ only: ['classes'] })} />,
+			content: (
+				<CreateClassModal
+					lecturerName={lecturerName}
+					lecturers={lecturers}
+					isSuperadmin={isSuperadmin}
+					onSuccess={() => router.reload({ only: ['classes'] })}
+				/>
+			),
 		});
 	};
 
-	const handleOpenDetail = (cls) => {
+	const handleOpenDetail = (cls, lecturerLabel) => {
 		popup.open({
 			title: 'Detail Kelas',
 			size: 'lg',
-			content: <ShowClassModal classId={cls.id} lecturerName={lecturerName} />,
+			content: <ShowClassModal classId={cls.id} lecturerName={lecturerLabel || lecturerName} />,
 		});
 	};
 
-	const handleOpenEdit = (cls) => {
+	const handleOpenEdit = (cls, lecturerLabel) => {
 		popup.open({
 			title: 'Edit Kelas',
 			size: 'lg',
 			content: (
 				<EditClassModal
 					initialClass={cls}
-					lecturerName={lecturerName}
+					lecturerName={lecturerLabel || lecturerName}
 					onSuccess={() => router.reload({ only: ['classes'] })}
 				/>
 			),
@@ -69,17 +80,17 @@ function DosenClassesContent({ classes = [], authUser }) {
 						<h1 className="text-xl font-semibold tracking-tight text-slate-900">Daftar Kelas</h1>
 						<p className="text-sm text-slate-500">Atur kelas, lihat detail mahasiswa, dan update informasi kelas.</p>
 					</div>
-				<Button
-					color="green"
-					variant="solid"
-					size="md"
-					leftIcon={<FaPlus className="h-3.5 w-3.5" />}
-					className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-200"
-					onClick={handleOpenCreate}
-				>
-					Tambah kelas
-				</Button>
-			</div>
+					<Button
+						color="green"
+						variant="solid"
+						size="md"
+						leftIcon={<FaPlus className="h-3.5 w-3.5" />}
+						className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-200"
+						onClick={handleOpenCreate}
+					>
+						Tambah kelas
+					</Button>
+				</div>
 			</div>
 
 			{/* Cards grid */}
@@ -89,9 +100,27 @@ function DosenClassesContent({ classes = [], authUser }) {
 						<ClassCard
 							key={cls.id}
 							cls={cls}
-							lecturerName={lecturerName}
-							onDetail={() => handleOpenDetail(cls)}
-							onEdit={() => handleOpenEdit(cls)}
+							lecturerName={
+								isSuperadmin
+									? cls.lecturer?.nama || cls.lecturer?.name || 'Dosen'
+									: lecturerName
+							}
+							onDetail={() =>
+								handleOpenDetail(
+									cls,
+									isSuperadmin
+										? cls.lecturer?.nama || cls.lecturer?.name || 'Dosen'
+										: lecturerName
+								)
+							}
+							onEdit={() =>
+								handleOpenEdit(
+									cls,
+									isSuperadmin
+										? cls.lecturer?.nama || cls.lecturer?.name || 'Dosen'
+										: lecturerName
+								)
+							}
 						/>
 					))
 				) : (
@@ -153,11 +182,14 @@ function ClassCard({ cls, lecturerName, onDetail, onEdit }) {
 	);
 }
 
-function CreateClassModal({ lecturerName, onSuccess }) {
+function CreateClassModal({ lecturerName, lecturers = [], isSuperadmin = false, onSuccess }) {
 	const popup = usePopup();
 	const [name, setName] = useState('');
 	const [classCode, setClassCode] = useState('');
 	const [description, setDescription] = useState('');
+	const [selectedLecturerId, setSelectedLecturerId] = useState(
+		isSuperadmin && lecturers.length ? lecturers[0].id : null,
+	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState('');
 	const [showConfirm, setShowConfirm] = useState(false);
@@ -167,11 +199,20 @@ function CreateClassModal({ lecturerName, onSuccess }) {
 		if (isSubmitting) return;
 		setIsSubmitting(true);
 		setError('');
+
+		if (isSuperadmin && !selectedLecturerId) {
+			setError('Silakan pilih dosen penanggung jawab kelas.');
+			setIsSubmitting(false);
+			return;
+		}
 		try {
 			await window.axios.post('/classes', {
 				class_name: name,
 				class_code: classCode,
 				description,
+				...(isSuperadmin && selectedLecturerId
+					? { lecturer_id: selectedLecturerId }
+					: {}),
 			});
 			onSuccess?.();
 			setResultModal({
@@ -206,11 +247,29 @@ function CreateClassModal({ lecturerName, onSuccess }) {
 	return (
 		<form onSubmit={handleSubmit} className="space-y-5">
 			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Dosen</p>
-				<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-					<span className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500">👤</span>
-					<span className="truncate">{lecturerName}</span>
-				</div>
+				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+					Dosen Penanggung Jawab
+				</p>
+				{isSuperadmin ? (
+					<select
+						className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+						value={selectedLecturerId || ''}
+						onChange={(e) => setSelectedLecturerId(e.target.value ? Number(e.target.value) : null)}
+						required
+					>
+						<option value="">Pilih dosen...</option>
+						{lecturers.map((lec) => (
+							<option key={lec.id} value={lec.id}>
+								{lec.nama || lec.name || lec.email}
+							</option>
+						))}
+					</select>
+				) : (
+					<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+						<span className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500">👤</span>
+						<span className="truncate">{lecturerName}</span>
+					</div>
+				)}
 			</div>
 
 			<div className="space-y-1">
@@ -548,4 +607,3 @@ function EditClassModal({ initialClass, lecturerName, onSuccess }) {
 		</form>
 	);
 }
-

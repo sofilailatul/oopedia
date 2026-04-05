@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { router } from "@inertiajs/react";
 
 export function useDosenMaterialCreate({ authUser }) {
   const [title, setTitle] = useState("");
@@ -43,7 +42,11 @@ export function useDosenMaterialCreate({ authUser }) {
   }
 
   async function publish(e, options = {}) {
-    const { onSuccess, onError } = options;
+    const role = (authUser?.role || "").toLowerCase();
+    const baseRole = role === "superadmin" ? "superadmin" : "dosen";
+    const defaultEndpoint = baseRole === "superadmin" ? "/superadmin/materi" : "/dosen/materi";
+
+    const { onSuccess, onError, endpoint = defaultEndpoint, extra = {} } = options;
 
     if (e?.preventDefault) e.preventDefault();
     if (isSubmitting) return;
@@ -62,8 +65,14 @@ export function useDosenMaterialCreate({ authUser }) {
       }
     });
 
+    Object.entries(extra || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        formData.append(key, value);
+      }
+    });
+
     try {
-      await window.axios.post("/dosen/materi", formData, {
+      await window.axios.post(endpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (typeof onSuccess === "function") {
