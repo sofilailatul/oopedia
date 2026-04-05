@@ -36,7 +36,7 @@ const NAV_BY_ROLE = {
     { label: "Materi", href: "/materi", icon: FaBook },
     { label: "Latihan Soal", href: "/daftar-latihan-soal", icon: FaClipboardList },
     { label: "Kuis", href: "/kuis", icon: FaFileAlt },
-    { label: "Leaderboard", href: "/leaderboard/combined", icon: FaTrophy },
+    { label: "Leaderboard", href: "/leaderboard/index", icon: FaTrophy },
   ],
   tamu: [
     { label: "Dashboard", href: "/dashboard", icon: FaThLarge },

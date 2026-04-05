@@ -215,6 +215,7 @@ function QuizEditContent({
 
 	const [submitting, setSubmitting] = React.useState(false);
 	const [duplicating, setDuplicating] = React.useState(false);
+	const [duplicateClassId, setDuplicateClassId] = React.useState("");
 	const [error, setError] = React.useState("");
 
 	const isDirty = React.useMemo(
@@ -390,8 +391,10 @@ function QuizEditContent({
 
 		router.post(route(saveRouteName, quiz.id), formDataPost, {
 			forceFormData: true,
-			onSuccess: () => {
+			onFinish: () => {
 				setSubmitting(false);
+			},
+			onSuccess: () => {
 				setModalState({
 					show: true,
 					type: "success",
@@ -402,7 +405,6 @@ function QuizEditContent({
 				});
 			},
 			onError: (errors) => {
-				setSubmitting(false);
 				const reason = getErrorReason(errors);
 				setError(reason);
 
@@ -418,7 +420,7 @@ function QuizEditContent({
 	};
 
 	const handleDuplicate = () => {
-		// Pilih kelas lain selain kelas utama kuis saat ini
+		const selectedClassId = Number(duplicateClassId);
 		const availableClassIds = classes
 			.filter((c) => c.id !== formData.class_id)
 			.map((c) => c.id);
@@ -427,33 +429,20 @@ function QuizEditContent({
 			setModalState({
 				show: true,
 				type: "error",
-				title: "Tidak Ada Kelas Lain",
+				title: "Kelas Tujuan Tidak Tersedia",
 				message:
-					"Tidak ada kelas lain yang tersedia untuk duplikasi. Tambah kelas baru terlebih dahulu.",
+					"Tidak ada kelas lain yang tersedia untuk menerima duplikasi kuis ini. Tambahkan kelas baru terlebih dahulu.",
 				confirmText: "Tutup",
 			});
 			return;
 		}
 
-		const classIds = window.prompt(
-			"Masukkan ID kelas tujuan, pisahkan dengan koma (contoh: 2,3).\n\n" +
-				"Kelas yang sekarang: " +
-				(classes.find((c) => c.id === formData.class_id)?.class_name || "(belum dipilih)"),
-		);
-
-		if (!classIds) return;
-
-		const parsed = String(classIds)
-			.split(",")
-			.map((v) => Number(v.trim()))
-			.filter((v) => Number.isInteger(v) && v > 0);
-
-		if (!parsed.length) {
+		if (!selectedClassId || !availableClassIds.includes(selectedClassId)) {
 			setModalState({
 				show: true,
 				type: "error",
-				title: "Input Tidak Valid",
-				message: "Format ID kelas tidak valid.",
+				title: "Pilih Kelas Tujuan",
+				message: "Silakan pilih kelas tujuan terlebih dahulu dari dropdown.",
 				confirmText: "Tutup",
 			});
 			return;
@@ -467,7 +456,7 @@ function QuizEditContent({
 
 		router.post(
 			route(`${baseRouteName}.duplicate`, quiz.id),
-			{ class_ids: parsed },
+			{ class_ids: [selectedClassId] },
 			{
 				onFinish: () => setDuplicating(false),
 				onSuccess: () => {
@@ -476,7 +465,7 @@ function QuizEditContent({
 						type: "success",
 						title: "Berhasil Diduplikasi",
 						message:
-							"Kuis berhasil diduplikasi ke kelas yang dipilih. Cek halaman daftar kuis untuk melihat hasilnya.",
+							"Kuis berhasil diduplikasi ke kelas tujuan yang dipilih. Cek daftar kuis untuk melihat hasilnya.",
 						confirmText: "Tutup",
 					});
 				},
@@ -493,6 +482,9 @@ function QuizEditContent({
 			},
 		);
 	};
+
+	const duplicateTargetClass = classes.find((c) => String(c.id) === String(duplicateClassId));
+	const availableDuplicateClasses = classes.filter((c) => c.id !== formData.class_id);
 
 	return (
 		<div className="mx-auto space-y-6">
@@ -614,36 +606,70 @@ function QuizEditContent({
 				</div>
 			</Card>
 
-			<Card className="rounded-3xl border border-dashed border-slate-200 bg-white/80 p-5 shadow-sm">
-				<div className="mb-3 flex items-center justify-between gap-3">
-					<div>
-						<h3 className="text-sm font-semibold text-slate-800">
-							Duplikasikan Kuis ke Kelas Lain
+			<Card className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
+				<div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+					<div className="space-y-1">
+						<h3 className="text-sm font-semibold text-slate-900">
+							Duplikasi Kuis ke Kelas Lain
 						</h3>
-						<p className="text-[11px] text-slate-500">
-							Salin kuis beserta soal-soalnya ke kelas lain tanpa mengubah kuis ini.
+						<p className="text-[11px] text-slate-500 leading-relaxed">
+							Pilih satu kelas tujuan untuk menyalin kuis beserta semua soalnya.
 						</p>
 					</div>
+					<div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+						{availableDuplicateClasses.length} kelas tersedia
+					</div>
 				</div>
-				<div className="text-[11px] text-slate-500">
-					<p>
-						Ketik ID kelas tujuan saat diminta. Kamu bisa memasukkan lebih dari satu ID
-						dengan koma, misalnya: <span className="font-mono">2,3,5</span>.
-					</p>
-					<p className="mt-1">
-						Untuk melihat ID kelas, buka halaman daftar kelas terlebih dahulu.
-					</p>
-				</div>
-				<div className="mt-3 flex justify-end">
+
+				<div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+					<div className="space-y-1.5">
+						<label className="text-xs font-medium text-slate-700">
+							Kelas tujuan
+						</label>
+						<Dropdown className="w-full">
+							<Dropdown.Trigger>
+								<div className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+									<span className={duplicateTargetClass ? "text-slate-900" : "text-slate-400"}>
+										{duplicateTargetClass?.class_name || "Pilih kelas tujuan"}
+									</span>
+									<span className="text-slate-400">▾</span>
+								</div>
+							</Dropdown.Trigger>
+							<Dropdown.Content align="left" width="64" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-64 overflow-y-auto">
+								{availableDuplicateClasses.length === 0 ? (
+									<div className="px-4 py-2 text-xs text-slate-400">Tidak ada kelas lain yang bisa dipilih</div>
+								) : (
+									availableDuplicateClasses.map((cls) => {
+										const isSelected = duplicateClassId === String(cls.id);
+										return (
+											<Dropdown.Item
+												key={cls.id}
+												onClick={() => setDuplicateClassId(String(cls.id))}
+												className={`flex items-center justify-between ${isSelected ? "bg-slate-900 text-white" : ""}`}
+											>
+												<span>{cls.class_name}</span>
+												{isSelected && <span className="text-[10px] font-semibold uppercase tracking-wide">Terpilih</span>}
+											</Dropdown.Item>
+										);
+									})
+								)}
+							</Dropdown.Content>
+						</Dropdown>
+						<p className="text-[11px] text-slate-500">
+							Kelas yang sedang aktif tidak bisa dipilih agar tidak terjadi duplikasi ke kelas yang sama.
+						</p>
+					</div>
+
 					<Button
 						type="button"
-						variant="outline"
+						variant="solid"
 						color="blue"
-						size="xs"
-						disabled={duplicating}
+						size="sm"
+						disabled={duplicating || !duplicateClassId || availableDuplicateClasses.length === 0}
 						onClick={handleDuplicate}
+						className="rounded-2xl px-5"
 					>
-						{duplicating ? "Menduplikasi..." : "Duplikasikan ke Kelas Lain"}
+						{duplicating ? "Menduplikasi..." : "Duplikasikan"}
 					</Button>
 				</div>
 			</Card>

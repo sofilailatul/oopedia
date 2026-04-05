@@ -3,6 +3,7 @@ import AppLayout from "@/Layouts/AppLayout";
 import { Link, router, usePage } from "@inertiajs/react";
 import Button from "@/Components/Button";
 import Card from "@/Components/Card";
+import Dropdown from "@/Components/Dropdown";
 import { FaEye, FaPen, FaTrash } from "react-icons/fa";
 import { difficultyLabel } from "@/Features/practice/labels";
 import { usePopup } from "@/Components/PopUp/PopUpProvider";
@@ -294,6 +295,14 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 		{ value: "hard", label: difficultyLabel("hard") },
 	];
 
+	const isMaterialFullyConfigured = React.useCallback(
+		(materialId) => {
+			const usedLevels = existingMap[Number(materialId)] ?? new Set();
+			return levels.every((lvl) => usedLevels.has(lvl.value));
+		},
+		[existingMap, levels],
+	);
+
 	const handleSubmit = (e) => {
 		e?.preventDefault();
 		logAction("submit_create_practice", {
@@ -355,25 +364,71 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 		? existingMap[Number(selectedMaterialId)] ?? new Set()
 		: new Set();
 
+	const selectedMaterialIsFull = selectedMaterialId
+		? isMaterialFullyConfigured(selectedMaterialId)
+		: false;
+
 	return (
 		<form onSubmit={handleSubmit} className="space-y-4">
 			<div className="space-y-1">
 				<p className="text-[11px] font-medium text-slate-500">Pilih Materi</p>
-				<select
-					value={selectedMaterialId}
-					onChange={(e) => {
-						setSelectedMaterialId(e.target.value);
-						setSelectedLevel("");
-					}}
-					className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-				>
-					<option value="">Pilih materi</option>
-					{materials.map((m) => (
-						<option key={m.id} value={m.id}>
-							{m.material_name}
-						</option>
-					))}
-				</select>
+				<Dropdown className="w-full">
+					<Dropdown.Trigger>
+						<div className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 flex items-center justify-between bg-white">
+							<span className={selectedMaterialId ? "text-slate-800" : "text-slate-400"}>
+								{selectedMaterialId
+									? materials.find((m) => String(m.id) === String(selectedMaterialId))?.material_name || "Pilih materi"
+									: "Pilih materi"}
+							</span>
+							<span className="text-slate-400">▾</span>
+						</div>
+					</Dropdown.Trigger>
+					<Dropdown.Content align="left" width="64" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-64 overflow-y-auto">
+						{materials.length === 0 ? (
+							<div className="px-4 py-2 text-xs text-slate-400">Belum ada materi tersedia</div>
+						) : (
+							materials.map((m) => {
+								const isSelected = String(selectedMaterialId) === String(m.id);
+								const isDisabled = isMaterialFullyConfigured(m.id);
+								return (
+									<button
+										key={m.id}
+										type="button"
+										disabled={isDisabled}
+										onClick={() => {
+											if (isDisabled) return;
+											setSelectedMaterialId(String(m.id));
+											setSelectedLevel("");
+										}}
+										className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
+											isDisabled
+												? "bg-slate-50 text-slate-300 cursor-not-allowed"
+											: ""
+										} ${
+											isSelected
+												? "bg-rose-100/70 text-rose-600"
+												: "text-slate-700"
+										}`}
+									>
+										<div className="flex items-center justify-between gap-2">
+											<span>{m.material_name}</span>
+											{isDisabled && (
+												<span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+													Lengkap
+												</span>
+											)}
+										</div>
+									</button>
+								);
+							})
+						)}
+					</Dropdown.Content>
+				</Dropdown>
+				{selectedMaterialIsFull && (
+					<p className="text-[11px] text-amber-600">
+						Materi ini sudah memiliki semua level latihan (Easy, Normal, Hard).
+					</p>
+				)}
 			</div>
 
 			<div className="space-y-1">

@@ -71,7 +71,23 @@ class QuizService
             return;
         }
 
-        // Progress baca + latihan per materi untuk user
+        // Progress baca + latihan per materi untuk user (semua class untuk fallback)
+        $allProgressRows = DB::table('user_progress')
+            ->where('user_id', $userId)
+            ->whereIn('material_id', $materialIds)
+            ->select('class_id', 'material_id', 'read_at', 'completed_practice_at')
+            ->get();
+
+        $progressFlagsByMaterial = $allProgressRows
+            ->groupBy('material_id')
+            ->map(function ($rows) {
+                return [
+                    'has_read' => $rows->contains(fn($r) => !is_null($r->read_at)),
+                    'ready_for_quiz' => $rows->contains(fn($r) => !is_null($r->read_at) && !is_null($r->completed_practice_at)),
+                ];
+            });
+
+        // Progress baca + latihan per materi untuk user pada class kuis
         $progressQuery = DB::table('user_progress')
             ->where('user_id', $userId)
             ->whereIn('material_id', $materialIds);
@@ -96,12 +112,23 @@ class QuizService
 
         foreach ($materialIds as $materialId) {
             $p = $progress->get($materialId);
+            $fallbackFlags = $progressFlagsByMaterial->get($materialId, [
+                'has_read' => false,
+                'ready_for_quiz' => false,
+            ]);
 
-            $hasRead = $p && !is_null($p->read_at);
+            $hasRead = ($p && !is_null($p->read_at)) || (bool)($fallbackFlags['has_read'] ?? false);
             $hasPractice = $materialsWithPractice->has($materialId);
-            $practiceDone = $hasPractice ? ($p && !is_null($p->completed_practice_at)) : true;
+            $readyFromClassProgress = $p && !is_null($p->read_at) && !is_null($p->completed_practice_at);
+            $readyFromFallback = (bool)($fallbackFlags['ready_for_quiz'] ?? false);
 
-            if (!($hasRead && $practiceDone)) {
+            // Untuk materi dengan latihan, syarat kuis: read_at + completed_practice_at tidak null.
+            // Untuk materi tanpa latihan, cukup read_at.
+            $progressSatisfied = $hasPractice
+                ? ($readyFromClassProgress || $readyFromFallback)
+                : $hasRead;
+
+            if (!$progressSatisfied) {
                 throw new \Exception('Kuis ini baru bisa dikerjakan setelah kamu membaca materi dan menyelesaikan semua latihan soal (easy, normal, hard) yang terkait.');
             }
         }

@@ -18,6 +18,7 @@ const isDone = quiz?.can_review === true || quiz?.status === "done";
 const isExpired = quiz?.end_at && new Date(quiz.end_at) < new Date();
 const isAvailable = quiz?.is_available !== false;
 const canStart = !isDone && !isExpired && isAvailable;
+const canOpenReview = Boolean(quiz?.attempt_id);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 h-full flex flex-col">
@@ -64,6 +65,28 @@ const canStart = !isDone && !isExpired && isAvailable;
         <Field label="Nilai" value={quiz.score ?? "Belum Dikerjakan"} disabled />
       </div>
 
+      {canOpenReview && (
+        <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+            Review
+          </p>
+          <p className="mt-1 text-[12px] text-emerald-800">
+            Pembahasan jawaban kuis tersedia.
+          </p>
+          <Button
+            variant="solid"
+            color="green"
+            className="mt-3 w-full"
+            onClick={() => {
+              if (onReview) return onReview(quiz);
+              router.get(route("quizzes.review", quiz.attempt_id));
+            }}
+          >
+            Lihat Review
+          </Button>
+        </div>
+      )}
+
       <div className="mt-auto pt-6">
         {!isDone && !isExpired && isAvailable && (
           <div className="flex items-start gap-3 text-[12px] text-slate-700">
@@ -93,6 +116,7 @@ const canStart = !isDone && !isExpired && isAvailable;
             <Button
               variant="solid"
               color="green"
+              disabled={!canOpenReview}
               onClick={() => {
                 if (!quiz.attempt_id) return;
                 if (onReview) return onReview(quiz);

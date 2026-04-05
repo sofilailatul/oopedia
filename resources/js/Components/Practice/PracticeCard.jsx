@@ -1,7 +1,18 @@
 import React from 'react';
 import Icons from '@/icons';
 
+const PASSING_SCORE = 60;
+
 const config = {
+  completed: {
+    label: "Selesai",
+    badge: "bg-emerald-100 text-emerald-700 border border-emerald-300",
+    accent: "border-l-emerald-500",
+    dot: "bg-emerald-500",
+    actionLabel: "Selesai",
+    actionClass: "bg-emerald-500 text-white",
+    icon: Icons.Success,
+  },
   in_progress: {
     label: "Sedang Dikerjakan",
     badge: "bg-indigo-50 text-indigo-600 border border-indigo-200",
@@ -34,8 +45,15 @@ const config = {
 export default function PracticeCard({ practice, onClick }) {
   const isLocked = practice?.is_locked;
   const hasActiveAttempt = Boolean(practice?.has_active_attempt);
+  const easy = Number(practice?.scores?.easy ?? -1);
+  const normal = Number(practice?.scores?.normal ?? -1);
+  const hard = Number(practice?.scores?.hard ?? -1);
+  const isCompleted = easy > PASSING_SCORE && normal > PASSING_SCORE && hard > PASSING_SCORE;
+
   const conf = isLocked
     ? config.locked
+    : isCompleted
+      ? config.completed
     : hasActiveAttempt
       ? config.in_progress
       : config.available;

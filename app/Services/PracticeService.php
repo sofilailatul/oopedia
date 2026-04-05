@@ -423,10 +423,10 @@ class PracticeService
             if ($result['isCorrect']) {
                 if ($result['type'] === 'multiple_choice') {
                     $mcCorrect++;
-                    $mcScore += 50;
+                    $mcScore += $result['score'];
                 } else {
                     $dragCorrect++;
-                    $dragScore += 50;
+                    $dragScore += $result['score'];
                 }
             }
 
@@ -450,19 +450,20 @@ class PracticeService
         $type = $answerData['type'];
         $isCorrect = false;
         $score = 0;
+        $questionPoints = (int)($question->points ?? 10);
 
         if ($type === 'multiple_choice') {
             $optionId = isset($answerData['option_id']) ? (int)$answerData['option_id'] : null;
             $correctOpt = $question->options->firstWhere('is_correct', true);
 
             $isCorrect = $correctOpt && $optionId && ($correctOpt->id === $optionId);
-            $score = $isCorrect ? 50 : 0;
+            $score = $isCorrect ? $questionPoints : 0;
         } else {
             $selectionItems = $answerData['selection_items'] ?? [];
             $correctOrder = $question->items->pluck('item_text')->values()->all();
 
             $isCorrect = ($selectionItems === $correctOrder);
-            $score = $isCorrect ? 50 : 0;
+            $score = $isCorrect ? $questionPoints : 0;
         }
 
         return [
@@ -521,6 +522,98 @@ class PracticeService
             'practice' => PracticeModel::findOrFail($practiceId),
             'attempt' => $lastAttempt,
             'answers' => $answers,
+        ];
+    }
+
+    /**
+     * Determine next level based on current score and alur latihan
+     * Alur:
+     * - Start at Normal → if score < 60, go to Easy → if Easy ok (≥60), go back to Normal
+     * - Normal ok (≥60), go to Hard
+     * - Hard not ok (< 60), retry Hard → if Hard ok, go to next material
+     */
+    public function determineNextLevel($userId, $materialId, $currentLevel, $currentScore)
+    {
+        // Cek apakah ada practice untuk material ini di setiap level
+        $practices = PracticeModel::query()
+            ->where('material_id', $materialId)
+            ->get()
+            ->keyBy('difficulty_level');
+
+        $lastEasy = null;
+        if (isset($practices['easy'])) {
+            $lastEasy = PracticeAttemptModel::query()
+                ->where('user_id', $userId)
+                ->where('practices_id', $practices['easy']->id)
+                ->whereNotNull('finished_at')
+                ->latest('finished_at')
+                ->first();
+        }
+
+        $isPassed = $currentScore >= 60;
+
+        if ($currentLevel === 'easy') {
+            // Easy < 60: retry Easy
+            // Easy ≥ 60: go back to Normal
+            return [
+                'next_level' => $isPassed ? 'normal' : 'easy',
+                'message' => $isPassed 
+                    ? 'Nilai kamu sudah mengumpul! Kembali ke level NORMAL.' 
+                    : 'Coba lagi di level EASY sampe nilai mengumpul.',
+                'action' => $isPassed ? 'next_level' : 'retry',
+            ];
+        } elseif ($currentLevel === 'normal') {
+            // Normal < 60:
+            // - kalau EASY belum pernah lulus, turun ke EASY
+            // - kalau EASY sudah pernah lulus (>=60), retry NORMAL
+            // Normal ≥ 60: go to Hard
+            if (!$isPassed) {
+                $easyPassed = $lastEasy && ((int)$lastEasy->final_score >= 60);
+
+                if ($easyPassed) {
+                    return [
+                        'next_level' => 'normal',
+                        'message' => 'Kamu sudah lulus EASY sebelumnya. Ulangi NORMAL sampai nilainya mengumpul.',
+                        'action' => 'retry',
+                    ];
+                }
+
+                return [
+                    'next_level' => 'easy',
+                    'message' => 'Nilai kamu belum mengumpul. Mari latih EASY dulu biar konsep lebih kuat.',
+                    'action' => 'fallback_easy',
+                ];
+            } else {
+                // Check if Hard level exists
+                if (!isset($practices['hard'])) {
+                    return [
+                        'next_level' => null,
+                        'message' => 'Selesai! Lanjut ke materi berikutnya.',
+                        'action' => 'next_material',
+                    ];
+                }
+                return [
+                    'next_level' => 'hard',
+                    'message' => 'Mantap! Sekarang coba naik ke level HARD.',
+                    'action' => 'next_level',
+                ];
+            }
+        } elseif ($currentLevel === 'hard') {
+            // Hard < 60: retry Hard
+            // Hard ≥ 60: next material
+            return [
+                'next_level' => $isPassed ? null : 'hard',
+                'message' => $isPassed 
+                    ? 'Excellent! Selesai di materi ini. Lanjut ke materi berikutnya.'
+                    : 'Coba lagi di level HARD. Semangat!',
+                'action' => $isPassed ? 'next_material' : 'retry',
+            ];
+        }
+
+        return [
+            'next_level' => 'normal',
+            'message' => 'Mulai dari level NORMAL.',
+            'action' => 'start',
         ];
     }
 }

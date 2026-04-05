@@ -109,10 +109,10 @@ Route::middleware('auth')->group(function () {
     });
 
     // LEADERBOARD (mahasiswa + dosen)
-    Route::middleware('auth', 'role:mahasiswa,dosen')->prefix('leaderboard')->name('leaderboard.')->group(function () {
+    Route::middleware('auth', 'role:mahasiswa')->prefix('leaderboard')->name('leaderboard.')->group(function () {
         Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
         Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
-        Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
+        Route::get('/index', [LeaderboardController::class, 'combined'])->name('combined');
     });
 
     /*

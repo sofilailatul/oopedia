@@ -1,8 +1,9 @@
 import React from "react";
+import { Link } from "@inertiajs/react";
 import Dropdown from "@/Components/Dropdown";
 import { FaChevronDown, FaCheck, FaTimes } from "react-icons/fa";
 import Button from "@/Components/Button";
-import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
+import { difficultyLabel } from "@/Features/practice/labels";
 import { hintToneClass, scoreBadgeClass } from "@/Features/practice/ui";
 import { calculateDifficultyRule, canSelectDifficulty } from "@/Features/practice/rules";
 import { totalQuestions } from "@/Features/practice/helpers";
@@ -12,12 +13,12 @@ export default function PracticeSidebar({
   difficulty,
   questionType,
   onDifficultyChange,
-  onQuestionTypeChange,
   onClose,
   onStart,
   canStart,
 }) {
   const scores = selectedPractice?.scores ?? { easy: null, normal: null, hard: null };
+  const levels = selectedPractice?.levels ?? {};
   const questionCounts = selectedPractice?.question_counts ?? {};
 
   const rule = calculateDifficultyRule(scores);
@@ -69,88 +70,50 @@ export default function PracticeSidebar({
         </div>
 
         {/* Options */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
-              Level Kesulitan
-            </label>
-            <Dropdown>
-              <Dropdown.Trigger>
-                <Button
-                  className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
-                >
-                  <span className="text-[12px] font-medium text-slate-700">
-                    {difficulty ? difficultyLabel(difficulty) : "Pilih Level"}
-                  </span>
-                  <FaChevronDown className="text-slate-400 text-[10px]" />
-                </Button>
-              </Dropdown.Trigger>
-              <Dropdown.Content align="left" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
-                {["easy", "normal", "hard"].map((level) => {
-                  const enabled = canSelectDifficulty(level, rule);
-                  const selected = difficulty === level;
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      disabled={!enabled}
-                      onClick={() => enabled && onDifficultyChange(level)}
-                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${
-                        selected ? "bg-indigo-50 text-indigo-700" : (enabled ? "text-slate-700 hover:bg-slate-50" : "text-slate-300 cursor-not-allowed")
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        {selected && <FaCheck className="text-[10px]" />}
-                        {difficultyLabel(level)}
-                      </span>
-                      {!enabled && <span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-md">Terkunci</span>}
-                    </button>
-                  );
-                })}
-              </Dropdown.Content>
-            </Dropdown>
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
-              Tipe Soal
-            </label>
-            <Dropdown>
-              <Dropdown.Trigger>
-                <Button
-                  className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
-                >
-                  <span className="text-[12px] font-medium text-slate-700">
-                    {questionType ? questionTypeLabel(questionType) : "Pilih Tipe"}
-                  </span>
-                  <FaChevronDown className="text-slate-400 text-[10px]" />
-                </Button>
-              </Dropdown.Trigger>
-              <Dropdown.Content align="right" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
-                {["multiple_choice", "drag_drop"].map((type) => {
-                  const selected = questionType === type;
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => onQuestionTypeChange(type)}
-                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 ${
-                        selected ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-50"
-                      }`}
-                    >
+        <div className="space-y-3">
+          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
+            Level Kesulitan
+          </label>
+          <Dropdown>
+            <Dropdown.Trigger>
+              <Button
+                className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
+              >
+                <span className="text-[12px] font-medium text-slate-700">
+                  {difficulty ? difficultyLabel(difficulty) : "Pilih Level"}
+                </span>
+                <FaChevronDown className="text-slate-400 text-[10px]" />
+              </Button>
+            </Dropdown.Trigger>
+            <Dropdown.Content align="left" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
+              {["easy", "normal", "hard"].map((level) => {
+                const enabled = canSelectDifficulty(level, rule);
+                const selected = difficulty === level;
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    disabled={!enabled}
+                    onClick={() => enabled && onDifficultyChange(level)}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${
+                      selected ? "bg-indigo-50 text-indigo-700" : (enabled ? "text-slate-700 hover:bg-slate-50" : "text-slate-300 cursor-not-allowed")
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
                       {selected && <FaCheck className="text-[10px]" />}
-                      {questionTypeLabel(type)}
-                    </button>
-                  );
-                })}
-              </Dropdown.Content>
-            </Dropdown>
-          </div>
+                      {difficultyLabel(level)}
+                    </span>
+                    {!enabled && <span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-md">Terkunci</span>}
+                  </button>
+                );
+              })}
+            </Dropdown.Content>
+          </Dropdown>
         </div>
 
         {/* Summary Info */}
         <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-sm font-semibold text-slate-600">Total Soal</span>
+          <span className="text-[13px] font-semibold text-slate-600">Total Soal</span>
           <div className="flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-indigo-600 shadow-sm">
             {!difficulty || !questionType ? "—" : qty}
           </div>
@@ -160,10 +123,48 @@ export default function PracticeSidebar({
           <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600">
             <span className="text-sm mt-0.5">⚠️</span>
             <p className="text-xs font-medium leading-relaxed">
-              Soal untuk level dan tipe ini belum tersedia. Silakan pilih kombinasi lain.
+              Soal untuk level ini belum tersedia. Silakan pilih level lain.
             </p>
           </div>
         )}
+
+        <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Summary</p>
+          </div>
+
+          <div className="space-y-2">
+            {(["easy", "normal", "hard"]).map((level) => {
+              const practiceId = levels[level];
+              const score = scores[level];
+
+              if (!practiceId || score == null) {
+                return null;
+              }
+
+              return (
+                <Link
+                  key={level}
+                  href={route("practices.summary", practiceId)}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50/60"
+                >
+                  <div>
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-900">{difficultyLabel(level)}</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                    {score} points
+                  </span>
+                </Link>
+              );
+            })}
+
+            {(["easy", "normal", "hard"]).every((level) => !levels[level] || scores[level] == null) && (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+                Summary akan muncul setelah kamu menyelesaikan latihan.
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="mt-8 pt-6 border-t border-slate-100">

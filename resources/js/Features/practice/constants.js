@@ -7,6 +7,7 @@ export const DIFFICULTY = Object.freeze({
 export const QUESTION_TYPE = Object.freeze({
   MC: "multiple_choice",
   DRAG: "drag_drop",
+  MIXED: "mixed",
 });
 
 export const PASSING_SCORE = 60;

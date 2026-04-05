@@ -10,6 +10,7 @@ use App\Models\QuizOptionModel;
 use App\Models\QuizMapModel;
 use App\Models\UserProgressModel;
 use App\Models\QuizAttemptMaterialScoreModel;
+use App\Models\MaterialRecommendationModel;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -83,6 +84,7 @@ class QuizController extends Controller
         $materialIds = $materialsRaw->pluck('material_id')->unique()->values();
 
         $progressByClassAndMaterial = collect();
+        $progressFlagsByMaterial = collect();
         $materialsWithPractice = collect();
 
         if ($materialIds->isNotEmpty()) {
@@ -96,6 +98,16 @@ class QuizController extends Controller
                 ->groupBy('class_id')
                 ->map(function ($rows) {
                     return $rows->keyBy('material_id');
+                });
+
+            // Fallback flags lintas class_id untuk antisipasi data progress tersimpan di row class berbeda/null
+            $progressFlagsByMaterial = $progressRows
+                ->groupBy('material_id')
+                ->map(function ($rows) {
+                    return [
+                        'has_read' => $rows->contains(fn($r) => !is_null($r->read_at)),
+                        'ready_for_quiz' => $rows->contains(fn($r) => !is_null($r->read_at) && !is_null($r->completed_practice_at)),
+                    ];
                 });
 
             $materialsWithPractice = DB::table('practices')
@@ -117,7 +129,7 @@ class QuizController extends Controller
             ->orderByDesc('id')
             ->get(['id', 'title', 'duration', 'passing_score', 'start_at', 'end_at', 'class_id', 'created_by']);
 
-        $payload = $quizzes->map(function ($q) use ($latestAttempts, $materialsByQuiz, $questionCountByQuiz, $materialsRaw, $progressByClassAndMaterial, $materialsWithPractice) {
+        $payload = $quizzes->map(function ($q) use ($latestAttempts, $materialsByQuiz, $questionCountByQuiz, $materialsRaw, $progressByClassAndMaterial, $progressFlagsByMaterial, $materialsWithPractice) {
             $attempt = $latestAttempts->get($q->id);
 
             $isDone = $attempt && !is_null($attempt->finished_at);
@@ -139,18 +151,32 @@ class QuizController extends Controller
                     $materialId = $row->material_id;
                     $p = $classProgress->get($materialId);
 
-                    $hasRead = $p && !is_null($p->read_at);
-                    $hasPractice = $materialsWithPractice->has($materialId);
-                    $practiceDone = $hasPractice ? ($p && !is_null($p->completed_practice_at)) : true;
+                    $fallbackFlags = $progressFlagsByMaterial->get($materialId, [
+                        'has_read' => false,
+                        'ready_for_quiz' => false,
+                    ]);
 
-                    if (!($hasRead && $practiceDone)) {
+                    $hasRead = ($p && !is_null($p->read_at)) || (bool)($fallbackFlags['has_read'] ?? false);
+                    $hasPractice = $materialsWithPractice->has($materialId);
+                    $readyFromClassProgress = $p && !is_null($p->read_at) && !is_null($p->completed_practice_at);
+                    $readyFromFallback = (bool)($fallbackFlags['ready_for_quiz'] ?? false);
+
+                    // Untuk materi yang punya latihan, wajib read_at + completed_practice_at sama-sama terisi.
+                    // Untuk materi tanpa latihan, cukup read_at.
+                    $progressSatisfied = $hasPractice
+                        ? ($readyFromClassProgress || $readyFromFallback)
+                        : $hasRead;
+
+                    if (!$progressSatisfied) {
                         $progressOk = false;
                         break;
                     }
                 }
             }
 
-            $isAvailable = $availableByTime && $progressOk;
+            // is_available dipakai UI untuk status Terkunci karena progress.
+            // Batas waktu ditangani terpisah di frontend lewat start_at/end_at.
+            $isAvailable = $progressOk;
 
             return [
                 'id' => $q->id,
@@ -456,6 +482,9 @@ class QuizController extends Controller
             }
         });
 
+        // Tandai completed_quiz_at untuk semua materi yang tercantum di kuis ini.
+        $this->updateCompletedQuizAt((int)$request->user()->id, (int)$attempt->quizzes_id);
+
         return redirect()->route('quiz_attempts.completed', $attempt->id);
     }
 
@@ -491,6 +520,50 @@ class QuizController extends Controller
                     'max_score' => (int)$r->max_score,
                 ];
             });
+
+        // Simpan semua materi quiz ke tabel material_recommendations.
+        // Yang lulus tetap masuk dengan is_completed = true.
+        foreach ($rows as $row) {
+            $isCompleted = ((int)$row->percentage >= 70);
+
+            MaterialRecommendationModel::updateOrCreate(
+                [
+                    'user_id' => $request->user()->id,
+                    'material_id' => (int)$row->material_id,
+                    'quizzes_id' => $attempt->quizzes_id,
+                ],
+                [
+                    'reason' => $isCompleted ? 'high_score' : 'low_score',
+                    'is_completed' => $isCompleted,
+                ]
+            );
+        }
+
+        $savedRecommendations = MaterialRecommendationModel::query()
+            ->join('materials', 'materials.id', '=', 'material_recommendations.material_id')
+            ->where('material_recommendations.user_id', $request->user()->id)
+            ->where('material_recommendations.quizzes_id', $attempt->quizzes_id)
+            ->where('material_recommendations.is_completed', false)
+            ->select(
+                'material_recommendations.material_id',
+                'materials.material_name as name',
+                DB::raw('0 as percentage'),
+                DB::raw('0 as earned_score'),
+                DB::raw('0 as max_score')
+            )
+            ->orderByDesc('material_recommendations.id')
+            ->get()
+            ->map(fn($r) => [
+                'material_id' => (int)$r->material_id,
+                'name' => $r->name,
+                'percentage' => (int)$r->percentage,
+                'earned_score' => (int)$r->earned_score,
+                'max_score' => (int)$r->max_score,
+            ]);
+
+        if ($savedRecommendations->isNotEmpty()) {
+            $recommendations = $savedRecommendations;
+        }
 
         return Inertia::render('Mahasiswa/Quizzes/Completed', [
             'attempt' => [
@@ -550,6 +623,32 @@ class QuizController extends Controller
                 'earned_score' => (int)$r->earned_score,
                 'max_score' => (int)$r->max_score,
             ]);
+
+        $savedRecommendations = MaterialRecommendationModel::query()
+            ->join('materials', 'materials.id', '=', 'material_recommendations.material_id')
+            ->where('material_recommendations.user_id', $request->user()->id)
+            ->where('material_recommendations.quizzes_id', $attempt->quizzes_id)
+            ->where('material_recommendations.is_completed', false)
+            ->select(
+                'material_recommendations.material_id',
+                'materials.material_name as name',
+                DB::raw('0 as percentage'),
+                DB::raw('0 as earned_score'),
+                DB::raw('0 as max_score')
+            )
+            ->orderByDesc('material_recommendations.id')
+            ->get()
+            ->map(fn($r) => [
+                'material_id' => (int)$r->material_id,
+                'name' => $r->name,
+                'percentage' => (int)$r->percentage,
+                'earned_score' => (int)$r->earned_score,
+                'max_score' => (int)$r->max_score,
+            ]);
+
+        if ($savedRecommendations->isNotEmpty()) {
+            $recommendations = $savedRecommendations;
+        }
 
         return Inertia::render('Mahasiswa/Quizzes/Review', [
             'attempt' => [

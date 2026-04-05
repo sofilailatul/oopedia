@@ -2,131 +2,145 @@ import React from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import Button from "@/Components/Button";
 import Icons from "@/icons";
-import Text from "@/Components/text";
-import { Link } from "@inertiajs/react";
 import { router } from "@inertiajs/react";
 
-function colorByScore(score) {
-  if (score < 60) return { bar: "bg-red-500", btn: "red", icon: "!", iconBg: "bg-red-100", iconText: "text-red-500" };
-  if (score < 75) return { bar: "bg-orange-500", btn: "yellow", icon: "★", iconBg: "bg-orange-100", iconText: "text-orange-500" };
-  return { bar: "bg-blue-500", btn: "blue", icon: "i", iconBg: "bg-blue-100", iconText: "text-blue-500" };
+function recommendationUi(percentage) {
+  if (percentage < 60) return { bar: "bg-rose-500", btn: "red", iconClass: "bg-rose-100 text-rose-600" };
+  if (percentage < 75) return { bar: "bg-amber-500", btn: "yellow", iconClass: "bg-amber-100 text-amber-600" };
+  return { bar: "bg-emerald-500", btn: "green", iconClass: "bg-emerald-100 text-emerald-600" };
 }
 
 export default function Completed({ attempt, materialScores = [], recommendations = [] }) {
-  return (
-    <AppLayout title="Kuis" label="Kuis">
-      <div className="mx-auto">
-        <Text variant="titleSection">
-          <Link href="/kuis" className="flex items-center gap-2 text-sm font-semibold text-slate-900 hover:text-slate-700">
-            <span>←</span> KUIS {attempt?.title ?? ""}
-          </Link>
-        </Text>
+  const totalScore = Number(attempt?.total_score ?? 0);
+  const finishedAt = attempt?.finished_at ? new Date(attempt.finished_at).toLocaleString("id-ID") : "-";
+  const weakCount = recommendations.length;
 
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-24 h-24 rounded-full bg-green-500/15 flex items-center justify-center">
-            <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+  return (
+    <AppLayout title="Kuis Selesai" label="Kuis Selesai" backHref="/kuis" backLabel="Kembali ke Daftar Kuis">
+      <div className="mx-auto w-full max-w-7xl space-y-6 pb-8">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600 p-6 md:p-8 text-white shadow-lg shadow-emerald-200">
+          <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-14 -left-6 h-32 w-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-50">
+                <Icons.Success className="h-3.5 w-3.5" />
+                Quiz Completed
+              </div>
+              <h1 className="mt-3 text-xl md:text-2xl font-semibold leading-tight">
+                Mantap, kamu sudah menyelesaikan kuis
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-emerald-50/90">
+                Lihat performa kamu dan lanjutkan perbaikan pada materi rekomendasi.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/10 px-5 py-4 backdrop-blur-sm">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-100/80">Skor Akhir</p>
+              <p className="mt-1 text-3xl font-bold tracking-tight">{totalScore}</p>
+              <p className="mt-2 text-xs text-emerald-100/90">Selesai: {finishedAt}</p>
             </div>
           </div>
-          <div className="mt-4 text-xl font-bold text-slate-900">Quiz Completed!</div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6 flex flex-col">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-green-500/15 flex items-center justify-center shrink-0">
-                <Icons.Lightbulb className="w-6 h-6 text-green-600" />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">Materi Diujikan</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{materialScores.length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">Rekomendasi</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-900">{weakCount}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">Status</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-600">Selesai</p>
+          </div>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
+                <Icons.Progress className="h-5 w-5" />
               </div>
               <div>
-                <div className="text-xl font-bold text-slate-900 leading-tight">
-                  Nilai<br />Kamu
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Ringkasan Nilai</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">Performa per materi</h3>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {materialScores.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  Data nilai per materi belum tersedia.
                 </div>
-              </div>
-            </div>
-
-            <div className="mt-auto pt-8">
-              <div className="text-6xl font-extrabold text-green-600">
-                {attempt?.total_score ?? 0}
-              </div>
-            </div>
-
-            {/* Nilai per materi */}
-            {materialScores.length > 0 && (
-              <div className="mt-6 space-y-3 border-t border-slate-100 pt-5">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Nilai per Materi</div>
-                {materialScores.map((m) => {
-                  const ui = colorByScore(m.earned_score);
+              ) : (
+                materialScores.map((m) => {
+                  const ui = recommendationUi(Number(m.percentage ?? 0));
                   return (
-                    <div key={m.material_id}>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-slate-700 font-medium">{m.name}</span>
-                        <span className="font-semibold text-slate-900">{m.earned_score} dari {m.max_score}</span>
+                    <div key={m.material_id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-slate-900">{m.name}</p>
+                        <span className="text-xs font-semibold text-slate-600">
+                          {m.earned_score} / {m.max_score}
+                        </span>
                       </div>
-                      <div className="mt-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                      <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
                         <div className={`h-2 rounded-full ${ui.bar}`} style={{ width: `${m.percentage}%` }} />
                       </div>
+                      <p className="mt-1 text-xs text-slate-500">{m.percentage}%</p>
                     </div>
                   );
-                })}
-              </div>
-            )}
+                })
+              )}
+            </div>
           </div>
 
-          {/* Card Rekomendasi Materi */}
-          <div className="lg:col-span-2 rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-orange-500/15 flex items-center justify-center">
-                  <Icons.Lightbulb className="w-5 h-5 text-orange-500" />
-                </div>
-                <div>
-                  <div className="text-xl font-bold text-slate-900">Rekomendasi Materi</div>
-                  <div className="text-sm text-slate-500">Fokus pada topik yang nilainya kurang</div>
-                </div>
+          <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                <Icons.Lightbulb className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Rekomendasi</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">Fokus belajar berikutnya</h3>
               </div>
             </div>
 
             {recommendations.length === 0 ? (
-              <div className="mt-6 text-sm text-slate-500">
-                Mantap! Tidak ada materi rekomendasi 🎉
+              <div className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+                Mantap, tidak ada materi rekomendasi tambahan.
               </div>
             ) : (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="mt-5 space-y-4">
                 {recommendations.map((m) => {
-                  const ui = colorByScore(m.earned_score);
+                  const ui = recommendationUi(Number(m.percentage ?? 0));
                   return (
-                    <div key={m.material_id} className="rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
-                      <div className={`w-10 h-10 rounded-xl ${ui.iconBg} flex items-center justify-center ${ui.iconText} font-bold text-lg`}>
-                        {ui.icon}
-                      </div>
-
-                      <div className="mt-4 font-bold text-slate-900">{m.name}</div>
-                      <div className="mt-2 text-xs text-slate-500">
-                        Materi yang perlu kamu tingkatkan.
-                      </div>
-
-                      <div className="mt-auto pt-4">
-                        <div className="text-xs text-slate-600 flex items-center justify-between">
-                          <span>Nilai Kamu</span>
-                          <span className="font-semibold">{m.earned_score} dari {m.max_score}</span>
+                    <div key={m.material_id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{m.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">{m.earned_score} / {m.max_score} poin</p>
                         </div>
-
-                        <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-                          <div className={`h-2 rounded-full ${ui.bar}`} style={{ width: `${m.percentage}%` }} />
+                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${ui.iconClass}`}>
+                          <Icons.Materials className="h-4 w-4" />
                         </div>
-
-                        <Button
-                          variant="solid"
-                          color={ui.btn}
-                          size="sm"
-                          className="mt-4 w-full"
-                          onClick={() => router.visit(route("materials.show", m.material_id))}
-                        >
-                          Mulai
-                        </Button>
                       </div>
+
+                      <div className="mt-3 h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div className={`h-2 rounded-full ${ui.bar}`} style={{ width: `${m.percentage}%` }} />
+                      </div>
+
+                      <Button
+                        variant="solid"
+                        color={ui.btn}
+                        size="sm"
+                        className="mt-4 w-full"
+                        onClick={() => router.visit(route("materials.show", m.material_id))}
+                      >
+                        Buka Materi
+                      </Button>
                     </div>
                   );
                 })}
@@ -135,8 +149,7 @@ export default function Completed({ attempt, materialScores = [], recommendation
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-8 flex justify-end">
+        <div className="flex justify-end">
           <Button
             variant="solid"
             color="gray"

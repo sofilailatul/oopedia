@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Services\ProgressService;
 use App\Models\QuizMapModel;
+use App\Models\PracticeModel;
+use App\Models\PracticeAttemptModel;
 
 class MaterialController extends Controller
 {
@@ -23,6 +25,7 @@ class MaterialController extends Controller
         $user = $request->user();
         $role = strtolower($user->role ?? 'tamu');
         $userId = $user->id;
+        $passingScore = 60;
 
         // Cari class_id aktif user (jika sudah join kelas)
         $classId = DB::table('class_user')
@@ -46,28 +49,84 @@ class MaterialController extends Controller
         $materials = $query->orderBy('order_number')->get();
 
         // Ambil progress per materi untuk user & class aktif
-        $progressRows = UserProgressModel::query()
-            ->where('user_id', $userId)
-            ->where('class_id', $classId)
+        $progressRowsQuery = UserProgressModel::query()
+            ->where('user_id', $userId);
+
+        if (is_null($classId)) {
+            $progressRowsQuery->whereNull('class_id');
+        } else {
+            $progressRowsQuery->where('class_id', $classId);
+        }
+
+        $progressRows = $progressRowsQuery
             ->get(['material_id', 'status', 'completed_practice_at', 'completed_quiz_at', 'read_at']);
 
         $progressMap = $progressRows->keyBy('material_id');
 
-        $materials = $materials->values()->map(function ($m, $idx) use ($progressMap, $materials) {
+        // Ambil data practice per materi dan skor attempt terakhir per practice
+        $materialIds = $materials->pluck('id')->filter()->values();
+
+        $practiceRows = PracticeModel::query()
+            ->whereIn('material_id', $materialIds)
+            ->get(['id', 'material_id', 'difficulty_level']);
+
+        $practiceByMaterial = $practiceRows->groupBy('material_id');
+
+        $latestAttemptSub = PracticeAttemptModel::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('finished_at')
+            ->select('practices_id', DB::raw('MAX(created_at) as max_created_at'))
+            ->groupBy('practices_id');
+
+        $latestScoreMap = PracticeAttemptModel::query()
+            ->joinSub($latestAttemptSub, 'latest_attempt', function ($join) {
+                $join->on('practice_attempts.practices_id', '=', 'latest_attempt.practices_id')
+                    ->on('practice_attempts.created_at', '=', 'latest_attempt.max_created_at');
+            })
+            ->pluck('practice_attempts.final_score', 'practice_attempts.practices_id');
+
+        $computeMaterialStatus = function (int $materialId) use ($progressMap, $practiceByMaterial, $latestScoreMap, $passingScore) {
+            $row = $progressMap->get($materialId);
+            $hasRead = !is_null($row?->read_at);
+
+            $levels = collect($practiceByMaterial->get($materialId, collect()))->keyBy('difficulty_level');
+
+            $easyId = $levels->get('easy')?->id;
+            $normalId = $levels->get('normal')?->id;
+            $hardId = $levels->get('hard')?->id;
+
+            $easyScore = $easyId ? (int)($latestScoreMap[$easyId] ?? -1) : -1;
+            $normalScore = $normalId ? (int)($latestScoreMap[$normalId] ?? -1) : -1;
+            $hardScore = $hardId ? (int)($latestScoreMap[$hardId] ?? -1) : -1;
+
+            $allLevelsPassed = ($easyScore > $passingScore)
+                && ($normalScore > $passingScore)
+                && ($hardScore > $passingScore);
+
+            $hasAnyPracticeAttempt = $easyScore >= 0 || $normalScore >= 0 || $hardScore >= 0;
+
+            if ($hasRead && $allLevelsPassed) {
+                return 'completed';
+            }
+
+            if ($hasRead || $hasAnyPracticeAttempt) {
+                return 'in_progress';
+            }
+
+            return $row?->status ?? 'locked';
+        };
+
+        $materials = $materials->values()->map(function ($m, $idx) use ($progressMap, $materials, $computeMaterialStatus) {
             $row = $progressMap->get($m->id);
 
-            $rawStatus = $row?->status ?? 'locked';
+            $rawStatus = $computeMaterialStatus($m->id);
 
             // Materi pertama selalu minimal unlocked, selanjutnya ikut status materi sebelumnya
             if ($idx === 0) {
                 $effectiveStatus = ($rawStatus === 'locked') ? 'unlocked' : $rawStatus;
             } else {
                 $prevMaterialId = $materials[$idx - 1]->id;
-                $prevRow = $progressMap->get($prevMaterialId);
-
-                $prevCompleted = ($prevRow?->status === 'completed')
-                    || !is_null($prevRow?->completed_practice_at)
-                    || !is_null($prevRow?->completed_quiz_at);
+                $prevCompleted = $computeMaterialStatus($prevMaterialId) === 'completed';
 
                 $effectiveStatus = $prevCompleted
                     ? (($rawStatus === 'locked') ? 'unlocked' : $rawStatus)

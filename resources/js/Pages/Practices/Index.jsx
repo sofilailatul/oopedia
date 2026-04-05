@@ -8,17 +8,25 @@ import PracticeSidebar from "@/Components/Practice/PracticeSidebar";
 
 import { canStartPractice } from "@/Features/practice/helpers";
 
+const PASSING_SCORE = 60;
+
 export default function Index({ practices = [] }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedPractice, setSelectedPractice] = useState(null);
 
     const [difficulty, setDifficulty] = useState("");
-    const [questionType, setQuestionType] = useState("");
+    const [questionType, setQuestionType] = useState("mixed");
 
     const [tab, setTab] = useState("all");
 
     const getStatus = (practice) => {
+        const easy = Number(practice?.scores?.easy ?? -1);
+        const normal = Number(practice?.scores?.normal ?? -1);
+        const hard = Number(practice?.scores?.hard ?? -1);
+        const isCompleted = easy > PASSING_SCORE && normal > PASSING_SCORE && hard > PASSING_SCORE;
+
         if (practice?.is_locked) return "locked";
+        if (isCompleted) return "completed";
         if (practice?.has_active_attempt) return "in_progress";
         return "available";
     };
@@ -30,13 +38,14 @@ export default function Index({ practices = [] }) {
                 acc[status] = (acc[status] || 0) + 1;
                 return acc;
             },
-            { available: 0, in_progress: 0, locked: 0 }
+            { available: 0, in_progress: 0, completed: 0, locked: 0 }
         );
 
         return [
             { key: "all", label: "Semua", count: practices.length },
             { key: "available", label: "Tersedia", count: counts.available },
             { key: "in_progress", label: "Sedang Dikerjakan", count: counts.in_progress },
+            { key: "completed", label: "Selesai", count: counts.completed },
             { key: "locked", label: "Terkunci", count: counts.locked },
         ];
     }, [practices]);
@@ -57,7 +66,7 @@ export default function Index({ practices = [] }) {
         setSidebarOpen(true);
 
         setDifficulty("");
-        setQuestionType("");
+        setQuestionType("mixed");
     };
 
     const closeSidebar = () => {
@@ -65,7 +74,7 @@ export default function Index({ practices = [] }) {
         setTimeout(() => setSelectedPractice(null), 300); // UI unmount delay
 
         setDifficulty("");
-        setQuestionType("");
+        setQuestionType("mixed");
     };
 
     const handleStart = (questionCount) => {
@@ -157,7 +166,6 @@ export default function Index({ practices = [] }) {
                                         difficulty={difficulty}
                                         questionType={questionType}
                                         onDifficultyChange={setDifficulty}
-                                        onQuestionTypeChange={setQuestionType}
                                         onClose={closeSidebar}
                                         onStart={handleStart}
                                         canStart={canStart}
@@ -206,7 +214,6 @@ export default function Index({ practices = [] }) {
                                         difficulty={difficulty}
                                         questionType={questionType}
                                         onDifficultyChange={setDifficulty}
-                                        onQuestionTypeChange={setQuestionType}
                                         onClose={closeSidebar}
                                         onStart={handleStart}
                                         canStart={canStart}
