@@ -14,6 +14,7 @@ class MaterialContentModel extends Model
 
     protected $fillable = [
         'material_id',
+        'subtopic_id',
         'title',
         'content_text',
         'image_path',
@@ -23,6 +24,11 @@ class MaterialContentModel extends Model
     public function material()
     {
         return $this->belongsTo(MaterialModel::class, 'material_id');
+    }
+
+    public function subTopic()
+    {
+        return $this->belongsTo(SubTopicModel::class, 'subtopic_id');
     }
 
     protected $appends = ['image_url'];
@@ -39,6 +45,6 @@ class MaterialContentModel extends Model
             return $this->image_path;
         }
 
-        return Storage::disk('public')->url($this->image_path);
+        return asset('storage/' . ltrim($this->image_path, '/'));
     }
 }

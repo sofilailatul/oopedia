@@ -17,21 +17,37 @@ export default function MultipleChoiceQuestionForm({
     <div className="space-y-5 px-5 py-4">
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)]">
         {readOnly ? (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <p className="text-[11px] font-medium text-slate-500">Teks Soal</p>
             <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
               <p className="whitespace-pre-wrap text-[12px] text-slate-800">{q.question_text || "-"}</p>
             </div>
+
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
+                {q.sub_topic || "-"}
+              </div>
+            </div>
           </div>
         ) : (
-          <Field
-            as="textarea"
-            label="Teks Soal"
-            rows={3}
-            value={q.question_text}
-            onChange={(e) => onQuestionFieldChange?.(questionIndex, "question_text", e.target.value)}
-            placeholder="Tulis pertanyaan yang jelas dan singkat..."
-          />
+          <div className="space-y-3">
+            <Field
+              as="textarea"
+              label="Teks Soal"
+              rows={3}
+              value={q.question_text}
+              onChange={(e) => onQuestionFieldChange?.(questionIndex, "question_text", e.target.value)}
+              placeholder="Tulis pertanyaan yang jelas dan singkat..."
+            />
+
+            <Field
+              label="Sub-topik"
+              value={q.sub_topic || ""}
+              onChange={(e) => onQuestionFieldChange?.(questionIndex, "sub_topic", e.target.value)}
+              placeholder="Contoh: Encapsulation"
+            />
+          </div>
         )}
 
         <div className="space-y-2">

@@ -13,8 +13,14 @@ return new class extends Migration
     {
         Schema::create('user_practice_answers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('practice_attempts_id')->nullable()->constrained('practice_attempts')->onDelete('set null');
-            $table->foreignId('practice_questions_id')->nullable()->constrained('practice_questions')->onDelete('set null');
+            $table->foreignId('practice_attempts_id')
+                ->nullable()
+                ->constrained('practice_attempts')
+                ->onDelete('set null');
+            $table->foreignId('practice_questions_id')
+                ->nullable()
+                ->constrained('practice_questions')
+                ->onDelete('set null');
             $table->foreignId('practice_options_id')
                 ->nullable()
                 ->constrained('practice_options')

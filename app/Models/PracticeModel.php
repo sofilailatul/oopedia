@@ -13,10 +13,14 @@ class PracticeModel extends Model
 
     protected $fillable = [
         'material_id',
+        'practice_type',
+        'level',
         'difficulty_level',
     ];
 
     protected $casts = [
+        'practice_type' => 'string',
+        'level' => 'string',
         'difficulty_level' => 'string',
     ];
 

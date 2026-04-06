@@ -14,6 +14,7 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
 		id: null,
 		question_text: "",
+		sub_topic: "",
 		points: 10,
 		feedbackCorrect: "",
 		feedbackIncorrect: "",
@@ -40,6 +41,7 @@ function normalizeInitialQuestions(initial = []) {
 		return {
 			...base,
 			...q,
+			sub_topic: q.sub_topic ?? q.subTopic ?? base.sub_topic,
 			type: q.type ?? base.type,
 			feedbackCorrect:
 				q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
@@ -114,6 +116,7 @@ function getQuestionsSnapshot(items = []) {
 		(items ?? []).map((q) => ({
 			id: q.id ?? null,
 			question_text: q.question_text ?? "",
+			sub_topic: q.sub_topic ?? "",
 			type: q.type ?? QUESTION_TYPE.MC,
 			points: Number(q.points ?? 0),
 			feedbackCorrect: q.feedbackCorrect ?? "",
@@ -322,6 +325,7 @@ function PracticeEditContent({
 			formData.append(`questions[${index}][id]`, q.id ?? "");
 			formData.append(`questions[${index}][type]`, q.type ?? QUESTION_TYPE.MC);
 			formData.append(`questions[${index}][question_text]`, q.question_text ?? "");
+			formData.append(`questions[${index}][sub_topic]`, q.sub_topic ?? "");
 			formData.append(`questions[${index}][points]`, q.points ?? "");
 			formData.append(`questions[${index}][output_code]`, q.outputCode ?? "");
 			formData.append(

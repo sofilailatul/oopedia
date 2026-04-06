@@ -8,6 +8,7 @@ use App\Models\PracticeModel;
 use App\Models\PracticeQuestionModel;
 use App\Models\PracticeOptionModel;
 use App\Models\PracticeItemModel;
+use App\Models\SubTopicModel;
 use App\Models\UserPracticeAnswerModel;
 use App\Models\MaterialModel;
 use Illuminate\Http\Request;
@@ -103,6 +104,8 @@ class PracticeController extends Controller
 
         $practice = PracticeModel::create([
             'material_id' => $material->id,
+            'practice_type' => 'practice',
+            'level' => $data['difficulty_level'] === 'normal' ? 'medium' : $data['difficulty_level'],
             'difficulty_level' => $data['difficulty_level'],
         ]);
 
@@ -132,6 +135,7 @@ class PracticeController extends Controller
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
+                    'sub_topic' => $q->sub_topic,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
                     'output_code' => $q->output_code,
@@ -191,6 +195,7 @@ class PracticeController extends Controller
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
+                    'sub_topic' => $q->sub_topic,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
                     'output_code' => $q->output_code,
@@ -250,6 +255,7 @@ class PracticeController extends Controller
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
+                    'sub_topic' => $q->sub_topic,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
                     'output_code' => $q->output_code,
@@ -296,90 +302,63 @@ class PracticeController extends Controller
         $userId = Auth::id();
 
         $data = $request->validate([
-            'level' => ['required','in:easy,normal,hard'],
+            'level' => ['required','in:easy,normal,medium,hard'],
             'question_type' => ['required','in:multiple_choice,drag_drop,mixed'],
             'question_count' => ['required','integer','min:1','max:50'],
             'material_name' => ['nullable','string'],
         ]);
 
-        // Alur latihan validation
-        $requestedLevel = $data['level'];
-        $materialId = $practice->material_id;
+        $requestedLevel = $data['level'] === 'medium' ? 'normal' : $data['level'];
 
-        // Get practices for all levels
-        $practices = PracticeModel::query()
-            ->where('material_id', $materialId)
-            ->get()
-            ->keyBy('difficulty_level');
-
-        // Get latest attempts for this user in this material
-        $lastEasy = PracticeAttemptModel::query()
+        $hasRead = DB::table('user_progress')
             ->where('user_id', $userId)
-            ->where('practices_id', $practices['easy']->id ?? null)
-            ->whereNotNull('finished_at')
-            ->latest('finished_at')
-            ->first();
-
-        $lastNormal = PracticeAttemptModel::query()
-            ->where('user_id', $userId)
-            ->where('practices_id', $practices['normal']->id ?? null)
-            ->whereNotNull('finished_at')
-            ->latest('finished_at')
-            ->first();
-
-        $hasAnyFinishedAttempt = PracticeAttemptModel::query()
-            ->where('user_id', $userId)
-            ->whereIn('practices_id', array_filter([
-                $practices['easy']->id ?? null,
-                $practices['normal']->id ?? null,
-                $practices['hard']->id ?? null,
-            ]))
-            ->whereNotNull('finished_at')
+            ->where('material_id', $practice->material_id)
+            ->whereNotNull('read_at')
             ->exists();
 
-        // Validate based on alur:
-        // 1) Belum pernah mengerjakan sama sekali: wajib NORMAL dulu
-        // 2) Jika NORMAL < 60: harus EASY dulu, NORMAL terkunci sampai EASY > 60
-        // Hard: harus pasing Normal dulu
-
-        if (!$hasAnyFinishedAttempt && $requestedLevel !== 'normal') {
+        if (!$hasRead) {
             return back()->withErrors([
-                'level' => 'Kamu harus mulai dari level NORMAL terlebih dahulu.',
+                'level' => 'Kamu perlu menyelesaikan membaca materi ini terlebih dahulu.',
             ]);
         }
 
-        if ($requestedLevel === 'normal' && $lastNormal && $lastNormal->final_score < 60) {
-            if (!$lastEasy || $lastEasy->final_score <= 60) {
-                return back()->withErrors([
-                    'level' => 'Setelah nilai NORMAL kurang, selesaikan EASY dulu sampai > 60 sebelum kembali ke NORMAL.',
-                ]);
-            }
+        $adaptivePlan = $this->practiceService->getAdaptiveStartPlan(
+            $userId,
+            (int) $practice->material_id,
+            $requestedLevel
+        );
+
+        $requiredLevel = $adaptivePlan['required_level'];
+        if ($requiredLevel && $requestedLevel !== $requiredLevel) {
+            return back()->withErrors([
+                'level' => ($adaptivePlan['message'] ?? 'Kamu belum bisa memilih level ini.')
+                    . ' Pilih level ' . strtoupper($requiredLevel === 'normal' ? 'MEDIUM' : $requiredLevel) . '.',
+            ]);
         }
 
-        if ($requestedLevel === 'hard') {
-            // Hard requires Normal to be passed
-            if (!isset($practices['normal'])) {
-                return back()->withErrors([
-                    'level' => 'Level HARD belum tersedia.',
-                ]);
-            }
-            
-            if (!$lastNormal) {
-                return back()->withErrors([
-                    'level' => 'Selesaikan level NORMAL terlebih dahulu.',
-                ]);
-            }
-            
-            if ($lastNormal->final_score < 60) {
-                return back()->withErrors([
-                    'level' => 'Nilai Normal kamu belum mengumpul. Coba ulang level NORMAL.',
-                ]);
-            }
+        $planPracticeId = $adaptivePlan['practice_id'] ?? null;
+        if ($requiredLevel && $planPracticeId && (int) $practice->id !== (int) $planPracticeId) {
+            return back()->withErrors([
+                'level' => 'Level yang dipilih tidak cocok dengan alur adaptive untuk materi ini.',
+            ]);
         }
 
         $attempt = PracticeAttemptModel::create([
             'user_id' => $userId,
             'practices_id' => $practice->id,
+            'sub_topic_id' => $this->resolveSubTopicId((int) $practice->material_id, $adaptivePlan['weak_sub_topic'] ?? null),
+            'attempt_mode' => $adaptivePlan['attempt_mode'] ?? 'regular',
+            'attempt_type' => $this->mapAttemptType($adaptivePlan['attempt_mode'] ?? 'regular'),
+            'attempt_no' => $this->resolveNextAttemptNo($userId, (int) $practice->id),
+            'target_level' => $requestedLevel,
+            'placement_level_result' => null,
+            'source_from' => $data['level'],
+            'next_action' => $adaptivePlan['action'] ?? null,
+            'total_questions' => (int) $data['question_count'],
+            'correct_answer' => 0,
+            'score' => 0,
+            'weak_sub_topic' => $adaptivePlan['weak_sub_topic'] ?? null,
+            'remediation_round' => (int) ($adaptivePlan['remediation_round'] ?? 0),
             'started_at' => now(),
             'finished_at' => null,
             'mc_correct' => 0,
@@ -391,19 +370,16 @@ class PracticeController extends Controller
             'is_passed' => 0,
         ]);
 
-        // simpan config di session (tanpa alter table)
         session([
             "attempt_cfg_{$attempt->id}" => [
-                'level' => $data['level'],
+                'level' => $requestedLevel,
                 'question_type' => $data['question_type'],
                 'question_count' => (int)$data['question_count'],
-                'duration_seconds' => 18 * 60, 
+                'duration_seconds' => 18 * 60,
+                'attempt_mode' => $adaptivePlan['attempt_mode'] ?? 'regular',
+                'weak_sub_topic' => $adaptivePlan['weak_sub_topic'] ?? null,
+                'remediation_round' => (int) ($adaptivePlan['remediation_round'] ?? 0),
             ],
-        ]);
-
-        logger()->info('startAttempt', [
-            'auth_id' => $userId,
-            'attempt_count' => \App\Models\PracticeAttemptModel::where('user_id', $userId)->count(),
         ]);
 
         return redirect()->route('practice_attempts.show', $attempt->id);
@@ -416,14 +392,21 @@ class PracticeController extends Controller
         $attempt->load(['practice.material']);
 
         $cfg = session("attempt_cfg_{$attempt->id}", [
-            'level' => $attempt->practice->difficulty_level,
+            'level' => $attempt->target_level ?: $attempt->practice->difficulty_level,
             'question_type' => 'mixed',
             'question_count' => 10,
             'duration_seconds' => 18 * 60,
+            'attempt_mode' => $attempt->attempt_mode ?: 'regular',
+            'weak_sub_topic' => $attempt->weak_sub_topic,
+            'remediation_round' => (int) ($attempt->remediation_round ?? 0),
         ]);
 
         $q = PracticeQuestionModel::query()
             ->where('practices_id', $attempt->practices_id);
+
+        if (!empty($cfg['weak_sub_topic'])) {
+            $q->where('sub_topic', $cfg['weak_sub_topic']);
+        }
 
         if ($cfg['question_type'] !== 'mixed') {
             $q->where('type', $cfg['question_type']);
@@ -433,6 +416,20 @@ class PracticeController extends Controller
             ->inRandomOrder()
             ->limit($cfg['question_count'])
             ->get();
+
+        if ($questions->isEmpty() && !empty($cfg['weak_sub_topic'])) {
+            $fallback = PracticeQuestionModel::query()
+                ->where('practices_id', $attempt->practices_id);
+
+            if ($cfg['question_type'] !== 'mixed') {
+                $fallback->where('type', $cfg['question_type']);
+            }
+
+            $questions = $fallback->with(['options','items'])
+                ->inRandomOrder()
+                ->limit($cfg['question_count'])
+                ->get();
+        }
 
         $savedAnswers = UserPracticeAnswerModel::query()
             ->where('practice_attempts_id', $attempt->id)
@@ -520,10 +517,13 @@ class PracticeController extends Controller
 
                 UserPracticeAnswerModel::create([
                     'practice_attempts_id' => $attempt->id,
+                    'practice_attempt_id' => $attempt->id,
                     'practice_questions_id' => $qid,
                     'practice_options_id' => $optionId,
+                    'selected_option_id' => $optionId,
                     'attempt' => $prevCount + 1,
                     'selection_items' => $selectionItems,
+                    'drag_answer' => $selectionItems,
                     'is_correct' => $isCorrect ? 1 : 0,
                     'score' => $score,
                     'timespent' => $timespent,
@@ -538,11 +538,16 @@ class PracticeController extends Controller
                 'drag_score' => $dragScore,
                 'total_earned' => $totalEarned,
                 'final_score' => $totalEarned,
+                'correct_answer' => $mcCorrect + $dragCorrect,
+                'score' => $totalEarned,
+                'placement_level_result' => ($attempt->attempt_type === 'pretest')
+                    ? ($totalEarned < 60 ? 'easy' : ($totalEarned <= 80 ? 'medium' : 'hard'))
+                    : null,
                 'is_passed' => ($totalEarned >= 60) ? 1 : 0,
             ]);
 
-            // Jika level HARD mencapai nilai > 60, tandai completed_practice_at
-            if ($practiceMeta && $practiceMeta->difficulty_level === 'hard' && $totalEarned > 60) {
+            // Selesai materi jika Hard > 80.
+            if ($practiceMeta && $practiceMeta->difficulty_level === 'hard' && $totalEarned > 80) {
                 $classId = DB::table('class_user')
                     ->where('user_id', $attempt->user_id)
                     ->value('class_id');
@@ -599,6 +604,7 @@ class PracticeController extends Controller
             'questions.*.id' => ['nullable', 'integer'],
             'questions.*.type' => ['nullable', Rule::in(['multiple_choice', 'drag_drop'])],
             'questions.*.question_text' => ['required', 'string'],
+            'questions.*.sub_topic' => ['nullable', 'string', 'max:120'],
             'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'questions.*.output_code' => ['nullable', 'string'],
             'questions.*.feedback_correct' => ['nullable', 'string'],
@@ -626,7 +632,13 @@ class PracticeController extends Controller
                 }
 
                 $question->question_text = $qData['question_text'];
+                $question->sub_topic = !empty($qData['sub_topic']) ? trim($qData['sub_topic']) : null;
+                $question->sub_topic_id = $this->resolveSubTopicId(
+                    (int) $practice->material_id,
+                    !empty($qData['sub_topic']) ? trim($qData['sub_topic']) : null
+                );
                 $question->type = $qData['type'] ?? 'multiple_choice';
+                $question->question_type = $qData['type'] ?? 'multiple_choice';
                 $question->points = $qData['points'] ?? 10;
                 $question->output_code = $qData['output_code'] ?? null;
 
@@ -845,18 +857,17 @@ class PracticeController extends Controller
             ->get();
 
         $cfg = session("attempt_cfg_{$lastAttempt->id}", [
-            'level' => $practice->difficulty_level,
+            'level' => $lastAttempt->target_level ?: $practice->difficulty_level,
             'question_type' => 'mixed',
             'question_count' => 10,
             'duration_seconds' => 18 * 60,
         ]);
 
-        // Determine next level/action based on alur latihan
         $nextLevelData = $this->practiceService->determineNextLevel(
             $userId,
             $practice->material_id,
-            $practice->difficulty_level,
-            $lastAttempt->final_score
+            $cfg['level'] ?? $practice->difficulty_level,
+            (int) $lastAttempt->final_score
         );
 
         return Inertia::render('Practices/Summary', [
@@ -866,5 +877,44 @@ class PracticeController extends Controller
             'cfg' => $cfg,
             'nextLevel' => $nextLevelData,
         ]);
+    }
+
+    private function mapAttemptType(string $attemptMode): string
+    {
+        if ($attemptMode === 'pretest') {
+            return 'pretest';
+        }
+
+        if ($attemptMode === 'remedial') {
+            return 'remedial';
+        }
+
+        return 'practice';
+    }
+
+    private function resolveNextAttemptNo(int $userId, int $practiceId): int
+    {
+        $latestNo = (int) (PracticeAttemptModel::query()
+            ->where('user_id', $userId)
+            ->where('practices_id', $practiceId)
+            ->max('attempt_no') ?? 0);
+
+        return $latestNo + 1;
+    }
+
+    private function resolveSubTopicId(int $materialId, ?string $subTopicName): ?int
+    {
+        if ($subTopicName === null || trim($subTopicName) === '') {
+            return null;
+        }
+
+        $name = trim($subTopicName);
+
+        $subTopic = SubTopicModel::query()->firstOrCreate([
+            'material_id' => $materialId,
+            'name' => $name,
+        ]);
+
+        return (int) $subTopic->id;
     }
 }

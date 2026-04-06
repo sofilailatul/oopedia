@@ -239,10 +239,6 @@ class PracticeService
 
         // Pastikan user sudah menyelesaikan membaca materi sebelum bisa mengerjakan latihan
         $this->ensureMaterialRead($userId, $practice->material_id);
-
-        if ($selectedLevel !== 'normal') {
-            $this->validateNormalCompleted($userId, $practice->material_id);
-        }
     }
 
     private function ensureMaterialRead($userId, $materialId)
@@ -258,33 +254,24 @@ class PracticeService
         }
     }
 
-    private function validateNormalCompleted($userId, $materialId)
-    {
-        $normalPractice = PracticeModel::query()
-            ->where('material_id', $materialId)
-            ->where('difficulty_level', 'normal')
-            ->first();
-
-        if (!$normalPractice) {
-            return; 
-        }
-
-        $hasFinishedNormal = PracticeAttemptModel::query()
-            ->where('user_id', $userId)
-            ->where('practices_id', $normalPractice->id)
-            ->whereNotNull('finished_at')
-            ->exists();
-
-        if (!$hasFinishedNormal) {
-            throw new \Exception('Kamu wajib menyelesaikan level NORMAL terlebih dahulu.');
-        }
-    }
-
     private function createAttempt($userId, $practiceId, $data)
     {
         $attempt = PracticeAttemptModel::create([
             'user_id' => $userId,
             'practices_id' => $practiceId,
+            'sub_topic_id' => null,
+            'attempt_mode' => $data['attempt_mode'] ?? 'regular',
+            'attempt_type' => $this->mapAttemptType($data['attempt_mode'] ?? 'regular'),
+            'attempt_no' => $this->resolveNextAttemptNo((int) $userId, (int) $practiceId),
+            'target_level' => $data['target_level'] ?? ($data['level'] ?? null),
+            'placement_level_result' => null,
+            'source_from' => $data['level'] ?? null,
+            'next_action' => null,
+            'total_questions' => (int) ($data['question_count'] ?? 10),
+            'correct_answer' => 0,
+            'score' => 0,
+            'weak_sub_topic' => $data['weak_sub_topic'] ?? null,
+            'remediation_round' => (int) ($data['remediation_round'] ?? 0),
             'started_at' => now(),
             'finished_at' => null,
             'mc_correct' => 0,
@@ -325,10 +312,13 @@ class PracticeService
         }
 
         $cfg = session("attempt_cfg_{$attemptId}", [
-            'level' => $attempt->practice->difficulty_level,
+            'level' => $attempt->target_level ?: $attempt->practice->difficulty_level,
             'question_type' => 'mixed',
             'question_count' => 10,
             'duration_seconds' => 18 * 60,
+            'attempt_mode' => $attempt->attempt_mode ?: 'regular',
+            'weak_sub_topic' => $attempt->weak_sub_topic,
+            'remediation_round' => (int) ($attempt->remediation_round ?? 0),
         ]);
 
         $questions = $this->getQuestionsForAttempt($attempt->practices_id, $cfg);
@@ -347,14 +337,33 @@ class PracticeService
         $query = PracticeQuestionModel::query()
             ->where('practices_id', $practiceId);
 
+        if (!empty($cfg['weak_sub_topic'])) {
+            $query->where('sub_topic', $cfg['weak_sub_topic']);
+        }
+
         if ($cfg['question_type'] !== 'mixed') {
             $query->where('type', $cfg['question_type']);
         }
 
-        return $query->with(['options', 'items'])
+        $questions = $query->with(['options', 'items'])
             ->inRandomOrder()
             ->limit($cfg['question_count'])
             ->get();
+
+        if ($questions->isEmpty() && !empty($cfg['weak_sub_topic'])) {
+            $fallback = PracticeQuestionModel::query()->where('practices_id', $practiceId);
+
+            if ($cfg['question_type'] !== 'mixed') {
+                $fallback->where('type', $cfg['question_type']);
+            }
+
+            return $fallback->with(['options', 'items'])
+                ->inRandomOrder()
+                ->limit($cfg['question_count'])
+                ->get();
+        }
+
+        return $questions;
     }
 
     private function getSavedAnswers($attemptId)
@@ -391,6 +400,8 @@ class PracticeService
                 'drag_score' => $stats['dragScore'],
                 'total_earned' => $stats['totalEarned'],
                 'final_score' => $stats['totalEarned'],
+                'correct_answer' => $stats['mcCorrect'] + $stats['dragCorrect'],
+                'score' => $stats['totalEarned'],
                 'is_passed' => ($stats['totalEarned'] >= 60) ? 1 : 0,
             ]);
         });
@@ -484,10 +495,13 @@ class PracticeService
 
         UserPracticeAnswerModel::create([
             'practice_attempts_id' => $attemptId,
+            'practice_attempt_id' => $attemptId,
             'practice_questions_id' => $questionId,
             'practice_options_id' => $result['optionId'],
+            'selected_option_id' => $result['optionId'],
             'attempt' => $prevCount + 1,
             'selection_items' => $result['selectionItems'],
+            'drag_answer' => $result['selectionItems'],
             'is_correct' => $result['isCorrect'] ? 1 : 0,
             'score' => $result['score'],
             'timespent' => (int)($answerData['timespent'] ?? 0),
@@ -525,95 +539,312 @@ class PracticeService
         ];
     }
 
-    /**
-     * Determine next level based on current score and alur latihan
-     * Alur:
-     * - Start at Normal → if score < 60, go to Easy → if Easy ok (≥60), go back to Normal
-     * - Normal ok (≥60), go to Hard
-     * - Hard not ok (< 60), retry Hard → if Hard ok, go to next material
-     */
     public function determineNextLevel($userId, $materialId, $currentLevel, $currentScore)
     {
-        // Cek apakah ada practice untuk material ini di setiap level
+        $plan = $this->getAdaptiveStartPlan($userId, $materialId, null);
+
+        return [
+            'next_level' => $plan['required_level'] ?? null,
+            'message' => $plan['message'],
+            'action' => $plan['action'],
+            'mode' => $plan['attempt_mode'],
+            'weak_sub_topic' => $plan['weak_sub_topic'],
+            'remediation_round' => $plan['remediation_round'],
+            'recommend_review' => $plan['recommend_review'],
+        ];
+    }
+
+    public function getAdaptiveStartPlan(int $userId, int $materialId, ?string $requestedLevel = null): array
+    {
         $practices = PracticeModel::query()
             ->where('material_id', $materialId)
             ->get()
             ->keyBy('difficulty_level');
 
-        $lastEasy = null;
-        if (isset($practices['easy'])) {
-            $lastEasy = PracticeAttemptModel::query()
-                ->where('user_id', $userId)
-                ->where('practices_id', $practices['easy']->id)
-                ->whereNotNull('finished_at')
-                ->latest('finished_at')
-                ->first();
-        }
+        $attempts = PracticeAttemptModel::query()
+            ->where('practice_attempts.user_id', $userId)
+            ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
+            ->where('practices.material_id', $materialId)
+            ->whereNotNull('practice_attempts.finished_at')
+            ->select('practice_attempts.*', 'practices.difficulty_level')
+            ->orderByDesc('practice_attempts.finished_at')
+            ->get();
 
-        $isPassed = $currentScore >= 60;
-
-        if ($currentLevel === 'easy') {
-            // Easy < 60: retry Easy
-            // Easy ≥ 60: go back to Normal
+        if ($attempts->isEmpty()) {
             return [
-                'next_level' => $isPassed ? 'normal' : 'easy',
-                'message' => $isPassed 
-                    ? 'Nilai kamu sudah mengumpul! Kembali ke level NORMAL.' 
-                    : 'Coba lagi di level EASY sampe nilai mengumpul.',
-                'action' => $isPassed ? 'next_level' : 'retry',
-            ];
-        } elseif ($currentLevel === 'normal') {
-            // Normal < 60:
-            // - kalau EASY belum pernah lulus, turun ke EASY
-            // - kalau EASY sudah pernah lulus (>=60), retry NORMAL
-            // Normal ≥ 60: go to Hard
-            if (!$isPassed) {
-                $easyPassed = $lastEasy && ((int)$lastEasy->final_score >= 60);
-
-                if ($easyPassed) {
-                    return [
-                        'next_level' => 'normal',
-                        'message' => 'Kamu sudah lulus EASY sebelumnya. Ulangi NORMAL sampai nilainya mengumpul.',
-                        'action' => 'retry',
-                    ];
-                }
-
-                return [
-                    'next_level' => 'easy',
-                    'message' => 'Nilai kamu belum mengumpul. Mari latih EASY dulu biar konsep lebih kuat.',
-                    'action' => 'fallback_easy',
-                ];
-            } else {
-                // Check if Hard level exists
-                if (!isset($practices['hard'])) {
-                    return [
-                        'next_level' => null,
-                        'message' => 'Selesai! Lanjut ke materi berikutnya.',
-                        'action' => 'next_material',
-                    ];
-                }
-                return [
-                    'next_level' => 'hard',
-                    'message' => 'Mantap! Sekarang coba naik ke level HARD.',
-                    'action' => 'next_level',
-                ];
-            }
-        } elseif ($currentLevel === 'hard') {
-            // Hard < 60: retry Hard
-            // Hard ≥ 60: next material
-            return [
-                'next_level' => $isPassed ? null : 'hard',
-                'message' => $isPassed 
-                    ? 'Excellent! Selesai di materi ini. Lanjut ke materi berikutnya.'
-                    : 'Coba lagi di level HARD. Semangat!',
-                'action' => $isPassed ? 'next_material' : 'retry',
+                'required_level' => 'normal',
+                'attempt_mode' => 'pretest',
+                'weak_sub_topic' => null,
+                'remediation_round' => 0,
+                'action' => 'start_pretest',
+                'recommend_review' => false,
+                'message' => 'Mulai dari pre-test untuk menentukan level awal kamu.',
+                'practice_id' => $practices['normal']->id ?? null,
             ];
         }
+
+        $latest = $attempts->first();
+        $latestLevel = $latest->target_level ?: $latest->difficulty_level;
+        $latestMode = $latest->attempt_mode ?: 'regular';
+        $latestScore = (int) $latest->final_score;
+
+        if ($latestMode === 'pretest') {
+            $startLevel = $this->resolveInitialLevelFromPretest($latestScore);
+
+            return [
+                'required_level' => $startLevel,
+                'attempt_mode' => 'regular',
+                'weak_sub_topic' => null,
+                'remediation_round' => 0,
+                'action' => 'next_level',
+                'recommend_review' => false,
+                'message' => 'Pre-test selesai. Kamu diarahkan ke level ' . strtoupper($this->toDisplayLevel($startLevel)) . '.',
+                'practice_id' => $practices[$startLevel]->id ?? null,
+            ];
+        }
+
+        if ($latestLevel === 'easy') {
+            return $this->resolveEasyPlan($latest, $practices);
+        }
+
+        if ($latestLevel === 'normal') {
+            return $this->resolveMediumPlan($latest, $practices);
+        }
+
+        return $this->resolveHardPlan($latest, $practices);
+    }
+
+    private function resolveInitialLevelFromPretest(int $score): string
+    {
+        if ($score < 60) {
+            return 'easy';
+        }
+
+        if ($score <= 80) {
+            return 'normal';
+        }
+
+        return 'hard';
+    }
+
+    private function resolveEasyPlan(PracticeAttemptModel $latest, $practices): array
+    {
+        $score = (int) $latest->final_score;
+
+        if ($score >= 60) {
+            return [
+                'required_level' => 'normal',
+                'attempt_mode' => 'regular',
+                'weak_sub_topic' => null,
+                'remediation_round' => 0,
+                'action' => 'next_level',
+                'recommend_review' => false,
+                'message' => 'Level Easy tuntas. Lanjut ke level Medium.',
+                'practice_id' => $practices['normal']->id ?? null,
+            ];
+        }
+
+        $nextRound = (int) ($latest->remediation_round ?? 0);
+        if (($latest->attempt_mode ?? 'regular') === 'regular') {
+            $nextRound = 1;
+        } else {
+            $nextRound++;
+        }
+
+        if ($nextRound > 3) {
+            return [
+                'required_level' => 'easy',
+                'attempt_mode' => 'regular',
+                'weak_sub_topic' => $latest->weak_sub_topic,
+                'remediation_round' => 3,
+                'action' => 'review_material',
+                'recommend_review' => true,
+                'message' => 'Easy belum mencapai 60 setelah 3 remedial. Baca ulang materi pada sub-topik lemah.',
+                'practice_id' => $practices['easy']->id ?? null,
+            ];
+        }
+
+        $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id) ?? $latest->weak_sub_topic;
 
         return [
-            'next_level' => 'normal',
-            'message' => 'Mulai dari level NORMAL.',
-            'action' => 'start',
+            'required_level' => 'easy',
+            'attempt_mode' => 'remedial',
+            'weak_sub_topic' => $weakSubTopic,
+            'remediation_round' => $nextRound,
+            'action' => 'retry',
+            'recommend_review' => false,
+            'message' => 'Remedial Easy fokus sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
+            'practice_id' => $practices['easy']->id ?? null,
         ];
+    }
+
+    private function resolveMediumPlan(PracticeAttemptModel $latest, $practices): array
+    {
+        $score = (int) $latest->final_score;
+
+        if ($score >= 60) {
+            return [
+                'required_level' => 'hard',
+                'attempt_mode' => 'regular',
+                'weak_sub_topic' => null,
+                'remediation_round' => 0,
+                'action' => 'next_level',
+                'recommend_review' => false,
+                'message' => 'Level Medium tuntas. Lanjut ke level Hard.',
+                'practice_id' => $practices['hard']->id ?? null,
+            ];
+        }
+
+        if (($latest->attempt_mode ?? 'regular') === 'regular') {
+            $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id);
+
+            return [
+                'required_level' => 'normal',
+                'attempt_mode' => 'remedial',
+                'weak_sub_topic' => $weakSubTopic,
+                'remediation_round' => 1,
+                'action' => 'retry',
+                'recommend_review' => false,
+                'message' => 'Remedial Medium 1x pada sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
+                'practice_id' => $practices['normal']->id ?? null,
+            ];
+        }
+
+        $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
+
+        return [
+            'required_level' => 'easy',
+            'attempt_mode' => 'remedial',
+            'weak_sub_topic' => $weakSubTopic,
+            'remediation_round' => 1,
+            'action' => 'fallback_easy',
+            'recommend_review' => false,
+            'message' => 'Medium masih < 60 setelah remedial. Turun ke Easy pada sub-topik yang sama.',
+            'practice_id' => $practices['easy']->id ?? null,
+        ];
+    }
+
+    private function resolveHardPlan(PracticeAttemptModel $latest, $practices): array
+    {
+        $score = (int) $latest->final_score;
+
+        if ($score > 80) {
+            return [
+                'required_level' => null,
+                'attempt_mode' => 'regular',
+                'weak_sub_topic' => null,
+                'remediation_round' => 0,
+                'action' => 'next_material',
+                'recommend_review' => false,
+                'message' => 'Level Hard > 80. Materi ini selesai.',
+                'practice_id' => null,
+            ];
+        }
+
+        if (($latest->attempt_mode ?? 'regular') === 'regular') {
+            $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id);
+
+            return [
+                'required_level' => 'hard',
+                'attempt_mode' => 'remedial',
+                'weak_sub_topic' => $weakSubTopic,
+                'remediation_round' => 1,
+                'action' => 'retry',
+                'recommend_review' => false,
+                'message' => 'Remedial Hard fokus sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
+                'practice_id' => $practices['hard']->id ?? null,
+            ];
+        }
+
+        if ($score < 60) {
+            $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
+
+            return [
+                'required_level' => 'normal',
+                'attempt_mode' => 'remedial',
+                'weak_sub_topic' => $weakSubTopic,
+                'remediation_round' => 1,
+                'action' => 'fallback_medium',
+                'recommend_review' => false,
+                'message' => 'Hard remedial masih < 60. Turun ke Medium pada sub-topik yang sama.',
+                'practice_id' => $practices['normal']->id ?? null,
+            ];
+        }
+
+        $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
+
+        return [
+            'required_level' => 'hard',
+            'attempt_mode' => 'remedial',
+            'weak_sub_topic' => $weakSubTopic,
+            'remediation_round' => 1,
+            'action' => 'retry',
+            'recommend_review' => false,
+            'message' => 'Lanjut remedial Hard sampai skor > 80.',
+            'practice_id' => $practices['hard']->id ?? null,
+        ];
+    }
+
+    private function resolveWeakSubTopic(int $attemptId): ?string
+    {
+        $rows = UserPracticeAnswerModel::query()
+            ->join('practice_questions', 'practice_questions.id', '=', 'user_practice_answers.practice_questions_id')
+            ->where('user_practice_answers.practice_attempts_id', $attemptId)
+            ->whereNotNull('practice_questions.sub_topic')
+            ->where('practice_questions.sub_topic', '!=', '')
+            ->select(
+                'practice_questions.sub_topic',
+                DB::raw('COUNT(*) as total_answered'),
+                DB::raw('SUM(CASE WHEN user_practice_answers.is_correct = 1 THEN 1 ELSE 0 END) as total_correct')
+            )
+            ->groupBy('practice_questions.sub_topic')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $sorted = $rows
+            ->map(function ($row) {
+                $total = max((int) $row->total_answered, 1);
+                $correct = (int) $row->total_correct;
+
+                return [
+                    'sub_topic' => $row->sub_topic,
+                    'accuracy' => ($correct / $total) * 100,
+                ];
+            })
+            ->sortBy('accuracy')
+            ->values();
+
+        return $sorted->first()['sub_topic'] ?? null;
+    }
+
+    private function toDisplayLevel(string $level): string
+    {
+        return $level === 'normal' ? 'medium' : $level;
+    }
+
+    private function mapAttemptType(string $attemptMode): string
+    {
+        if ($attemptMode === 'pretest') {
+            return 'pretest';
+        }
+
+        if ($attemptMode === 'remedial') {
+            return 'remedial';
+        }
+
+        return 'practice';
+    }
+
+    private function resolveNextAttemptNo(int $userId, int $practiceId): int
+    {
+        $latestNo = (int) (PracticeAttemptModel::query()
+            ->where('user_id', $userId)
+            ->where('practices_id', $practiceId)
+            ->max('attempt_no') ?? 0);
+
+        return $latestNo + 1;
     }
 }

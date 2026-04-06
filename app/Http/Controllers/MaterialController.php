@@ -7,6 +7,7 @@ use App\Models\MaterialModel;
 use App\Models\UserProgressModel;
 use App\Models\MaterialContentModel;
 use App\Models\UserModel;
+use App\Models\SubTopicModel;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
@@ -386,10 +387,46 @@ class MaterialController extends Controller
                 ->get(['id', 'nama', 'email']);
         }
 
+        $material = null;
+        $subTopics = [];
+        $materialId = $request->integer('material');
+        if ($materialId) {
+            $materialModel = MaterialModel::with(['subTopics', 'contents.subTopic', 'creator'])
+                ->find($materialId);
+
+            if ($materialModel) {
+                $material = [
+                    'id' => $materialModel->id,
+                    'material_name' => $materialModel->material_name,
+                    'description' => $materialModel->description,
+                    'order_number' => $materialModel->order_number,
+                    'contents' => $materialModel->contents->map(function ($content) {
+                        return [
+                            'id' => $content->id,
+                            'title' => $content->title,
+                            'content_text' => $content->content_text,
+                            'subtopic_id' => $content->subtopic_id,
+                            'image_path' => $content->image_path,
+                            'image_url' => $content->image_url,
+                        ];
+                    }),
+                ];
+
+                $subTopics = $materialModel->subTopics->map(function ($subTopic) {
+                    return [
+                        'id' => $subTopic->id,
+                        'name' => $subTopic->name,
+                    ];
+                });
+            }
+        }
+
         // Satu halaman Inertia ManageMaterial/Create, React akan pilih layout berdasarkan role
         return Inertia::render('ManageMaterial/Create', [
             'authUser' => $user,
             'lecturers' => $lecturers,
+            'material' => $material,
+            'subTopics' => $subTopics,
         ]);
     }
 
@@ -437,7 +474,7 @@ class MaterialController extends Controller
 
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
-        }]);
+        }, 'contents.subTopic']);
 
         $author = $material->creator?->name
             ?? $material->creator?->nama
@@ -457,6 +494,7 @@ class MaterialController extends Controller
                         'id' => $c->id,
                         'title' => $c->title,
                         'content_text' => $c->content_text,
+                        'sub_topic' => $c->subTopic?->name,
                         'image_path' => $c->image_path,
                         'image_url' => $c->image_url,
                     ];
@@ -474,7 +512,7 @@ class MaterialController extends Controller
 
         $material->load(['creator', 'contents' => function ($q) {
             $q->orderBy('sort_order');
-        }]);
+        }, 'contents.subTopic']);
 
         $author = $material->creator?->name
                 ?? $material->creator?->nama
@@ -494,6 +532,7 @@ class MaterialController extends Controller
                         'id' => $c->id,
                         'title' => $c->title,
                         'content_text' => $c->content_text,
+                        'sub_topic' => $c->subTopic?->name,
                         'image_path' => $c->image_path,
                         'image_url' => $c->image_url,
                     ];
@@ -508,9 +547,15 @@ class MaterialController extends Controller
             'material_name' => ['required','string','max:255'],
             'description' => ['nullable','string'],
             'order_number' => ['nullable','integer','min:1'],
+            'create_mode' => ['nullable','boolean'],
+            'sub_topic' => ['nullable','string','max:255'],
+            'sub_topics' => ['nullable','array'],
+            'sub_topics.*' => ['nullable','string','max:255'],
             'sections' => ['nullable','array'],
             'sections.*.title' => ['nullable','string','max:255'],
             'sections.*.content_text' => ['nullable','string'],
+            'sections.*.subtopic_id' => ['nullable','integer'],
+            'sections.*.sub_topic' => ['nullable','string','max:255'],
             'sections.*.image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
         ];
 
@@ -539,18 +584,30 @@ class MaterialController extends Controller
             'created_by' => $creatorId,
         ]);
 
-        // Otomatis tambahkan ke tabel material_class untuk semua kelas milik Dosen ini
-        $dosenClasses = \App\Models\ClassModel::where('created_by', $creatorId)->pluck('id');
-        if ($dosenClasses->isNotEmpty()) {
-            $syncData = [];
-            foreach ($dosenClasses as $classId) {
-                $syncData[$classId] = [
-                    'publish_date' => now(),
-                    'is_active' => 1,
-                    'actived_at' => now(),
-                ];
+        $isCreateMode = (bool) ($data['create_mode'] ?? false);
+        if ($isCreateMode) {
+            $initialSubTopics = $data['sub_topics'] ?? [];
+            if (empty($initialSubTopics) && !empty($data['sub_topic'])) {
+                $initialSubTopics = [$data['sub_topic']];
             }
-            $material->classes()->sync($syncData);
+
+            foreach ($initialSubTopics as $subTopicName) {
+                $subTopicName = trim((string) $subTopicName);
+                if ($subTopicName === '') {
+                    continue;
+                }
+
+                SubTopicModel::firstOrCreate([
+                    'material_id' => $material->id,
+                    'name' => $subTopicName,
+                ]);
+            }
+
+            $routeName = strtolower($request->user()->role ?? '') === 'superadmin'
+                ? 'superadmin.materials.create'
+                : 'dosen.materials.create';
+
+            return redirect()->route($routeName, ['material' => $material->id]);
         }
 
         $sections = $data['sections'] ?? [];
@@ -559,6 +616,8 @@ class MaterialController extends Controller
         foreach ($sections as $index => $sectionData) {
             $text = $sectionData['content_text'] ?? null;
             $title = $sectionData['title'] ?? null;
+            $subTopicId = $sectionData['subtopic_id'] ?? null;
+            $subTopicName = $sectionData['sub_topic'] ?? null;
             $imageFile = $request->file("sections.$index.image");
 
             if (!$title && !$text && !$imageFile) {
@@ -570,13 +629,15 @@ class MaterialController extends Controller
                 $imagePath = $imageFile->store("materials/{$material->id}/sections", 'public');
             }
 
-            MaterialContentModel::create([
+            $section = MaterialContentModel::create([
                 'material_id' => $material->id,
                 'title' => $title,
                 'content_text' => $text ?? '',
                 'image_path' => $imagePath,
                 'sort_order' => $sort++,
             ]);
+
+            $this->syncMaterialSectionSubTopic($material, $section, $subTopicName, $subTopicId);
         }
 
         $role = strtolower($request->user()->role ?? '');
@@ -602,6 +663,8 @@ class MaterialController extends Controller
             'sections.*.id' => ['nullable','integer'],
             'sections.*.title' => ['nullable','string','max:255'],
             'sections.*.content_text' => ['nullable','string'],
+            'sections.*.subtopic_id' => ['nullable','integer'],
+            'sections.*.sub_topic' => ['nullable','string','max:255'],
             'sections.*.image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
         ]);
 
@@ -622,6 +685,8 @@ class MaterialController extends Controller
         foreach (($data['sections'] ?? []) as $index => $sectionData) {
             $text = $sectionData['content_text'] ?? null;
             $title = $sectionData['title'] ?? null;
+            $subTopicId = $sectionData['subtopic_id'] ?? null;
+            $subTopicName = $sectionData['sub_topic'] ?? null;
             $imageFile = $request->file("sections.$index.image");
             $sectionId = $sectionData['id'] ?? null;
 
@@ -642,6 +707,8 @@ class MaterialController extends Controller
                 $section->sort_order = $sort++;
                 $section->save();
 
+                $this->syncMaterialSectionSubTopic($material, $section, $subTopicName, $subTopicId);
+
                 $keepIds[] = $section->id;
             } else {
                 $imagePath = null;
@@ -656,6 +723,8 @@ class MaterialController extends Controller
                     'image_path' => $imagePath,
                     'sort_order' => $sort++,
                 ]);
+
+                $this->syncMaterialSectionSubTopic($material, $section, $subTopicName, $subTopicId);
 
                 $keepIds[] = $section->id;
             }
@@ -765,6 +834,8 @@ class MaterialController extends Controller
         $data = $request->validate([
             'title' => ['nullable','string','max:255'],
             'content_text' => ['required','string'],
+            'subtopic_id' => ['nullable','integer'],
+            'sub_topic' => ['nullable','string','max:255'],
             'image' => ['nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
         ]);
 
@@ -784,6 +855,8 @@ class MaterialController extends Controller
             'sort_order' => $maxSort + 1,
         ]);
 
+        $this->syncMaterialSectionSubTopic($material, $section, $data['sub_topic'] ?? null, $data['subtopic_id'] ?? null);
+
         return response()->json($section, 201);
     }
 
@@ -800,6 +873,8 @@ class MaterialController extends Controller
         $data = $request->validate([
             'title' => ['sometimes','nullable','string','max:255'],
             'content_text' => ['sometimes','required','string'],
+            'subtopic_id' => ['sometimes','nullable','integer'],
+            'sub_topic' => ['sometimes','nullable','string','max:255'],
             'image' => ['sometimes','nullable','image','mimes:png,jpg,jpeg,webp','max:2048'],
         ]);
 
@@ -815,6 +890,14 @@ class MaterialController extends Controller
         }
         if (array_key_exists('content_text', $data)) {
             $section->content_text = $data['content_text'];
+        }
+        if (array_key_exists('subtopic_id', $data) || array_key_exists('sub_topic', $data)) {
+            $this->syncMaterialSectionSubTopic(
+                $material,
+                $section,
+                $data['sub_topic'] ?? null,
+                $data['subtopic_id'] ?? null
+            );
         }
 
         $section->save();
@@ -858,5 +941,44 @@ class MaterialController extends Controller
         });
 
         return response()->json(['message' => 'reordered']);
+    }
+
+    private function syncMaterialSectionSubTopic(MaterialModel $material, MaterialContentModel $section, ?string $subTopicName, ?int $subTopicId = null): void
+    {
+        if ($subTopicId) {
+            $subTopic = SubTopicModel::query()
+                ->where('id', $subTopicId)
+                ->where('material_id', $material->id)
+                ->first();
+
+            if (!$subTopic) {
+                return;
+            }
+
+            $section->subtopic_id = $subTopicId;
+            $section->save();
+            return;
+        }
+
+        $subTopicName = trim((string) $subTopicName);
+
+        if ($subTopicName === '') {
+            if ($section->subtopic_id) {
+                $section->subtopic_id = null;
+                $section->save();
+            }
+
+            return;
+        }
+
+        $subTopic = SubTopicModel::query()->firstOrCreate([
+            'material_id' => $material->id,
+            'name' => $subTopicName,
+        ]);
+
+        if ((int) $section->subtopic_id !== (int) $subTopic->id) {
+            $section->subtopic_id = $subTopic->id;
+            $section->save();
+        }
     }
 }

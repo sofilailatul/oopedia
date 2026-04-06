@@ -10,6 +10,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
     (material?.contents || []).map((c) => ({
       id: c.id,
       title: c.title || "",
+      subTopic: c.sub_topic || "",
       content: c.content_text || "",
       imagePath: c.image_path || null,
       previewUrl: c.image_url || null,
@@ -26,6 +27,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
       {
         id: null,
         title: "",
+        subTopic: "",
         content: "",
         imagePath: null,
         previewUrl: null,
@@ -69,6 +71,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
     const payloadSections = sections.map((s) => ({
       id: s.id,
       title: s.title,
+      sub_topic: s.subTopic,
       content_text: s.content,
       image: s.imageFile || null,
     }));

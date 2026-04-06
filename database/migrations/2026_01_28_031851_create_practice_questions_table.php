@@ -13,11 +13,18 @@ return new class extends Migration
     {
         Schema::create('practice_questions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('practices_id')->nullable()->constrained('practices')->onDelete('set null');
-            $table->text('question_text');
+            $table->foreignId('practices_id')
+                ->nullable()
+                ->constrained('practices')
+                ->onDelete('set null');
+            $table->foreignId('subtopic_id')
+                ->nullable();
+
             $table->enum('type', ['multiple_choice','drag_drop']);
+            $table->text('question_text');
             $table->string('image_path')->nullable();
             $table->integer('points')->default(10);
+            $table->text('code_snippet')->nullable();
             $table->text('feedback_correct')->nullable();
             $table->text('feedback_incorrect')->nullable();
             $table->timestamps();

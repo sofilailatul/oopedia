@@ -1,19 +1,32 @@
 import { useState } from "react";
 
-export function useDosenMaterialCreate({ authUser }) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+export function useDosenMaterialCreate({ authUser, material = null, subTopics = [] }) {
+  const [title, setTitle] = useState(material?.material_name || "");
+  const [description, setDescription] = useState(material?.description || "");
   const [sections, setSections] = useState([
-    { id: 1, title: "", content: "", imageFile: null, previewUrl: null },
+    ...(material?.contents?.length
+      ? material.contents.map((content) => ({
+          id: content.id,
+          title: content.title || "",
+          subTopicId: content.subtopic_id || "",
+          content: content.content_text || "",
+          imageFile: null,
+          previewUrl: content.image_url || null,
+        }))
+      : [
+          { id: 1, title: "", subTopicId: subTopics?.[0]?.id || "", content: "", imageFile: null, previewUrl: null },
+        ]),
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const creatorName = authUser?.name || authUser?.nama || "-";
 
+  const materialId = material?.id || null;
+
   function addSection() {
     setSections((prev) => [
       ...prev,
-      { id: Date.now(), title: "", content: "", imageFile: null, previewUrl: null },
+      { id: Date.now(), title: "", subTopicId: subTopics?.[0]?.id || "", content: "", imageFile: null, previewUrl: null },
     ]);
   }
 
@@ -45,6 +58,7 @@ export function useDosenMaterialCreate({ authUser }) {
     const role = (authUser?.role || "").toLowerCase();
     const baseRole = role === "superadmin" ? "superadmin" : "dosen";
     const defaultEndpoint = baseRole === "superadmin" ? "/superadmin/materi" : "/dosen/materi";
+    const updateEndpoint = materialId ? `${defaultEndpoint}/${materialId}` : defaultEndpoint;
 
     const { onSuccess, onError, endpoint = defaultEndpoint, extra = {} } = options;
 
@@ -57,8 +71,14 @@ export function useDosenMaterialCreate({ authUser }) {
     formData.append("material_name", title || "Untitled Learning Material");
     if (description) formData.append("description", description);
 
+    if (materialId) {
+      formData.append("_method", "put");
+      formData.append("order_number", material?.order_number || 1);
+    }
+
     sections.forEach((s, index) => {
       if (s.title) formData.append(`sections[${index}][title]`, s.title);
+      if (s.subTopicId) formData.append(`sections[${index}][subtopic_id]`, s.subTopicId);
       if (s.content) formData.append(`sections[${index}][content_text]`, s.content);
       if (s.imageFile) {
         formData.append(`sections[${index}][image]`, s.imageFile);
@@ -72,7 +92,8 @@ export function useDosenMaterialCreate({ authUser }) {
     });
 
     try {
-      await window.axios.post(endpoint, formData, {
+      const targetEndpoint = materialId ? updateEndpoint : endpoint;
+      await window.axios.post(targetEndpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (typeof onSuccess === "function") {
@@ -88,7 +109,7 @@ export function useDosenMaterialCreate({ authUser }) {
   }
 
   return {
-    state: { title, description, sections, isSubmitting, creatorName },
+    state: { title, description, sections, isSubmitting, creatorName, subTopics, materialId },
     actions: {
       setTitle,
       setDescription,

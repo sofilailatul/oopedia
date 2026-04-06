@@ -56,17 +56,17 @@ class MaterialModel extends Model
     {
         return $this->hasMany(QuizQuestionsModel::class, 'material_id');
     }
-    public function images()
-    {
-        return $this->hasMany(MaterialImageModel::class, 'material_id')
-            ->orderBy('sort_order')
-            ->orderBy('id');
-    }
+
     public function contents()
     {
         return $this->hasMany(
             MaterialContentModel::class,
             'material_id'
         )->orderBy('sort_order');
+    }
+
+    public function subTopics()
+    {
+        return $this->hasMany(SubTopicModel::class, 'material_id')->orderBy('name');
     }
 }

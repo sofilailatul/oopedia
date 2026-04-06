@@ -13,8 +13,13 @@ return new class extends Migration
     {
         Schema::create('practices', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('material_id')->nullable()->constrained('materials')->onDelete('set null');
-            $table->enum('difficulty_level', ['easy','normal','hard']);
+            $table->foreignId('material_id')->nullable()
+                ->constrained('materials')
+                ->onDelete('set null');
+            $table->enum ('type', ['pretest', 'practice']);
+            $table->enum('level', ['easy','medium','hard']);
+            $table->integer('min_score')->default(0)->nullable();
+            $table->integer('max_attempts')->default(1)->nullable();
             $table->timestamps();
         });
     }

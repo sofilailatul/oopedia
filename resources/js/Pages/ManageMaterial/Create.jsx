@@ -3,18 +3,19 @@ import AppLayout from '@/Layouts/AppLayout';
 import { router } from '@inertiajs/react';
 import Button from '@/Components/Button';
 import StatusModal from '@/Components/StatusModal';
+import Dropdown from '@/Components/Dropdown';
 import { useDosenMaterialCreate } from '@/Features/materials/useDosenMaterialCreate';
 import UploadImage from '@/Components/UploadImage';
-import { FaPlus, FaCheck, FaBookOpen } from 'react-icons/fa';
+import { FaPlus, FaCheck, FaBookOpen, FaChevronDown } from 'react-icons/fa';
 
 export default function ManageMaterialCreate(props) {
-	const { authUser } = props;
+	const { authUser, material = null, subTopics = [] } = props;
 	const role = (authUser?.role || '').toLowerCase();
 	const baseRole = role === 'superadmin' ? 'superadmin' : 'dosen';
 	const indexRouteName = `${baseRole}.materials.index`;
 	const indexUrl = route(indexRouteName);
 
-	const { state, actions } = useDosenMaterialCreate({ authUser });
+	const { state, actions } = useDosenMaterialCreate({ authUser, material, subTopics });
 	const { title, description, sections, isSubmitting, creatorName } = state;
 	const {
 		setTitle,
@@ -47,7 +48,7 @@ export default function ManageMaterialCreate(props) {
 		autoResize(descriptionRef);
 	}, [description]);
 
-	const hasChanges = title || description || sections.some((s) => s.title || s.content || s.imageFile);
+	const hasChanges = title || description || sections.some((s) => s.title || s.subTopicId || s.content || s.imageFile);
 
 	const handleBackClick = (e) => {
 		if (hasChanges && !isSubmitting) {
@@ -143,6 +144,11 @@ export default function ManageMaterialCreate(props) {
 		});
 	};
 
+	const getSubTopicName = (subTopicId) => {
+		const selected = subTopics.find((item) => String(item.id) === String(subTopicId));
+		return selected?.name || 'Pilih subtopic';
+	};
+
 	return (
 		<AppLayout
 			title="Buat Materi Baru"
@@ -195,6 +201,56 @@ export default function ManageMaterialCreate(props) {
 										value={section.title}
 										onChange={(e) => updateSectionField(section.id, 'title', e.target.value)}
 									/>
+								</div>
+
+								<div className="mb-4">
+									<label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+										Subtopic
+									</label>
+									<Dropdown className="w-full">
+										<Dropdown.Trigger>
+											<button
+												type="button"
+												disabled={subTopics.length === 0}
+												className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 text-sm text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												<span className="truncate">
+													{subTopics.length === 0 ? 'Belum ada subtopic' : getSubTopicName(section.subTopicId)}
+												</span>
+												<FaChevronDown className="text-[11px] text-slate-400" />
+											</button>
+										</Dropdown.Trigger>
+
+										{subTopics.length > 0 ? (
+											<Dropdown.Content align="left" width="64" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-64 overflow-y-auto">
+												<Dropdown.Item
+													onClick={() => updateSectionField(section.id, 'subTopicId', '')}
+													className={`flex items-center justify-between px-3 py-2.5 ${
+														!section.subTopicId ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+													}`}
+												>
+													<span>Pilih subtopic</span>
+													{!section.subTopicId ? <FaCheck className="text-[10px]" /> : null}
+												</Dropdown.Item>
+												{subTopics.map((subTopic) => {
+													const active = String(section.subTopicId) === String(subTopic.id);
+
+													return (
+														<Dropdown.Item
+															key={subTopic.id}
+															onClick={() => updateSectionField(section.id, 'subTopicId', String(subTopic.id))}
+															className={`flex items-center justify-between px-3 py-2.5 ${
+																active ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+															}`}
+														>
+															<span className="truncate">{subTopic.name}</span>
+															{active ? <FaCheck className="text-[10px]" /> : null}
+														</Dropdown.Item>
+													);
+												})}
+											</Dropdown.Content>
+										) : null}
+									</Dropdown>
 								</div>
 
 								{/* Content Textarea Container */}

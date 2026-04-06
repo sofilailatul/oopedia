@@ -3,7 +3,7 @@ import { DIFFICULTY, QUESTION_TYPE } from "./constants";
 export const difficultyLabel = (level) =>
   ({
     [DIFFICULTY.EASY]: "Easy",
-    [DIFFICULTY.NORMAL]: "Normal",
+    [DIFFICULTY.NORMAL]: "Medium",
     [DIFFICULTY.HARD]: "Hard",
   }[level] ?? "Pilih Level");
 

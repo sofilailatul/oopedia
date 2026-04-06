@@ -9,6 +9,7 @@ import PracticeSidebar from "@/Components/Practice/PracticeSidebar";
 import { canStartPractice } from "@/Features/practice/helpers";
 
 const PASSING_SCORE = 60;
+const HARD_COMPLETION_SCORE = 80;
 
 export default function Index({ practices = [] }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,10 +21,8 @@ export default function Index({ practices = [] }) {
     const [tab, setTab] = useState("all");
 
     const getStatus = (practice) => {
-        const easy = Number(practice?.scores?.easy ?? -1);
-        const normal = Number(practice?.scores?.normal ?? -1);
         const hard = Number(practice?.scores?.hard ?? -1);
-        const isCompleted = easy > PASSING_SCORE && normal > PASSING_SCORE && hard > PASSING_SCORE;
+        const isCompleted = hard > HARD_COMPLETION_SCORE;
 
         if (practice?.is_locked) return "locked";
         if (isCompleted) return "completed";

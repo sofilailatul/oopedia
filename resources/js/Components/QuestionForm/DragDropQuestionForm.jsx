@@ -34,6 +34,23 @@ export default function DragDropQuestionForm({
           )}
 
           <div className="space-y-2 pt-1">
+            <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
+            {readOnly ? (
+              <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
+                {q.sub_topic || "-"}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={q.sub_topic || ""}
+                onChange={(e) => onQuestionFieldChange?.(questionIndex, "sub_topic", e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                placeholder="Contoh: Polymorphism"
+              />
+            )}
+          </div>
+
+          <div className="space-y-2 pt-1">
             <p className="text-[11px] font-medium text-slate-500">Output Code</p>
             {readOnly ? (
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">

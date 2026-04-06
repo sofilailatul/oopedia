@@ -13,10 +13,13 @@ class UserPracticeAnswerModel extends Model
 
     protected $fillable = [
         'practice_attempts_id',
+        'practice_attempt_id',
         'practice_questions_id',
         'practice_options_id',
+        'selected_option_id',
         'attempt',
         'selection_items',
+        'drag_answer',
         'is_correct',
         'score',
         'timespent',
@@ -24,6 +27,7 @@ class UserPracticeAnswerModel extends Model
 
     protected $casts = [
         'selection_items' => 'array',
+        'drag_answer' => 'array',
         'is_correct' => 'boolean',
         'attempt' => 'integer',
     ];
@@ -34,6 +38,11 @@ class UserPracticeAnswerModel extends Model
         return $this->belongsTo(PracticeAttemptModel::class, 'practice_attempts_id');
     }
 
+    public function attemptRef()
+    {
+        return $this->belongsTo(PracticeAttemptModel::class, 'practice_attempt_id');
+    }
+
     public function question()
     {
         return $this->belongsTo(PracticeQuestionModel::class, 'practice_questions_id');
@@ -42,5 +51,10 @@ class UserPracticeAnswerModel extends Model
     public function option()
     {
         return $this->belongsTo(PracticeOptionModel::class, 'practice_options_id');
+    }
+
+    public function selectedOption()
+    {
+        return $this->belongsTo(PracticeOptionModel::class, 'selected_option_id');
     }
 }

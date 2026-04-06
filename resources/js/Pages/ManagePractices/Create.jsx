@@ -18,6 +18,7 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
 		id: null,
 		question_text: "",
+		sub_topic: "",
 		points: 10,
 		feedbackCorrect: "Jawaban kamu benar.",
 		feedbackIncorrect: "",
@@ -44,6 +45,7 @@ function normalizeInitialQuestions(initial = []) {
 		return {
 			...base,
 			...q,
+			sub_topic: q.sub_topic ?? q.subTopic ?? base.sub_topic,
 			type: q.type ?? base.type,
 			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
 			feedbackIncorrect:
@@ -128,6 +130,7 @@ function CreatePracticeContent({
 
 		return (questions ?? []).some((q) => {
 			const questionText = String(q.question_text ?? "").trim();
+			const subTopic = String(q.sub_topic ?? "").trim();
 			const outputCode = String(q.outputCode ?? "").trim();
 			const feedbackIncorrect = String(q.feedbackIncorrect ?? "").trim();
 			const feedbackCorrect = String(q.feedbackCorrect ?? "").trim();
@@ -142,6 +145,7 @@ function CreatePracticeContent({
 
 			return (
 				questionText.length > 0 ||
+				subTopic.length > 0 ||
 				outputCode.length > 0 ||
 				feedbackIncorrect.length > 0 ||
 				hasNonDefaultCorrectFeedback ||
@@ -267,6 +271,7 @@ function CreatePracticeContent({
 			formData.append(`questions[${index}][id]`, q.id ?? "");
 			formData.append(`questions[${index}][type]`, q.type ?? QUESTION_TYPE.MC);
 			formData.append(`questions[${index}][question_text]`, q.question_text ?? "");
+			formData.append(`questions[${index}][sub_topic]`, q.sub_topic ?? "");
 			formData.append(`questions[${index}][points]`, q.points ?? "");
 			formData.append(`questions[${index}][output_code]`, q.outputCode ?? "");
 			formData.append(`questions[${index}][feedback_correct]`, q.feedbackCorrect ?? "");

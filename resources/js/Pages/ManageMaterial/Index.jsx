@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import AppLayout from "@/Layouts/AppLayout";
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { FaPlus, FaPen, FaEye, FaChevronUp, FaChevronDown, FaLock } from "react-icons/fa";
 import Button from "@/Components/Button";
 import Card from "@/Components/Card";
 import StatusModal from "@/Components/StatusModal";
+import Modal from "@/Components/Modal";
 import { useDosenMaterialsIndex } from "@/Features/materials/useDosenMaterialsIndex";
 
 export default function ManageMaterialsIndex({ authUser, materials = [] }) {
@@ -13,17 +14,23 @@ export default function ManageMaterialsIndex({ authUser, materials = [] }) {
 
 	const routeShowName = `${baseRole}.materials.show`;
 	const routeEditName = `${baseRole}.materials.edit`;
-	const createHref = baseRole === "superadmin" ? "/superadmin/materi/create" : "/dosen/materi/create";
+	const createRouteName = `${baseRole}.materials.store`;
 
 	const [showSuccessModal, setShowSuccessModal] = useState(false);
 	const [showErrorModal, setShowErrorModal] = useState(false);
+	const [errorTitle, setErrorTitle] = useState("Terjadi Kesalahan");
 	const [errorMessage, setErrorMessage] = useState("");
+	const [showCreateModal, setShowCreateModal] = useState(false);
+	const [materialName, setMaterialName] = useState("");
+	const [subTopics, setSubTopics] = useState([{ id: Date.now(), name: "" }]);
+	const [isCreating, setIsCreating] = useState(false);
 
 	const handleOrderSuccess = () => {
 		setShowSuccessModal(true);
 	};
 
 	const handleOrderError = (message) => {
+		setErrorTitle('Oops, Gagal Mengubah Urutan!');
 		setErrorMessage(message);
 		setShowErrorModal(true);
 	};
@@ -38,6 +45,51 @@ export default function ManageMaterialsIndex({ authUser, materials = [] }) {
 	const { paginated } = view;
 	const { moveUp, moveDown } = actions;
 
+	const handleCreateMaterial = () => {
+		if (!materialName.trim()) {
+			setErrorTitle('Validasi Gagal');
+			setShowErrorModal(true);
+			setErrorMessage('Nama materi wajib diisi.');
+			return;
+		}
+
+		const cleanedSubTopics = subTopics
+			.map((item) => item.name.trim())
+			.filter((name) => name.length > 0);
+
+		if (cleanedSubTopics.length === 0) {
+			setErrorTitle('Validasi Gagal');
+			setShowErrorModal(true);
+			setErrorMessage('Minimal satu subtopic wajib diisi.');
+			return;
+		}
+
+		setIsCreating(true);
+		router.post(
+			route(createRouteName),
+			{
+				material_name: materialName,
+				sub_topics: cleanedSubTopics,
+				create_mode: true,
+			},
+			{
+				preserveScroll: true,
+				onFinish: () => setIsCreating(false),
+				onSuccess: () => {
+					setShowCreateModal(false);
+					setMaterialName("");
+					setSubTopics([{ id: Date.now(), name: "" }]);
+				},
+				onError: (errors) => {
+						setErrorTitle('Gagal Membuat Materi');
+					const firstMessage = Object.values(errors || {})?.[0];
+					setErrorMessage(Array.isArray(firstMessage) ? firstMessage[0] : firstMessage || 'Gagal membuat materi.');
+					setShowErrorModal(true);
+				},
+			},
+		);
+	};
+
 	return (
 		<AppLayout title="Kelola Materi" label="Kelola Materi">
 			<div className="mx-auto max-w-6xl space-y-6">
@@ -49,14 +101,12 @@ export default function ManageMaterialsIndex({ authUser, materials = [] }) {
 						</div>
 
 						<Button
-							as={Link}
-							href={createHref}
 							color="blue"
 							variant="solid"
 							size="md"
 							leftIcon={<FaPlus className="h-3.5 w-3.5" />}
 							className="rounded-full shadow-sm"
-							onClick={() => console.log("Tombol Tambah Materi diklik")}
+							onClick={() => setShowCreateModal(true)}
 						>
 							Tambah Materi
 						</Button>
@@ -186,12 +236,90 @@ export default function ManageMaterialsIndex({ authUser, materials = [] }) {
 			<StatusModal
 				show={showErrorModal}
 				type="danger"
-				title="Oops, Gagal Mengubah Urutan!"
+				title={errorTitle}
 				message={errorMessage}
 				onClose={() => setShowErrorModal(false)}
 				onConfirm={() => setShowErrorModal(false)}
 				confirmText="Tutup"
 			/>
+
+			<Modal show={showCreateModal} maxWidth="lg" onClose={() => setShowCreateModal(false)}>
+				<div className="p-6 space-y-5">
+					<div>
+						<h3 className="text-lg font-semibold text-slate-900">Buat Materi Baru</h3>
+						<p className="mt-1 text-sm text-slate-500">Isi nama materi dan subtopic awal untuk memulai drafting.</p>
+					</div>
+
+					<div className="space-y-4">
+						<div className="space-y-2">
+							<label className="text-sm font-medium text-slate-700">Nama Materi</label>
+							<input
+								type="text"
+								value={materialName}
+								onChange={(e) => setMaterialName(e.target.value)}
+								className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-300"
+								placeholder="Contoh: Pengenalan OOP"
+							/>
+						</div>
+
+						<div className="space-y-2">
+							<div className="flex items-center justify-between gap-3">
+								<label className="text-sm font-medium text-slate-700">Subtopic</label>
+								<Button
+									type="button"
+									size="sm"
+									color="grey"
+									variant="outline"
+									onClick={() => setSubTopics((prev) => [...prev, { id: Date.now() + prev.length, name: "" }])}
+								>
+									Tambah Subtopic
+								</Button>
+							</div>
+
+							<div className="space-y-3">
+								{subTopics.map((item, index) => (
+									<div key={item.id} className="flex items-center gap-3">
+										<input
+											type="text"
+											value={item.name}
+											onChange={(e) =>
+												setSubTopics((prev) =>
+													prev.map((subTopic) =>
+														subTopic.id === item.id ? { ...subTopic, name: e.target.value } : subTopic,
+													),
+												)
+											}
+											className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-300"
+											placeholder={`Contoh subtopic ${index + 1}`}
+										/>
+										<Button
+											type="button"
+											size="sm"
+											color="red"
+											variant="outline"
+											onClick={() => {
+												setSubTopics((prev) => prev.length === 1 ? prev : prev.filter((subTopic) => subTopic.id !== item.id));
+											}}
+											disabled={subTopics.length === 1}
+										>
+											Hapus
+										</Button>
+									</div>
+								))}
+							</div>
+						</div>
+					</div>
+
+					<div className="flex justify-end gap-3 pt-2">
+						<Button color="grey" variant="outline" onClick={() => setShowCreateModal(false)}>
+							Batal
+						</Button>
+						<Button color="blue" variant="solid" onClick={handleCreateMaterial} disabled={isCreating}>
+							{isCreating ? 'Membuat...' : 'Lanjut '}
+						</Button>
+					</div>
+				</div>
+			</Modal>
 		</AppLayout>
 	);
 }

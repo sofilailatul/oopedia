@@ -1,7 +1,7 @@
 import React from 'react';
 import Icons from '@/icons';
 
-const PASSING_SCORE = 60;
+const HARD_COMPLETION_SCORE = 80;
 
 const config = {
   completed: {
@@ -45,10 +45,8 @@ const config = {
 export default function PracticeCard({ practice, onClick }) {
   const isLocked = practice?.is_locked;
   const hasActiveAttempt = Boolean(practice?.has_active_attempt);
-  const easy = Number(practice?.scores?.easy ?? -1);
-  const normal = Number(practice?.scores?.normal ?? -1);
   const hard = Number(practice?.scores?.hard ?? -1);
-  const isCompleted = easy > PASSING_SCORE && normal > PASSING_SCORE && hard > PASSING_SCORE;
+  const isCompleted = hard > HARD_COMPLETION_SCORE;
 
   const conf = isLocked
     ? config.locked

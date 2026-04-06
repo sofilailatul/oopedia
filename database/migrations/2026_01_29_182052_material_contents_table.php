@@ -17,11 +17,11 @@ return new class extends Migration
             $table->foreignId('material_id')
                 ->constrained('materials')
                 ->cascadeOnDelete();
-
-            $table->string('title')->nullable();     // judul section (opsional)
-            $table->longText('content_text');        // isi materi
-            $table->string('image_path')->nullable(); // 1 section 1 gambar
-
+            $table->foreignId('subtopic_id')
+                ->nullable();
+            $table->string('title')->nullable();
+            $table->longText('content_text');    
+            $table->string('image_path')->nullable(); 
             $table->unsignedInteger('sort_order')->default(0);
 
             $table->timestamps();

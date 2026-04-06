@@ -14,15 +14,6 @@ class DatabaseSeeder extends Seeder
         $this->call([
             UserSeeder::class,
             ClassSeeder::class,
-            MaterialSeeder::class,
-            PracticeSeeder::class,
-            QuizSeeder::class,
-            UserProgressSeeder::class,
-            MaterialRecommendationSeeder::class,
-            PracticeAttemptSeeder::class,
-            QuizAttemptSeeder::class,
-            MaterialContentSeeder::class,
-            QuizMaterialAndAttemptScore::class,
         ]);
     }
 }

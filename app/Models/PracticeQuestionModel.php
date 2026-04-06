@@ -14,7 +14,10 @@ class PracticeQuestionModel extends Model
     protected $fillable = [
         'practices_id',
         'question_text',
+        'sub_topic',
+        'sub_topic_id',
         'type',
+        'question_type',
         'image_path',
         'points',
         'output_code',
@@ -24,13 +27,21 @@ class PracticeQuestionModel extends Model
 
     protected $casts = [
         'type' => 'string',
+        'question_type' => 'string',
         'points' => 'integer',
+        'sub_topic' => 'string',
+        'sub_topic_id' => 'integer',
     ];
 
     // Relationships
     public function practice()
     {
         return $this->belongsTo(PracticeModel::class, 'practices_id');
+    }
+
+    public function subTopicRef()
+    {
+        return $this->belongsTo(SubTopicModel::class, 'sub_topic_id');
     }
 
     public function options()

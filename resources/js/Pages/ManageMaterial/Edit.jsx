@@ -124,6 +124,20 @@ function EditMaterialContent({ material, authUser, indexUrl }) {
 									/>
 								</div>
 							</div>
+							<div className="w-full">
+								<label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
+									Subtopic
+								</label>
+								<input
+									type="text"
+									className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+									placeholder="Masukkan subtopic section"
+									value={section.subTopic || ''}
+									onChange={(e) =>
+										updateSectionField(index, 'subTopic', e.target.value)
+									}
+								/>
+							</div>
 
 							<textarea
 								className="w-full min-h-[120px] border rounded-lg px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
