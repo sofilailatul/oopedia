@@ -17,9 +17,9 @@ return new class extends Migration
                 ->constrained('materials')
                 ->onDelete('set null');
             $table->enum ('type', ['pretest', 'practice']);
-            $table->enum('level', ['easy','medium','hard']);
-            $table->integer('min_score')->default(0)->nullable();
-            $table->integer('max_attempts')->default(1)->nullable();
+            $table->string('level')->nullable();
+            $table->integer('min_score')->default(60)->nullable();
+            $table->integer('max_attempts')->default(3)->nullable();
             $table->timestamps();
         });
     }
