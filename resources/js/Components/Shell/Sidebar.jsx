@@ -79,15 +79,15 @@ export default function Sidebar() {
   return (
     <aside
       className={[
-        "flex shrink-0 flex-col border-r border-slate-200 bg-gradient-to-b from-sky-50 to-white py-4 transition-all duration-200",
-        isCollapsed ? "w-[84px] px-2.5" : "w-[250px] px-4",
+        "flex shrink-0 flex-col rounded-3xl border-r border-sky-200 bg-gradient-to-b from-sky-50 to-white py-4 transition-all duration-200",
+        isCollapsed ? "w-[60px] px-2.5" : "w-[220px] px-4",
       ].join(" ")}
     >
       <header
         className={[
-          "rounded-2xl border border-slate-200 bg-white shadow-sm",
+          "shadow-xs",
           isCollapsed
-            ? "flex flex-col items-center gap-2 px-2 py-2.5"
+            ? "flex flex-col items-center gap-2  py-2.5"
             : "flex items-center justify-between gap-3 px-3 py-3",
         ].join(" ")}
       >
@@ -136,31 +136,40 @@ export default function Sidebar() {
           const Icon = item.icon;
 
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              title={isCollapsed ? item.label : undefined}
+          <Link
+            key={item.href}
+            href={item.href}
+            title={isCollapsed ? item.label : undefined}
+            className={[
+              "group relative flex items-center transition",
+              isCollapsed
+                ? "justify-center rounded-2xl px-2 py-2"
+                : "gap-3 rounded-xl px-2.5 py-2",
+              active
+                ? "bg-sky-100 text-sky-900 shadow-sm ring-1 ring-sky-200"
+                : "text-slate-700 hover:bg-slate-100/80 hover:text-slate-900",
+            ].join(" ")}
+          >
+            <span
               className={[
-                "group relative flex items-center rounded-xl px-2.5 py-2 transition",
-                isCollapsed ? "justify-center" : "gap-3",
+                "inline-flex items-center justify-center transition",
+                isCollapsed ? "h-7 w-7 rounded-xl" : "h-8 w-8 rounded-lg",
                 active
-                  ? "bg-sky-100 text-sky-900 shadow-sm ring-1 ring-sky-200"
-                  : "text-slate-700 hover:bg-slate-100/80 hover:text-slate-900",
+                  ? "bg-white text-sky-700"
+                  : "bg-slate-100 text-slate-500 group-hover:bg-white",
               ].join(" ")}
             >
-              <span
-                className={[
-                  "inline-flex h-8 w-8 items-center justify-center rounded-lg transition",
-                  active ? "bg-white text-sky-700" : "bg-slate-100 text-slate-500 group-hover:bg-white",
-                ].join(" ")}
-              >
-                <Icon className="text-sm" />
-              </span>
+              <Icon className={isCollapsed ? "text-xs" : "text-sm"} />
+            </span>
 
-              {!isCollapsed ? <span className="truncate text-[13px] font-medium">{item.label}</span> : null}
+            {!isCollapsed ? (
+              <span className="truncate text-[13px] font-medium">{item.label}</span>
+            ) : null}
 
-              {!isCollapsed && active ? <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sky-500" /> : null}
-            </Link>
+            {!isCollapsed && active ? (
+              <span className="ml-auto h-1.5 w-1.5 rounded-full bg-sky-500" />
+            ) : null}
+          </Link>
           );
         })}
       </nav>

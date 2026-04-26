@@ -199,15 +199,15 @@ class ProgressController extends Controller
             })
             ->select(
                 'practices.material_id',
-                'practices.difficulty_level',
+                'practices.level',
                 DB::raw('MAX(practice_attempts.final_score) as best_score')
             )
-            ->groupBy('practices.material_id', 'practices.difficulty_level')
+            ->groupBy('practices.material_id', 'practices.level')
             ->get();
 
         $practiceMap = [];
         foreach ($practiceScores as $row) {
-            $practiceMap[$row->material_id][$row->difficulty_level] = (int) $row->best_score;
+            $practiceMap[$row->material_id][$row->level] = (int) $row->best_score;
         }
 
         $quizScores = DB::table('quiz_attempt_material_scores')

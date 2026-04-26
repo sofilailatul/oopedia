@@ -3,8 +3,7 @@ import AppLayout from "@/Layouts/AppLayout";
 import { Link } from "@inertiajs/react";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
-import { QUESTION_TYPE } from "@/Features/practice/constants";
-import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
+import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from "@/Features/practice/core";
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
@@ -39,31 +38,14 @@ export default function ManagePracticesShow({
 			backHref={route(backRoute)}
 			backLabel="Kembali ke daftar latihan"
 		>
-			<div className="mx-auto max-w-6xl space-y-6">
+			<div className="mx-auto  space-y-3">
 				{/* Header */}
-				<div className="rounded-3xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
-					<div className="flex flex-wrap items-start justify-between gap-4">
+
+					<div className="flex flex-wrap items-start justify-between gap-4 px-3 py-2">
 						<div className="space-y-1">
-							<p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-								Detail Latihan Soal
-							</p>
 							<h1 className="text-lg font-semibold tracking-tight text-slate-900">
 								{practice?.material?.name ?? "Nama materi belum diatur"}
 							</h1>
-							<p className="text-xs text-slate-500">
-								Level {difficultyLabel(practice?.difficulty_level) ?? "-"}
-								{teacher?.name && (
-									<>
-										{" "}&bull; Pengampu {" "}
-										<span className="font-medium text-slate-800">{teacher.name}</span>
-									</>
-								)}
-								{questions?.length > 0 && (
-									<>
-										{" "}&bull; {questions.length} soal
-									</>
-								)}
-							</p>
 						</div>
 						<Button
 							as={Link}
@@ -76,36 +58,27 @@ export default function ManagePracticesShow({
 							Edit Latihan & Soal
 						</Button>
 					</div>
-				</div>
 
 				{/* Meta & Filter */}
-				<Card className="rounded-3xl border border-slate-200/80 bg-slate-50/70 p-5 shadow-sm">
-					<div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-						<div>
-							<h3 className="text-sm font-semibold text-slate-800">Pengaturan Latihan & Filter Soal</h3>
-							<p className="text-[11px] text-slate-500">
-								Pilih tipe soal yang ingin ditampilkan untuk review.
-							</p>
-						</div>
-					</div>
-					<PracticeMetaPanel
-						teacherName={teacher?.name ?? "Dosen"}
-						materialName={practice?.material?.name ?? "Pilih Materi"}
-						levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
-						enableTypeSelect
-						selectedType={typeFilter}
-						onTypeChange={setTypeFilter}
-						typeOptions={[
-							{ value: "all", label: "Semua tipe soal" },
-							{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
-							{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
-						]}
-					/>
-				</Card>
+				<PracticeMetaPanel
+					teacherName={teacher?.name ?? "Dosen"}
+					materialName={practice?.material?.name ?? "Pilih Materi"}
+					levelLabel={difficultyLabel(practice?.level) ?? "Pilih Level"}
+					enableTypeSelect
+					selectedType={typeFilter}
+					onTypeChange={setTypeFilter}
+					typeOptions={[
+						{ value: "all", label: "Semua tipe soal" },
+						{ value: QUESTION_TYPE.MC, label: questionTypeLabel(QUESTION_TYPE.MC) },
+						{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
+					]}
+				/>
 
 				<section className="space-y-4">
 					{filteredQuestions.length === 0 ? (
-						<p className="text-sm text-slate-500">Belum ada soal untuk ditampilkan.</p>
+						<div className="flex min-h-[60vh] items-center justify-center">
+							<p className="text-sm text-slate-500 text-center">Belum ada soal untuk ditampilkan.</p>
+						</div>
 					) : (
 						filteredQuestions.map((q, idx) => (
 							<div

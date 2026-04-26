@@ -4,8 +4,7 @@ import { router } from "@inertiajs/react";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
 import { usePopup } from "@/Components/PopUp/PopUpProvider";
-import { QUESTION_TYPE } from "@/Features/practice/constants";
-import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
+import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from "@/Features/practice/core";
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
@@ -18,7 +17,8 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
 		id: null,
 		question_text: "",
-		sub_topic: "",
+		subtopic_id: null,
+		sub_topic_name: "",
 		points: 10,
 		feedbackCorrect: "Jawaban kamu benar.",
 		feedbackIncorrect: "",
@@ -45,12 +45,13 @@ function normalizeInitialQuestions(initial = []) {
 		return {
 			...base,
 			...q,
-			sub_topic: q.sub_topic ?? q.subTopic ?? base.sub_topic,
+			subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? null,
+			sub_topic_name: q.sub_topic_name ?? q.sub_topic ?? q.subTopic ?? "",
 			type: q.type ?? base.type,
 			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
 			feedbackIncorrect:
 				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
-			outputCode: q.output_code ?? q.outputCode ?? base.outputCode,
+			outputCode: q.code_snippet ?? q.outputCode ?? base.outputCode,
 			imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
 			options:
 				Array.isArray(q.options) && q.options.length
@@ -65,7 +66,7 @@ function normalizeInitialQuestions(initial = []) {
 	});
 }
 
-export default function ManagePracticesCreate({ practice, teacher, questions: initialQuestions = [], authUser }) {
+export default function ManagePracticesCreate({ practice, teacher, questions: initialQuestions = [], subtopics = [], authUser }) {
 	const backHandlerRef = React.useRef(null);
 	const role = (authUser?.role || "").toLowerCase();
 	const isSuperadmin = role === "superadmin";
@@ -91,6 +92,7 @@ export default function ManagePracticesCreate({ practice, teacher, questions: in
 				practice={practice}
 				teacher={teacher}
 				initialQuestions={initialQuestions}
+				subtopics={subtopics}
 				registerBackHandler={registerBackHandler}
 				authUser={authUser}
 			/>
@@ -102,6 +104,7 @@ function CreatePracticeContent({
 	practice,
 	teacher,
 	initialQuestions = [],
+	subtopics = [],
 	registerBackHandler,
 	authUser,
 }) {
@@ -130,7 +133,7 @@ function CreatePracticeContent({
 
 		return (questions ?? []).some((q) => {
 			const questionText = String(q.question_text ?? "").trim();
-			const subTopic = String(q.sub_topic ?? "").trim();
+			const subTopic = q.subtopic_id ?? null;
 			const outputCode = String(q.outputCode ?? "").trim();
 			const feedbackIncorrect = String(q.feedbackIncorrect ?? "").trim();
 			const feedbackCorrect = String(q.feedbackCorrect ?? "").trim();
@@ -145,7 +148,7 @@ function CreatePracticeContent({
 
 			return (
 				questionText.length > 0 ||
-				subTopic.length > 0 ||
+				subTopic !== null ||
 				outputCode.length > 0 ||
 				feedbackIncorrect.length > 0 ||
 				hasNonDefaultCorrectFeedback ||
@@ -271,9 +274,9 @@ function CreatePracticeContent({
 			formData.append(`questions[${index}][id]`, q.id ?? "");
 			formData.append(`questions[${index}][type]`, q.type ?? QUESTION_TYPE.MC);
 			formData.append(`questions[${index}][question_text]`, q.question_text ?? "");
-			formData.append(`questions[${index}][sub_topic]`, q.sub_topic ?? "");
+			formData.append(`questions[${index}][subtopic_id]`, q.subtopic_id ?? "");
 			formData.append(`questions[${index}][points]`, q.points ?? "");
-			formData.append(`questions[${index}][output_code]`, q.outputCode ?? "");
+			formData.append(`questions[${index}][code_snippet]`, q.outputCode ?? "");
 			formData.append(`questions[${index}][feedback_correct]`, q.feedbackCorrect ?? "");
 			formData.append(
 				`questions[${index}][feedback_incorrect]`,
@@ -293,6 +296,10 @@ function CreatePracticeContent({
 
 			if (q.imageFile) {
 				formData.append(`questions[${index}][image]`, q.imageFile);
+			}
+
+			if (q.remove_image) {
+				formData.append(`questions[${index}][remove_image]`, "1");
 			}
 		});
 
@@ -334,7 +341,8 @@ function CreatePracticeContent({
 					? {
 							...q,
 							imageFile: file || null,
-							imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
+							imageUrl: file ? URL.createObjectURL(file) : null,
+							remove_image: !file,
 						}
 					: q,
 				),
@@ -347,7 +355,7 @@ function CreatePracticeContent({
 				<PracticeMetaPanel
 					teacherName={teacher?.name ?? "Dosen"}
 					materialName={practice?.material?.name ?? "Pilih Materi"}
-					levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
+					levelLabel={difficultyLabel(practice?.level) ?? "Pilih Level"}
 					enableTypeSelect
 					selectedType={selectedType}
 					onTypeChange={setSelectedType}
@@ -417,6 +425,7 @@ function CreatePracticeContent({
 							<DragDropQuestionForm
 								question={q}
 								questionIndex={idx}
+								subtopicOptions={subtopics}
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onAddCodeBlock={handleAddCodeBlock}
@@ -427,6 +436,7 @@ function CreatePracticeContent({
 							<MultipleChoiceQuestionForm
 								question={q}
 								questionIndex={idx}
+								subtopicOptions={subtopics}
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onSetCorrectOption={setCorrectOption}

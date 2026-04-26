@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
-import { FaChevronDown, FaUser, FaSignOutAlt, FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaChevronDown, FaUser, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 
 function useOutsideClick(ref, handler) {
   useEffect(() => {
@@ -45,95 +45,108 @@ export default function Navbar({
   const showBack = !!backHref || typeof onBackClick === "function";
 
   return (
-    <div>
-      <div className="flex  items-center justify-between px-[30px] py-[7px] relative z-20 bg-[#224172] rounded-[15px] border border-solid border-[#224172] text-white shadow">
-        <div className="flex items-center gap-3">
-          {showBack && (
-            backHref ? (
-              <Link
-                href={backHref}
-                onClick={onBackClick}
-                aria-label={backLabel}
-                title={backLabel}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-sm text-white/90 transition hover:bg-white/10"
-              >
-                <FaArrowLeft aria-hidden="true" className="text-[14px]" />
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={onBackClick}
-                aria-label={backLabel}
-                title={backLabel}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-sm text-white/90 transition hover:bg-white/10"
-              >
-                <FaArrowLeft aria-hidden="true" className="text-[14px]" />
-              </button>
-            )
-          )}
-
-          <h1 className="text-l tracking-[0] leading-[normal] font-semibold text-white">{title}</h1>
-        </div>
-
-        {/* Right */}
-        <div className="flex items-center gap-5">
-          <div className="relative" ref={menuRef}>
+<div className="relative">
+  {/* Outer shell */}
+    {/* Inner glass bar */}
+    <div className="relative z-20 flex items-center justify-between rounded-full border border-sky-200 bg-sky-50 px-5 py-3 text-slate-800 shadow-[0_10px_30px_rgba(148,163,184,0.12)] backdrop-blur-xl">
+      
+      {/* LEFT */}
+      <div className="flex items-center gap-3">
+        {showBack && (
+          backHref ? (
+            <Link
+              href={backHref}
+              onClick={onBackClick}
+              aria-label={backLabel}
+              title={backLabel}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/70 text-slate-600 transition hover:bg-white"
+            >
+              <FaArrowLeft aria-hidden="true" className="text-[14px]" />
+            </Link>
+          ) : (
             <button
               type="button"
-              onClick={() => setOpen((v) => !v)}
-              className="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-white/10"
+              onClick={onBackClick}
+              aria-label={backLabel}
+              title={backLabel}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/70 text-slate-600 transition hover:bg-white"
             >
-              <img
-                src={avatar}
-                alt="avatar"
-                className="h-8 w-8 rounded-full object-cover"
-              />
-
-              <div className="text-left leading-tight">
-                <div className="text-[13px] font-medium">{nama}</div>
-              </div>
-
-              <FaChevronDown
-                className={`text-sm opacity-80 transition ${
-                  open ? "rotate-180" : ""
-                }`}
-              />
+              <FaArrowLeft aria-hidden="true" className="text-[14px]" />
             </button>
+          )
+        )}
 
-            {open && (
-              <div className="absolute right-0 mt-3 w-56 overflow-hidden rounded-lg bg-white text-gray-900 shadow-lg ring-1 ring-black/5 z-30">
-                <div className="px-4 py-3">
-                  {/* ✅ ganti {nama} jadi {name} */}
-                  <div className="text-[14px] font-medium">{nama}</div>
-                  <div className="text-xs text-gray-500 capitalize">{role}</div>
-                </div>
+        <div>
+          <h1 className="text-[17px] ml-2 font-semibold tracking-tight text-slate-700">
+            {title}
+          </h1>
+        </div>
+      </div>
 
-                <div className="h-px bg-gray-100" />
+      {/* RIGHT */}
+      <div className="flex items-center gap-4">
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center gap-3 rounded-full border border-slate-200/80 bg-white/75 px-3 py-2 transition hover:bg-white"
+          >
+            {/* Ganti foto jadi icon */}
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+              <FaUserCircle className="text-[22px]" />
+            </div>
 
-                <div className="p-2">
-                  <Link
-                    href="/profile"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
-                  >
-                    <FaUser />
-                    Profile
-                  </Link>
+            <div className="text-left leading-tight">
+              <div className="text-[13px] font-medium text-slate-800">{nama}</div>
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={logout}
-                    className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-gray-100"
-                  >
-                    <FaSignOutAlt />
-                    Logout
-                  </button>
+            <FaChevronDown
+              className={`text-sm text-slate-500 transition ${
+                open ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {open && (
+            <div className="absolute right-0 z-30 mt-3 w-56 overflow-hidden rounded-2xl border border-white/60 bg-white/90 text-gray-900 shadow-xl backdrop-blur-xl">
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-sky-100">
+                    <FaUserCircle className="text-[22px]" />
+                  </div>
+                  <div>
+                    <div className="text-[14px] font-medium">{nama}</div>
+                    <div className="text-xs capitalize text-gray-500">{role}</div>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="p-2">
+                <Link
+                  href="/profile"
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition hover:bg-sky-50"
+                >
+                  <FaUser />
+                  Profile
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm transition hover:bg-sky-50"
+                >
+                  <FaSignOutAlt />
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
+  </div>
   );
 }

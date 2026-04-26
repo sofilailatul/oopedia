@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { router } from "@inertiajs/react";
 import AppLayout from "@/Layouts/AppLayout";
 import Button from "@/Components/Button";
 import Icons from "@/icons";
 import axios from "axios";
 
-// ─── Reading progress bar (sticky top) ───────────────────────────────────────
+// ─── Reading progress bar ─────────────────────────────────────────────────────
 function ReadingProgressBar() {
   const [pct, setPct] = useState(0);
 
@@ -16,13 +16,14 @@ function ReadingProgressBar() {
       setPct(docH > 0 ? Math.min((scrollTop / docH) * 100, 100) : 0);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-transparent pointer-events-none">
+    <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-transparent pointer-events-none">
       <div
-        className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-100"
+        className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 transition-all duration-150"
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -34,80 +35,94 @@ function SuccessModal({ progressData, onNext, onBack }) {
   const hasPractice = progressData.has_practice;
   const hasNext =
     progressData.next_step === "practice" ||
-    (progressData.next_step === "completed" && progressData.next_unlocked_material_id);
+    (progressData.next_step === "completed" &&
+      progressData.next_unlocked_material_id);
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in duration-300">
-        {/* Top gradient accent */}
-        <div className="h-1.5 bg-gradient-to-r from-emerald-400 to-teal-400" />
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="h-1.5 bg-gradient-to-r from-emerald-400 to-teal-500" />
         <div className="p-7">
-          {/* Icon */}
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center">
-              <Icons.CheckCircle className="w-8 h-8 text-emerald-500" />
-            </div>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50">
+            <Icons.CheckCircle className="h-8 w-8 text-emerald-500" />
           </div>
 
-          <h3 className="text-lg font-extrabold text-slate-900 text-center tracking-tight">
-            Materi Selesai! 🎉
+          <h3 className="text-center text-lg font-extrabold tracking-tight text-slate-900">
+            Materi selesai 🎉
           </h3>
-          <p className="text-sm text-slate-500 text-center mt-1 leading-relaxed">
-            {progressData.message || "Kamu sudah menyelesaikan membaca materi ini."}
+          <p className="mt-2 text-center text-xs leading-relaxed text-slate-500">
+            {progressData.message ||
+              "Kamu sudah menyelesaikan membaca materi ini."}
           </p>
 
-          {/* Progress checklist */}
-          <div className="mt-5 space-y-2 bg-slate-50 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-sm">
+          <div className="mt-5 space-y-3 rounded-2xl bg-slate-50 p-4">
+              <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-2 font-medium text-slate-700">
-                <Icons.Materials className="w-4 h-4 text-slate-400" />
+                <Icons.Materials className="h-4 w-4 text-slate-400" />
                 Baca Materi
               </span>
-              <span className="text-emerald-600 font-bold text-xs flex items-center gap-1">
-                <Icons.Check className="w-3.5 h-3.5" /> Selesai
+                <span className="flex items-center text-emerald-600" aria-label="Baca materi tuntas">
+                  <Icons.Check className="h-4 w-4" />
               </span>
             </div>
-            <div className="flex items-center justify-between text-sm">
+
+            <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-2 font-medium text-slate-700">
-                <Icons.Practice className="w-4 h-4 text-slate-400" />
+                <Icons.Practice className="h-4 w-4 text-slate-400" />
                 Latihan Soal
               </span>
               <span
-                className={`font-bold text-xs flex items-center gap-1 ${
+                className={`flex items-center ${
                   !hasPractice
                     ? "text-slate-400"
                     : progressData.practice_done
                       ? "text-emerald-600"
                       : "text-amber-500"
                 }`}
+                aria-label={
+                  !hasPractice
+                    ? "Latihan soal tidak tersedia"
+                    : progressData.practice_done
+                      ? "Latihan soal tuntas"
+                      : "Latihan soal proses"
+                }
               >
                 {!hasPractice
-                  ? "Belum tersedia"
+                  ? <Icons.Lock className="h-4 w-4" />
                   : progressData.practice_done
-                    ? (<><Icons.Check className="w-3.5 h-3.5" /> Selesai</>)
-                    : "Belum"}
+                    ? <Icons.Check className="h-4 w-4" />
+                    : <Icons.Clock className="h-4 w-4" />}
               </span>
             </div>
           </div>
 
           {progressData.quiz_available && (
-            <p className="mt-3 text-[11px] text-slate-400 text-center">
-              💡 Ada quiz tersedia setelah kamu selesai latihan soal
+            <p className="mt-3 text-center text-[10px] text-slate-400">
+              Quiz tersedia setelah latihan soal selesai
             </p>
           )}
 
-          {/* Actions */}
           <div className="mt-6 flex flex-col gap-2">
             {hasNext && (
-              <Button onClick={onNext} color="gray" size="sm" className="w-full">
+              <Button
+                onClick={onNext}
+                color="gray"
+                size="sm"
+                className="w-full"
+              >
                 {progressData.next_step === "practice"
-                  ? "Lanjut ke Latihan Soal →"
-                  : "Lanjut Materi Berikutnya →"}
+                  ? "Lanjut ke Latihan Soal"
+                  : "Lanjut Materi Berikutnya"}
               </Button>
             )}
-            <Button onClick={onBack} variant="outline" color="gray" size="sm" className="w-full">
-              Kembali ke Daftar Materi
+            <Button
+              onClick={onBack}
+              variant="outline"
+              color="gray"
+              size="sm"
+              className="w-full"
+            >
+              Kembali ke daftar materi
             </Button>
           </div>
         </div>
@@ -116,58 +131,169 @@ function SuccessModal({ progressData, onNext, onBack }) {
   );
 }
 
-// ─── Section Content Block ────────────────────────────────────────────────────
-function ContentBlock({ content, index }) {
+// ─── Small helper blocks ──────────────────────────────────────────────────────
+function InfoPill({ children }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-      {/* Section label */}
-      {content.title && (
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
-          <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-            <span className="text-[10px] font-extrabold text-indigo-600">{String(index + 1).padStart(2, "0")}</span>
-          </div>
-          <h2 className="text-sm font-bold text-slate-900 tracking-tight">{content.title}</h2>
-        </div>
-      )}
+    <span className="inline-flex items-center rounded-full bg-white/80 px-3 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
+      {children}
+    </span>
+  );
+}
 
-      <div className="px-6 py-5">
-        {/* Image */}
-        {content.image_path && (
-          <div className="mb-5 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex justify-center">
-            <img
-              src={
-                content.image_path.startsWith('http') 
-                  ? content.image_path 
-                  : (content.image_path.startsWith('/storage/') 
-                      ? content.image_path 
-                      : `/storage/${content.image_path}`)
-              }
-              alt={content.title || "Gambar materi"}
-              className="w-full max-h-96 object-contain"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.style.display = 'none';
-                console.error("Gagal memuat gambar:", e.target.src);
+function InsightCard({ title = "Ingat ini", children, tone = "blue" }) {
+  const tones = {
+    blue: "bg-sky-50 border-sky-100 text-sky-900",
+    amber: "bg-amber-50 border-amber-100 text-amber-900",
+    emerald: "bg-emerald-50 border-emerald-100 text-emerald-900",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <div className="mb-2 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80">
+          <Icons.CheckCircle className="h-4 w-4" />
+        </div>
+        <h3 className="text-xs font-bold">{title}</h3>
+      </div>
+      <div className="text-xs leading-6 text-slate-700">{children}</div>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100">
+        <Icons.Materials className="h-7 w-7 text-slate-300" />
+      </div>
+      <p className="text-xs font-bold text-slate-600">Konten belum tersedia</p>
+      <p className="mt-1 text-[10px] text-slate-400">
+        Dosen belum menambahkan konten untuk materi ini
+      </p>
+    </div>
+  );
+}
+
+// ─── Sticky section nav ───────────────────────────────────────────────────────
+function SectionNav({ contents, activeId, onSelectSection }) {
+  if (!contents?.length) return null;
+
+  return (
+    <div className="sticky top-3 z-30 rounded-2xl border border-slate-200 bg-white/85 p-2 shadow-sm backdrop-blur">
+      <div className="flex w-full justify-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+        {contents.map((content, i) => {
+          const id = `section-${content.id}`;
+          const active = activeId === id;
+
+          return (
+            <a
+              key={content.id}
+              href={`#${id}`}
+              onClick={(e) => {
+                e.preventDefault();
+                onSelectSection?.(id);
               }}
-            />
-          </div>
-        )}
-
-        {/* Plain text content */}
-        <div className="space-y-2">
-          {(content.content_text ?? "")
-            .split("\n")
-            .filter((line) => line.trim() !== "")
-            .map((line, i) => (
-              <p key={i} className="text-[11px] text-slate-600 leading-relaxed">
-                {line}
-              </p>
-            ))}
-        </div>
+              className={`whitespace-nowrap rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                active
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {content.title || `Bagian ${i + 1}`}
+            </a>
+          );
+        })}
       </div>
     </div>
   );
 }
+
+// ─── Section block ────────────────────────────────────────────────────────────
+function ContentBlock({ content, index }) {
+  const sectionId = `section-${content.id}`;
+  const variant = index % 3;
+
+  return (
+    <section
+      id={sectionId}
+      className="scroll-mt-28 rounded-3xl border border-slate-200 bg-white shadow-sm"
+    >
+      <div className="border-b border-slate-100 px-4 py-4 sm:px-8">
+        <div className="flex items-center gap-4">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <span className="text-xs font-extrabold text-slate-600">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold tracking-tight text-slate-900">
+              {content.title || `Bagian ${index + 1}`}
+            </h2>
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-6 sm:px-8">
+        {content.image_path ? (
+          <div
+            className={`grid gap-4 ${
+              variant === 1 ? "lg:grid-cols-[1.15fr_0.85fr]" : "lg:grid-cols-[0.9fr_1.1fr]"
+            }`}
+          >
+            <div className={variant === 1 ? "lg:order-2" : ""}>
+              <div className="space-y-4">
+                {(content.content_text ?? "")
+                  .split("\n")
+                  .filter((line) => line.trim() !== "")
+                  .map((line, i) => (
+                    <p key={i} className="text-xs leading-6 text-slate-700">
+                      {line}
+                    </p>
+                  ))}
+              </div>
+            </div>
+
+            <div className={variant === 1 ? "lg:order-1" : ""}>
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <img
+                  src={
+                    content.image_path.startsWith("http")
+                      ? content.image_path
+                      : content.image_path.startsWith("/storage/")
+                        ? content.image_path
+                        : `/storage/${content.image_path}`
+                  }
+                  alt={content.title || "Gambar materi"}
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = "none";
+                  }}
+                />
+              </div>
+              <p className="mt-3 text-xs text-slate-400">
+                Ilustrasi pendukung untuk membantu memahami materi.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {(content.content_text ?? "")
+              .split("\n")
+              .filter((line) => line.trim() !== "")
+              .map((line, i) => (
+                <p key={i} className="text-xs leading-5 text-slate-700">
+                  {line}
+                </p>
+              ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Show({ material }) {
@@ -176,43 +302,101 @@ export default function Show({ material }) {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [progressData, setProgressData] = useState(null);
   const [error, setError] = useState(null);
-  const scrollTimeoutRef = useRef(null);
+  const [activeSection, setActiveSection] = useState(null);
+  const [selectedSection, setSelectedSection] = useState(null);
 
+  const scrollTimeoutRef = useRef(null);
   const progress = material.progress ?? {};
   const alreadyRead = progress.read_at != null;
 
-  // ── Scroll detection ──────────────────────────────────────────────────────
+  const totalSections = material.contents?.length ?? 0;
+  const selectedContent = useMemo(() => {
+    if (!material.contents?.length) return null;
+
+    if (selectedSection) {
+      return material.contents.find((content) => `section-${content.id}` === selectedSection) ?? material.contents[0];
+    }
+
+    return material.contents[0];
+  }, [material.contents, selectedSection]);
+
   useEffect(() => {
-    if (alreadyRead) { setHasReachedBottom(true); return; }
+    if (alreadyRead) {
+      setHasReachedBottom(true);
+      return;
+    }
 
     const handleScroll = () => {
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
       scrollTimeoutRef.current = setTimeout(() => {
         const isAtBottom =
-          window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 100;
+          window.scrollY + window.innerHeight >=
+          document.documentElement.scrollHeight - 100;
+
         if (isAtBottom && !hasReachedBottom) setHasReachedBottom(true);
-      }, 300);
+      }, 200);
     };
 
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
+
     return () => {
       window.removeEventListener("scroll", handleScroll);
       if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     };
   }, [hasReachedBottom, alreadyRead]);
 
-  // ── Finish reading ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!material.contents?.length) return;
+
+    if (!selectedSection) {
+      setSelectedSection(`section-${material.contents[0].id}`);
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+
+        if (visible?.target?.id) {
+          setActiveSection(visible.target.id);
+        }
+      },
+      {
+        rootMargin: "-20% 0px -60% 0px",
+        threshold: [0.2, 0.4, 0.7],
+      }
+    );
+
+    material.contents.forEach((content) => {
+      const el = document.getElementById(`section-${content.id}`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [material.contents, selectedSection]);
+
   const handleFinishReading = async () => {
     if (isSubmitting) return;
+
     setIsSubmitting(true);
     setError(null);
+
     try {
       const res = await axios.post(
         `/materi/${material.id}/finish-read`,
         {},
-        { headers: { Accept: "application/json", "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" }, timeout: 10000 }
+        {
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+          },
+          timeout: 10000,
+        }
       );
+
       if (res.data?.success) {
         setProgressData(res.data.data);
         setShowSuccessModal(true);
@@ -221,9 +405,13 @@ export default function Show({ material }) {
         throw new Error(res.data?.message || "Gagal menyimpan progress");
       }
     } catch (err) {
-      const msg = err.response?.data?.message
-        ?? (err.request ? "Tidak dapat terhubung ke server." : err.message)
-        ?? "Terjadi kesalahan";
+      const msg =
+        err.response?.data?.message ??
+        (err.request
+          ? "Tidak dapat terhubung ke server."
+          : err.message) ??
+        "Terjadi kesalahan";
+
       setError(msg);
       setTimeout(() => setError(null), 5000);
     } finally {
@@ -233,152 +421,178 @@ export default function Show({ material }) {
 
   const handleNavigateNext = () => {
     if (!progressData) return;
-    if (progressData.next_step === "practice") { router.visit("/daftar-latihan-soal"); return; }
-    if (progressData.next_step === "quiz") { router.visit("/quizzes"); return; }
-    if (progressData.next_step === "completed" && progressData.next_unlocked_material_id) {
-      router.visit(`/materi/${progressData.next_unlocked_material_id}`); return;
+
+    if (progressData.next_step === "practice") {
+      router.visit("/daftar-latihan-soal");
+      return;
     }
+
+    if (progressData.next_step === "quiz") {
+      router.visit("/quizzes");
+      return;
+    }
+
+    if (
+      progressData.next_step === "completed" &&
+      progressData.next_unlocked_material_id
+    ) {
+      router.visit(`/materi/${progressData.next_unlocked_material_id}`);
+      return;
+    }
+
     router.visit("/materi");
   };
 
   return (
     <AppLayout
-      title="Materi"
+      title="Membaca Materi"
       label={material.material_name}
       backHref="/materi"
       backLabel="Daftar Materi"
     >
-      {/* Sticky reading progress */}
       <ReadingProgressBar />
 
-      <div className=" mx-auto px-2 py-6 space-y-4">
+      <div className="py-6 sm:px-4 lg:px-6">
+        <div className="space-y-5">
+          {/* Header */}
+          <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-sky-50 shadow-sm">
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    {material.order_number && (
+                      <InfoPill>
+                        Materi {String(material.order_number).padStart(2, "0")}
+                      </InfoPill>
+                    )}
 
-        {/* ── Material Header ───────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-          {/* Gradient accent top */}
-          <div className="h-1 bg-gradient-to-r from-indigo-500 to-violet-500" />
+                    <InfoPill>{totalSections} bagian</InfoPill>
 
-          <div className="p-6">
-            {/* Meta chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              {material.order_number && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  Materi #{String(material.order_number).padStart(2, "0")}
-                </span>
-              )}
-              {alreadyRead ? (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-bold uppercase tracking-widest border border-emerald-200">
-                  <Icons.CheckCircle className="w-3 h-3" /> Sudah Dibaca
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-bold uppercase tracking-widest border border-amber-200">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  Sedang Membaca
-                </span>
-              )}
-            </div>
-
-            {/* Title */}
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">
-              {material.material_name}
-            </h1>
-
-            {/* Description */}
-            {material.description && (
-              <p className="text-[12px] text-slate-500 mt-2 leading-relaxed">{material.description}</p>
-            )}
-
-            {/* Author + read date */}
-            <div className="flex flex-wrap items-center gap-3 mt-4">
-              {material.author && (
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                    <Icons.User className="w-3.5 h-3.5 text-slate-400" />
+                    {alreadyRead ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-600 ring-1 ring-emerald-200">
+                        <Icons.CheckCircle className="h-3.5 w-3.5" />
+                        Sudah dipelajari
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-600 ring-1 ring-amber-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        Sedang dibaca
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs text-slate-500 font-medium">{material.author}</span>
+
+                  <h1 className="max-w-4xl text-xl font-black tracking-tight text-slate-900 ">
+                    {material.material_name}
+                  </h1>
+
+                  {material.description && (
+                    <p className="mt-4 max-w-2xl text-[12px] leading-5 text-slate-600">
+                      {material.description}
+                    </p>
+                  )}
+
+                  <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+                    {material.author && (
+                      <span className="inline-flex items-center gap-2">
+                        <Icons.User className="h-4 w-4 text-slate-400" />
+                        {material.author}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
-              {progress.read_at && (
-                <p className="text-[11px] text-emerald-600 font-medium">
-                  ✓ Diselesaikan pada{" "}
-                  {new Date(progress.read_at).toLocaleDateString("id-ID", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </p>
-              )}
+
+                <div className="hidden shrink-0 lg:block">
+                  <div className="flex h-28 w-28 items-center justify-center rounded-[28px] bg-white shadow-sm ring-1 ring-slate-200">
+                    <Icons.Materials className="h-12 w-12 text-indigo-500" />
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          </section>
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-3.5">
+              <Icons.Error className="h-4 w-4 shrink-0 text-red-500" />
+              <p className="text-sm font-medium text-red-700">{error}</p>
+            </div>
+          )}
+
+          {/* Nav */}
+          <SectionNav
+            contents={material.contents}
+            activeId={selectedSection || activeSection}
+            onSelectSection={setSelectedSection}
+          />
+
+          {/* Content */}
+          {selectedContent ? (
+            <div className="space-y-5">
+              <ContentBlock
+                key={selectedContent.id}
+                content={selectedContent}
+                index={material.contents.findIndex((content) => content.id === selectedContent.id)}
+              />
+            </div>
+          ) : (
+            <EmptyState />
+          )}
+
+          <div className="h-24" />
         </div>
-
-        {/* ── Error toast ───────────────────────────────────────────────── */}
-        {error && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-3.5">
-            <Icons.Error className="w-4 h-4 text-red-500 shrink-0" />
-            <p className="text-sm text-red-700 font-medium">{error}</p>
-          </div>
-        )}
-
-        {/* ── Content Sections ──────────────────────────────────────────── */}
-        {material.contents && material.contents.length > 0 ? (
-          material.contents.map((content, i) => (
-            <ContentBlock key={content.id} content={content} index={i} />
-          ))
-        ) : (
-          <div className="bg-white rounded-2xl border border-slate-100 p-10 flex flex-col items-center text-center shadow-sm">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-              <Icons.Materials className="w-7 h-7 text-slate-300" />
-            </div>
-            <p className="text-sm font-bold text-slate-500">Konten belum tersedia</p>
-            <p className="text-xs text-slate-400 mt-1">Dosen belum menambahkan konten untuk materi ini</p>
-          </div>
-        )}
-
-        {/* bottom spacer so FAB doesn't overlap last content */}
-        <div className="h-20" />
       </div>
 
-      {/* ── Floating Action Button ─────────────────────────────────────── */}
+      {/* Floating CTA */}
       {hasReachedBottom && !alreadyRead && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
+        <div className="fixed bottom-7 left-1/2 z-40 -translate-x-1/2">
           <button
             onClick={handleFinishReading}
             disabled={isSubmitting}
-            className={`
-              inline-flex items-center gap-2.5 px-6 py-3.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/30
-              transition-all duration-300 hover:scale-105 active:scale-95
-              ${isSubmitting
-                ? "bg-slate-200 text-slate-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-emerald-500/40 hover:shadow-xl"
-              }
-            `}
+            className={`inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 text-xs font-bold shadow-lg transition-all duration-300 ${
+              isSubmitting
+                ? "cursor-not-allowed bg-slate-200 text-slate-400"
+                : "bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-emerald-500/25 hover:-translate-y-0.5 hover:shadow-xl"
+            }`}
           >
             {isSubmitting ? (
               <>
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
                 </svg>
                 Menyimpan...
               </>
             ) : (
               <>
-                <Icons.Check className="w-4 h-4" />
-                Selesai Membaca
+                <Icons.Check className="h-4 w-4" />
+                Selesai membaca
               </>
             )}
           </button>
         </div>
       )}
 
-      {/* ── Success Modal ──────────────────────────────────────────────── */}
+      {/* Success modal */}
       {showSuccessModal && progressData && (
         <SuccessModal
           progressData={progressData}
           onNext={handleNavigateNext}
-          onBack={() => { setShowSuccessModal(false); router.visit("/materi"); }}
+          onBack={() => {
+            setShowSuccessModal(false);
+            router.visit("/materi");
+          }}
         />
       )}
     </AppLayout>

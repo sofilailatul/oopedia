@@ -1,6 +1,6 @@
 import React from "react";
 import { useForm } from "@inertiajs/react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import AppLayout from "@/Layouts/AppLayout";
 
 export default function Edit({ user }) {
 	const { data, setData, put, processing, errors } = useForm({
@@ -16,7 +16,7 @@ export default function Edit({ user }) {
 	};
 
 	return (
-		<AdminLayout title="Edit User">
+		<AppLayout title="Edit User">
 			<div className="mb-6">
 				<h1 className="text-2xl font-bold text-slate-900">Edit User</h1>
 				<p className="mt-1 text-sm text-slate-600">Perbarui data akun pengguna.</p>
@@ -95,6 +95,6 @@ export default function Edit({ user }) {
 					</button>
 				</div>
 			</form>
-		</AdminLayout>
+		</AppLayout>
 	);
 }

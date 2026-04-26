@@ -1,18 +1,21 @@
 <?php
 
+use App\Http\Controllers\ClassController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Dosen\MaterialController as DosenMaterialController;
+use App\Http\Controllers\Dosen\PracticeController as DosenPracticeController;
+use App\Http\Controllers\Dosen\QuizController as DosenQuizController;
+use App\Http\Controllers\LeaderboardController;
+use App\Http\Controllers\Mahasiswa\MaterialController as MahasiswaMaterialController;
+use App\Http\Controllers\Mahasiswa\PracticeController as MahasiswaPracticeController;
+use App\Http\Controllers\Mahasiswa\QuizController as MahasiswaQuizController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\RecommendationController;
+use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use App\Http\Controllers\ClassController;
-use App\Http\Controllers\MaterialController;
-use App\Http\Controllers\PracticeController;
-use App\Http\Controllers\QuizController;
-use App\Http\Controllers\RecommendationController;
-use App\Http\Controllers\LeaderboardController;
-use App\Http\Controllers\ProgressController;
-use App\Http\Controllers\UserController;
-use App\Http\Controllers\DashboardController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -21,14 +24,13 @@ Route::get('/', function () {
         'laravelVersion' => Application::VERSION,
         'phpVersion' => PHP_VERSION,
     ]);
-}) ->name('welcome');
+})->name('welcome');
 
 Route::get('/ping', fn () => response()->json(['ok' => true]))->name('ping');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth'])
     ->name('dashboard');
-
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -50,9 +52,9 @@ Route::middleware('auth')->group(function () {
     | MATERI 
     |--------------------------------------------------------------------------
     */
-    Route::get('/materi', [MaterialController::class, 'IndexMahasiswa'])->name('materials.index');
-    Route::get('/materi/{material}', [MaterialController::class, 'show'])->name('materials.show');
-    Route::post('/materi/{material}/finish-read',[MaterialController::class, 'finishRead']);
+    Route::get('/materi', [MahasiswaMaterialController::class, 'IndexMahasiswa'])->name('materials.index');
+    Route::get('/materi/{material}', [MahasiswaMaterialController::class, 'show'])->name('materials.show');
+    Route::post('/materi/{material}/finish-read', [MahasiswaMaterialController::class, 'finishRead']);
     Route::get('/materi/{material}/finish-read', function () {
         abort(405, 'Finish-read hanya boleh POST');
     });
@@ -62,15 +64,15 @@ Route::middleware('auth')->group(function () {
     | PRACTICE 
     |--------------------------------------------------------------------------
     */
-    Route::get('/daftar-latihan-soal', [PracticeController::class, 'index'])
+    Route::get('/daftar-latihan-soal', [MahasiswaPracticeController::class, 'index'])
         ->name('practices.index');
-    Route::post('/latihan-soal/{practice}/attempts', [PracticeController::class, 'startAttempt'])
-        ->name('practices.attempts.start');
-    Route::get('/latihan-soal-attempts/{attempt}', [PracticeController::class, 'attemptDetail'])
-        ->name('practice_attempts.show');
-    Route::post('/latihan-soal-attempts/{attempt}/answers', [PracticeController::class, 'submitAnswers'])
-        ->name('practice_attempts.answers');
-    Route::get('/latihan-soal/{practice}/summary', [PracticeController::class, 'summary'])
+    Route::post('/latihan-soal/{material}/attempts', [MahasiswaPracticeController::class, 'entry'])
+        ->name('practices.attempts.entry');
+    Route::get('/latihan-soal-attempts/{attempt}', [MahasiswaPracticeController::class, 'attemptDetail'])
+        ->name('practices.attempts.show');
+    Route::post('/latihan-soal-attempts/{attempt}/submit', [MahasiswaPracticeController::class, 'submitAnswers'])
+        ->name('practices.attempts.submit');
+    Route::get('/latihan-soal/{practice}/summary', [MahasiswaPracticeController::class, 'summary'])
         ->name('practices.summary');
     /*
     |--------------------------------------------------------------------------
@@ -86,21 +88,21 @@ Route::middleware('auth')->group(function () {
     | MAHASISWA
     |--------------------------------------------------------------------------
     */
-    Route::middleware('auth','role:mahasiswa')->group(function () {
+    Route::middleware('role:mahasiswa')->group(function () {
 
         // PROGRESS
         Route::get('/progress', [ProgressController::class, 'myProgress'])->name('progress.me');
 
         // QUIZ
-        Route::get('/kuis', [QuizController::class, 'index'])->name('quizzes.index');
-        Route::get('/quizzes/{quiz}', [QuizController::class, 'show'])->name('quizzes.show');
-        Route::get('/quizzes/{quiz}/questions', [QuizController::class, 'questions'])->name('quizzes.questions');
-        Route::post('/quizzes/{quiz}/attempts', [QuizController::class, 'startAttempt'])->name('quizzes.attempts.start');
-        Route::get('/quiz-attempts/{attempt}', [QuizController::class, 'attemptShow'])->name('quiz_attempts.show');
-        Route::post('/quiz-attempts/{attempt}/answers', [QuizController::class, 'submitAnswers'])->name('quiz_attempts.answers');
-        Route::post('/quiz-attempts/{attempt}/check-answer', [QuizController::class, 'checkAnswer'])->name('quiz_attempts.check_answer');
-        Route::get('/quiz-attempts/{attempt}/review',[QuizController::class, 'review'])->name('quizzes.review');
-        Route::get('/quiz-attempts/{attempt}/completed', [QuizController::class, 'completed']) ->name('quiz_attempts.completed');
+        Route::get('/kuis', [MahasiswaQuizController::class, 'index'])->name('quizzes.index');
+        Route::get('/quizzes/{quiz}', [MahasiswaQuizController::class, 'show'])->name('quizzes.show');
+        Route::get('/quizzes/{quiz}/questions', [MahasiswaQuizController::class, 'questions'])->name('quizzes.questions');
+        Route::post('/quizzes/{quiz}/attempts', [MahasiswaQuizController::class, 'startAttempt'])->name('quizzes.attempts.start');
+        Route::get('/quiz-attempts/{attempt}', [MahasiswaQuizController::class, 'attemptShow'])->name('quiz_attempts.show');
+        Route::post('/quiz-attempts/{attempt}/answers', [MahasiswaQuizController::class, 'submitAnswers'])->name('quiz_attempts.answers');
+        Route::post('/quiz-attempts/{attempt}/check-answer', [MahasiswaQuizController::class, 'checkAnswer'])->name('quiz_attempts.check_answer');
+        Route::get('/quiz-attempts/{attempt}/review', [MahasiswaQuizController::class, 'review'])->name('quizzes.review');
+        Route::get('/quiz-attempts/{attempt}/completed', [MahasiswaQuizController::class, 'completed'])->name('quiz_attempts.completed');
 
         // RECOMMENDATION
         Route::get('/recommendations', [RecommendationController::class, 'myRecommendations'])->name('recommendations.me');
@@ -109,7 +111,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // LEADERBOARD (mahasiswa + dosen)
-    Route::middleware('auth', 'role:mahasiswa')->prefix('leaderboard')->name('leaderboard.')->group(function () {
+    Route::middleware('role:mahasiswa')->prefix('leaderboard')->name('leaderboard.')->group(function () {
         Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
         Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
         Route::get('/index', [LeaderboardController::class, 'combined'])->name('combined');
@@ -120,7 +122,7 @@ Route::middleware('auth')->group(function () {
     | DOSEN
     |--------------------------------------------------------------------------
     */
-    Route::middleware('auth','role:dosen')->group(function () {
+    Route::middleware('role:dosen')->group(function () {
 
         // ===== NILAI MAHASISWA (dosen) =====
         Route::get('/dosen/nilai-mahasiswa', [ProgressController::class, 'dosenClassScoresPage'])
@@ -129,75 +131,71 @@ Route::middleware('auth')->group(function () {
             ->name('dosen.grades.show');
 
         // ===== PRACTICE (dosen) =====
-        Route::get('/dosen/latihan-soal', [PracticeController::class, 'dosenIndexPage'])
+        Route::get('/dosen/latihan-soal', [DosenPracticeController::class, 'index'])
             ->name('dosen.practices.index');
-        Route::get('/dosen/latihan-soal/{practice}/show', [PracticeController::class, 'dosenShowPage'])
+        Route::get('/dosen/latihan-soal/{practice}/show', [DosenPracticeController::class, 'show'])
             ->name('dosen.practices.show');
-        Route::get('/dosen/latihan-soal/{practice}/create', [PracticeController::class, 'dosenCreatePage'])
+        Route::get('/dosen/latihan-soal/{practice}/create', [DosenPracticeController::class, 'create'])
             ->name('dosen.practices.create');
-        Route::get('/dosen/latihan-soal/{practice}', [PracticeController::class, 'dosenEditPage'])
+        Route::get('/dosen/latihan-soal/{practice}', [DosenPracticeController::class, 'edit'])
             ->name('dosen.practices.edit');
-        Route::post('/dosen/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])
+        Route::post('/dosen/latihan-soal/{practice}/questions', [DosenPracticeController::class, 'saveQuestions'])
             ->name('dosen.practices.questions.save');
 
         // ===== QUIZZES (dosen) =====
-        Route::get('/dosen/kuis', [QuizController::class, 'dosenIndexPage'])
+        Route::get('/dosen/kuis', [DosenQuizController::class, 'dosenIndexPage'])
             ->name('dosen.quizzes.index');
-        Route::get('/dosen/kuis/create', [QuizController::class, 'dosenCreatePage'])
+        Route::get('/dosen/kuis/create', [DosenQuizController::class, 'dosenCreatePage'])
             ->name('dosen.quizzes.create');
-        Route::get('/dosen/kuis/{quiz}/show', [QuizController::class, 'dosenShowPage'])
+        Route::get('/dosen/kuis/{quiz}/show', [DosenQuizController::class, 'dosenShowPage'])
             ->name('dosen.quizzes.show');
-        Route::get('/dosen/kuis/{quiz}/edit', [QuizController::class, 'dosenEditPage'])
+        Route::get('/dosen/kuis/{quiz}/edit', [DosenQuizController::class, 'dosenEditPage'])
             ->name('dosen.quizzes.edit');
-        Route::post('/dosen/kuis/{quiz}/questions', [QuizController::class, 'dosenSaveQuestions'])
+        Route::post('/dosen/kuis/{quiz}/questions', [DosenQuizController::class, 'saveQuestions'])
             ->name('dosen.quizzes.questions.save');
-        Route::post('/dosen/kuis/{quiz}/duplicate', [QuizController::class, 'duplicateToClasses'])
+        Route::post('/dosen/kuis/{quiz}/duplicate', [DosenQuizController::class, 'duplicateToClasses'])
             ->name('dosen.quizzes.duplicate');
 
         // ===== MATERI (dosen) =====
         Route::prefix('dosen/materi')->name('dosen.materials.')->group(function () {
-            Route::get('/', [MaterialController::class, 'manageIndex'])->name('index');
-            Route::put('/reorder', [MaterialController::class, 'reorderMaterials'])->name('reorder');
-            Route::get('/create', [MaterialController::class, 'manageCreate'])->name('create');
-            Route::get('/{material}/show', [MaterialController::class, 'manageShow'])->name('show');
-            Route::get('/{material}/edit', [MaterialController::class, 'manageEdit'])->name('edit');
-            Route::post('/', [MaterialController::class, 'manageStore'])->name('store');
-            Route::put('/{material}', [MaterialController::class, 'manageUpdate'])->name('update');
+            Route::get('/', [DosenMaterialController::class, 'index'])->name('index');
+            Route::put('/reorder', [DosenMaterialController::class, 'reorderMaterials'])->name('reorder');
+            Route::get('/create', [DosenMaterialController::class, 'create'])->name('create');
+            Route::get('/{material}/show', [DosenMaterialController::class, 'show'])->name('show');
+            Route::get('/{material}/edit', [DosenMaterialController::class, 'edit'])->name('edit');
+            Route::post('/', [DosenMaterialController::class, 'store'])->name('store');
+            Route::put('/{material}', [DosenMaterialController::class, 'update'])->name('update');
         });
 
         // ===== KELAS (halaman ManageClasses untuk dosen) =====
         Route::get('/dosen/kelas', [ClassController::class, 'manageIndex'])->name('dosen.classes.index');
 
         // ===== PRACTICE =====
-        Route::post('/practices', [PracticeController::class, 'store'])->name('practices.store');
-        Route::put('/practices/{practice}', [PracticeController::class, 'update'])->name('practices.update');
-        Route::delete('/practices/{practice}', [PracticeController::class, 'destroy'])->name('practices.destroy');
-
-        Route::post('/practice-questions/{question}/image', [PracticeController::class, 'uploadQuestionImage'])->name('practice_questions.image.upload');
-        Route::delete('/practice-questions/{question}/image', [PracticeController::class, 'deleteQuestionImage'])->name('practice_questions.image.delete');
+        Route::post('/practices', [DosenPracticeController::class, 'store'])->name('dosen.practices.store');
+        Route::delete('/practices/{practice}', [DosenPracticeController::class, 'destroy'])->name('dosen.practices.destroy');
 
         // ===== QUIZ =====
-        Route::post('/quizzes', [QuizController::class, 'store'])->name('quizzes.store');
-        Route::put('/quizzes/{quiz}', [QuizController::class, 'update'])->name('quizzes.update');
-        Route::delete('/quizzes/{quiz}', [QuizController::class, 'destroy'])->name('quizzes.destroy');
+        Route::post('/quizzes', [DosenQuizController::class, 'store'])->name('quizzes.store');
+        Route::put('/quizzes/{quiz}', [DosenQuizController::class, 'update'])->name('quizzes.update');
+        Route::delete('/quizzes/{quiz}', [DosenQuizController::class, 'destroy'])->name('quizzes.destroy');
 
         // bank soal quiz
-        Route::post('/quiz-questions', [QuizController::class, 'questionStore'])->name('quiz_questions.store');
-        Route::put('/quiz-questions/{question}', [QuizController::class, 'questionUpdate'])->name('quiz_questions.update');
-        Route::delete('/quiz-questions/{question}', [QuizController::class, 'questionDestroy'])->name('quiz_questions.destroy');
+        Route::post('/quiz-questions', [DosenQuizController::class, 'questionStore'])->name('quiz_questions.store');
+        Route::put('/quiz-questions/{question}', [DosenQuizController::class, 'questionUpdate'])->name('quiz_questions.update');
+        Route::delete('/quiz-questions/{question}', [DosenQuizController::class, 'questionDestroy'])->name('quiz_questions.destroy');
 
-        Route::post('/quiz-questions/{question}/image', [QuizController::class, 'uploadQuestionImage'])->name('quiz_questions.image.upload');
-        Route::delete('/quiz-questions/{question}/image', [QuizController::class, 'deleteQuestionImage'])->name('quiz_questions.image.delete');
+        Route::post('/quiz-questions/{question}/image', [DosenQuizController::class, 'uploadQuestionImage'])->name('quiz_questions.image.upload');
+        Route::delete('/quiz-questions/{question}/image', [DosenQuizController::class, 'deleteQuestionImage'])->name('quiz_questions.image.delete');
 
         // quiz map + points
-        Route::post('/quizzes/{quiz}/map', [QuizController::class, 'mapAttach'])->name('quizzes.map.attach');
-        Route::put('/quizzes/{quiz}/map/{question}', [QuizController::class, 'mapUpdate'])->name('quizzes.map.update');
-        Route::delete('/quizzes/{quiz}/map/{question}', [QuizController::class, 'mapDetach'])->name('quizzes.map.detach');
+        Route::post('/quizzes/{quiz}/map', [DosenQuizController::class, 'mapAttach'])->name('quizzes.map.attach');
+        Route::put('/quizzes/{quiz}/map/{question}', [DosenQuizController::class, 'mapUpdate'])->name('quizzes.map.update');
+        Route::delete('/quizzes/{quiz}/map/{question}', [DosenQuizController::class, 'mapDetach'])->name('quizzes.map.detach');
 
     });
 
     // API kelas (dipakai di halaman ManageClasses) untuk dosen & superadmin
-    Route::middleware('auth','role:dosen,superadmin')->group(function () {
+    Route::middleware('role:dosen,superadmin')->group(function () {
         Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
         Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
         Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
@@ -209,7 +207,7 @@ Route::middleware('auth')->group(function () {
     | SUPERADMIN (semua route admin digabung di sini)
     |--------------------------------------------------------------------------
     */
-    Route::middleware('auth','role:superadmin')->group(function () {
+    Route::middleware('role:superadmin')->group(function () {
 
 
     // Kelola User (superadmin)
@@ -231,43 +229,43 @@ Route::middleware('auth')->group(function () {
 
         // Kelola Materi (superadmin) -> gunakan halaman ManageMaterial dengan method controller yang sama dg dosen
         Route::prefix('superadmin/materials')->name('superadmin.materials.')->group(function () {
-            Route::get('/', [MaterialController::class, 'manageIndex'])->name('index');
-            Route::put('/reorder', [MaterialController::class, 'reorderMaterials'])->name('reorder');
-            Route::get('/create', [MaterialController::class, 'manageCreate'])->name('create');
-            Route::get('/{material}/show', [MaterialController::class, 'manageShow'])->name('show');
-            Route::get('/{material}/edit', [MaterialController::class, 'manageEdit'])->name('edit');
-            Route::post('/', [MaterialController::class, 'manageStore'])->name('store');
-            Route::put('/{material}', [MaterialController::class, 'manageUpdate'])->name('update');
+            Route::get('/', [DosenMaterialController::class, 'index'])->name('index');
+            Route::put('/reorder', [DosenMaterialController::class, 'reorderMaterials'])->name('reorder');
+            Route::get('/create', [DosenMaterialController::class, 'create'])->name('create');
+            Route::get('/{material}/show', [DosenMaterialController::class, 'show'])->name('show');
+            Route::get('/{material}/edit', [DosenMaterialController::class, 'edit'])->name('edit');
+            Route::post('/', [DosenMaterialController::class, 'store'])->name('store');
+            Route::put('/{material}', [DosenMaterialController::class, 'update'])->name('update');
         });
 
         // ===== KELAS (halaman ManageClasses untuk superadmin) =====
         Route::get('/superadmin/kelas', [ClassController::class, 'manageIndex'])->name('superadmin.classes.index');
 
         // Kelola Latihan Soal (superadmin) -> gunakan halaman ManagePractices (method sama dg dosen)
-        Route::get('/superadmin/latihan-soal', [PracticeController::class, 'dosenIndexPage'])
+        Route::get('/superadmin/latihan-soal', [DosenPracticeController::class, 'index'])
             ->name('superadmin.practices.index');
 
-        Route::get('/superadmin/latihan-soal/{practice}/show', [PracticeController::class, 'dosenShowPage'])
+        Route::get('/superadmin/latihan-soal/{practice}/show', [DosenPracticeController::class, 'show'])
             ->name('superadmin.practices.show');
-        Route::get('/superadmin/latihan-soal/{practice}/create', [PracticeController::class, 'dosenCreatePage'])
+        Route::get('/superadmin/latihan-soal/{practice}/create', [DosenPracticeController::class, 'create'])
             ->name('superadmin.practices.create');
-        Route::get('/superadmin/latihan-soal/{practice}', [PracticeController::class, 'dosenEditPage'])
+        Route::get('/superadmin/latihan-soal/{practice}', [DosenPracticeController::class, 'edit'])
             ->name('superadmin.practices.edit');
 
         // Simpan soal latihan (superadmin) menggunakan method yang sama dengan dosen
-        Route::post('/superadmin/latihan-soal/{practice}/questions', [PracticeController::class, 'dosenSaveQuestions'])
+        Route::post('/superadmin/latihan-soal/{practice}/questions', [DosenPracticeController::class, 'saveQuestions'])
             ->name('superadmin.practices.questions.save');
 
         // Kelola Kuis (superadmin) -> gunakan halaman ManageQuizzes
         Route::prefix('superadmin/kuis')->name('superadmin.quizzes.')->group(function () {
-            Route::get('/', [QuizController::class, 'dosenIndexPage'])->name('index');
-            Route::get('/create', [QuizController::class, 'dosenCreatePage'])->name('create');
-            Route::get('/{quiz}/show', [QuizController::class, 'dosenShowPage'])->name('show');
-            Route::get('/{quiz}/edit', [QuizController::class, 'dosenEditPage'])->name('edit');
-            Route::post('/', [QuizController::class, 'store'])->name('store');
-            Route::post('/{quiz}/questions', [QuizController::class, 'dosenSaveQuestions'])->name('questions.save');
-            Route::post('/{quiz}/duplicate', [QuizController::class, 'duplicateToClasses'])->name('duplicate');
-            Route::delete('/{quiz}', [QuizController::class, 'destroy'])->name('destroy');
+            Route::get('/', [DosenQuizController::class, 'dosenIndexPage'])->name('index');
+            Route::get('/create', [DosenQuizController::class, 'dosenCreatePage'])->name('create');
+            Route::get('/{quiz}/show', [DosenQuizController::class, 'dosenShowPage'])->name('show');
+            Route::get('/{quiz}/edit', [DosenQuizController::class, 'dosenEditPage'])->name('edit');
+            Route::post('/', [DosenQuizController::class, 'store'])->name('store');
+            Route::post('/{quiz}/questions', [DosenQuizController::class, 'saveQuestions'])->name('questions.save');
+            Route::post('/{quiz}/duplicate', [DosenQuizController::class, 'duplicateToClasses'])->name('duplicate');
+            Route::delete('/{quiz}', [DosenQuizController::class, 'destroy'])->name('destroy');
         });
 
         // Nilai Mahasiswa (superadmin) -> gunakan halaman ManageLeaderboard

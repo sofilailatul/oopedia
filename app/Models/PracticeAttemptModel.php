@@ -14,26 +14,19 @@ class PracticeAttemptModel extends Model
     protected $fillable = [
         'user_id',
         'practices_id',
-        'sub_topic_id',
-        'attempt_mode',
+        'user_progress_id',
+        'focused_subtopic_id',
         'attempt_type',
-        'attempt_no',
-        'target_level',
-        'placement_level_result',
-        'source_from',
+        'level',
+        'mode',
+        'attempt_number',
         'next_action',
-        'total_questions',
-        'correct_answer',
-        'score',
-        'weak_sub_topic',
-        'remediation_round',
         'started_at',
         'finished_at',
         'mc_correct',
         'mc_score',
         'drag_correct',
         'drag_score',
-        'total_earned',
         'final_score',
         'is_passed',
     ];
@@ -42,8 +35,10 @@ class PracticeAttemptModel extends Model
         'started_at' => 'datetime',
         'finished_at' => 'datetime',
         'is_passed' => 'boolean',
-        'attempt_no' => 'integer',
-        'sub_topic_id' => 'integer',
+        'attempt_number' => 'integer',
+        'practices_id' => 'integer',
+        'user_progress_id' => 'integer',
+        'focused_subtopic_id' => 'integer',
         'total_questions' => 'integer',
         'correct_answer' => 'integer',
         'score' => 'float',
@@ -63,11 +58,16 @@ class PracticeAttemptModel extends Model
 
     public function subTopicRef()
     {
-        return $this->belongsTo(SubTopicModel::class, 'sub_topic_id');
+        return $this->belongsTo(SubTopicModel::class, 'subtopic_id');
     }
 
     public function answers()
     {
         return $this->hasMany(UserPracticeAnswerModel::class, 'practice_attempts_id');
+    }
+
+    public function progress()
+    {
+        return $this->belongsTo(UserProgressModel::class, 'user_progress_id');
     }
 }

@@ -1,8 +1,25 @@
-// resources/js/Features/practice/useDragDropOrder.js
-
 import { useEffect, useMemo, useState } from "react";
-import { buildDragState } from "./dragDropUtils";
-import { QUESTION_TYPE } from "./constants";
+import { QUESTION_TYPE } from "./core";
+
+function shuffleItems(items) {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildDragState(question, savedSelection = []) {
+  const correctItems = question?.items?.map((item) => item.item_text) ?? [];
+  const slotCount = correctItems.length;
+
+  const slots = Array.from({ length: slotCount }, (_, idx) => savedSelection[idx] ?? null);
+  const used = new Set(slots.filter(Boolean));
+  const pool = shuffleItems(correctItems.filter((item) => !used.has(item)));
+
+  return { pool, slots };
+}
 
 export function useDragDropOrder({ current, answers, setDragSelection }) {
   const [dragStates, setDragStates] = useState({});
@@ -30,7 +47,6 @@ export function useDragDropOrder({ current, answers, setDragSelection }) {
 
   const updateDragState = (questionId, nextState) => {
     setDragStates((prev) => ({ ...prev, [questionId]: nextState }));
-
     const selectionItems = nextState.slots.filter(Boolean);
     setDragSelection(questionId, selectionItems);
   };

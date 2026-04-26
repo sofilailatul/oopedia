@@ -13,15 +13,17 @@ class PracticeModel extends Model
 
     protected $fillable = [
         'material_id',
-        'practice_type',
+        'type',
         'level',
-        'difficulty_level',
+        'min_score',
+        'max_attempts'
     ];
 
     protected $casts = [
-        'practice_type' => 'string',
+        'type' => 'string',
         'level' => 'string',
-        'difficulty_level' => 'string',
+        'min_score' => 'integer',
+        'max_attempts' => 'integer',
     ];
 
     // Relationships

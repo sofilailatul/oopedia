@@ -3,16 +3,22 @@ import AppLayout from "@/Layouts/AppLayout";
 import Button from "@/Components/Button";
 import { usePracticeAttempt } from "@/Features/practice/usePracticeAttempt";
 import { formatMMSS } from "@/Features/practice/time";
-import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
 import { useDragDropOrder } from "@/Features/practice/useDragDropOrder";
+import StatusModal from "@/Components/StatusModal";
 import Icons from "@/icons";
+import { usePage, router } from "@inertiajs/react"; // ← tambahan
 
 export default function AttemptShow(props) {
   const vm = usePracticeAttempt(props);
+  const { flash } = usePage().props;
+  const [errorModal, setErrorModal] = useState(
+    flash?.error ? { message: flash.error } : null
+  );
 
-  const { cfg, questions, total, currentIndex, current, remaining, answeredCount, answers, actions } = vm;
+  const { attempt } = props;
+  const { cfg, questions: vmQuestions, total, currentIndex, current, remaining, answeredCount, answers, actions } = vm;
   const materialName = props?.attempt?.practice?.material?.material_name ?? "-";
-  const levelLabel = difficultyLabel(cfg?.level ?? props?.attempt?.practice?.difficulty_level);
+  const levelLabel = cfg?.level ?? props?.attempt?.practice?.level;
 
   const [feedback, setFeedback] = useState(null);
   const [lockedQuestionIds, setLockedQuestionIds] = useState(() => new Set());
@@ -20,6 +26,7 @@ export default function AttemptShow(props) {
 
   const isLastQuestion = currentIndex >= total - 1;
   const isCurrentLocked = Boolean(current?.id && lockedQuestionIds.has(current.id));
+  const navLocked = Boolean(current && (isCurrentLocked || actions.isAnswered(current)));
 
   useEffect(() => {
     if (!feedback?.autoSubmitLast) return;
@@ -46,7 +53,7 @@ export default function AttemptShow(props) {
     if (!question) return null;
 
     const selectedOption = question.options?.find((opt) => opt.id === optionId);
-    const isCorrect = selectedOption?.is_correct === 1 || selectedOption?.is_correct === true;
+    const isCorrect = Number(selectedOption?.is_correct) === 1;
 
     return {
       isCorrect,
@@ -55,13 +62,20 @@ export default function AttemptShow(props) {
         : (question.feedback_incorrect ?? "Jawaban kamu salah."),
     };
   };
-
   const evaluateDragAnswer = (questionId, selectionItems) => {
     const question = current;
     if (!question) return null;
 
-    const correctOrder = question.items?.map((item) => item.item_text) ?? [];
-    const isCorrect = JSON.stringify(selectionItems) === JSON.stringify(correctOrder);
+    const normalizedSelection = (selectionItems ?? [])
+      .map((item) => String(item).trim());
+
+    const correctOrder = [...(question.items ?? [])]
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .map((item) => String(item.item_text).trim());
+
+    const isCorrect =
+      normalizedSelection.length === correctOrder.length &&
+      normalizedSelection.every((item, index) => item === correctOrder[index]);
 
     return {
       isCorrect,
@@ -75,17 +89,16 @@ export default function AttemptShow(props) {
     if (!current || isCurrentLocked || isAutoSubmitting) return;
 
     actions.setMC(current.id, optionId);
+    lockQuestion(current.id);
     const result = evaluateMCAnswer(current.id, optionId);
     if (result) {
-      if (isLastQuestion) {
-        lockQuestion(current.id);
-      }
       setFeedback({
         ...result,
         autoSubmitLast: isLastQuestion,
       });
     }
   };
+
   const blockTheme = (index) => {
     const themes = [
       "bg-blue-50 border-blue-200 text-blue-700",
@@ -104,15 +117,12 @@ export default function AttemptShow(props) {
       if (lockedQuestionIds.has(qid) || isAutoSubmitting) return;
 
       actions.setDragSelection(qid, items);
-      // Only show feedback when all items are placed
       const totalItems = current?.items?.length ?? 0;
       if (totalItems > 0 && items.length === totalItems) {
+        lockQuestion(qid);
         const result = evaluateDragAnswer(qid, items);
         if (result) {
           const shouldAutoSubmit = isLastQuestion;
-          if (shouldAutoSubmit) {
-            lockQuestion(qid);
-          }
           setFeedback({
             ...result,
             autoSubmitLast: shouldAutoSubmit,
@@ -132,16 +142,22 @@ export default function AttemptShow(props) {
                 type="button"
                 onClick={() => {
                   actions.commitTimeSpent();
+                  if (navLocked || isAutoSubmitting) return;
                   window.history.back();
                 }}
-                className="w-10 h-10 rounded-xl border border-slate-200 bg-white hover:bg-slate-50"
+                disabled={navLocked || isAutoSubmitting}
+                className={`w-10 h-10 rounded-xl border border-slate-200 ${
+                  navLocked || isAutoSubmitting
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-white hover:bg-slate-50"
+                }`}
                 aria-label="Kembali"
               >
                 ←
               </button>
 
               <div className="font-semibold text-sm text-slate-900">
-                {currentIndex + 1}. Latihan Soal 
+                {currentIndex + 1}. Latihan Soal
               </div>
             </div>
 
@@ -180,7 +196,7 @@ export default function AttemptShow(props) {
                             type="button"
                             disabled={isCurrentLocked || isAutoSubmitting}
                             onClick={() => handleMCClick(opt.id)}
-                            className={`w-full text-left  text-xs rounded-2xl border px-5 py-3 shadow-sm transition ${
+                            className={`w-full text-left text-xs rounded-2xl border px-5 py-3 shadow-sm transition ${
                               selected
                                 ? "border-slate-700 bg-slate-50"
                                 : "border-slate-200 hover:border-slate-300"
@@ -243,9 +259,7 @@ export default function AttemptShow(props) {
                               onDragStart={(event) =>
                                 !isCurrentLocked && !isAutoSubmitting && dragHandlers.handleDragStart(event, { source: "pool", index: idx, text: item })
                               }
-                              className={`cursor-grab rounded-xl border px-3 py-3 text-xs font-medium shadow-sm transition active:cursor-grabbing ${blockTheme(
-                                idx
-                              )}`}
+                              className={`cursor-grab rounded-xl border px-3 py-3 text-xs font-medium shadow-sm transition active:cursor-grabbing ${blockTheme(idx)}`}
                             >
                               {item}
                             </div>
@@ -292,7 +306,7 @@ export default function AttemptShow(props) {
 
               <div className="mt-5">
                 <div className="grid grid-cols-4 gap-2">
-                  {questions.map((q, idx) => {
+                  {vmQuestions.map((q, idx) => {
                     const isCurrent = idx === currentIndex;
                     const isDone = actions.isAnswered(q);
                     return (
@@ -303,13 +317,17 @@ export default function AttemptShow(props) {
                         variant="outline"
                         color="blue"
                         onClick={() => actions.goTo(idx)}
-                        disabled={isAutoSubmitting}
+                        disabled={isAutoSubmitting || idx < currentIndex}
                         className={`h-9 w-[36px] rounded-lg border text-sm font-medium transition ${
                           isCurrent
                             ? "border-slate-500 text-slate-700"
                             : isDone
                             ? "border-slate-300 bg-slate-300 text-slate-500"
                             : "border-slate-200 text-slate-500"
+                        } ${
+                          idx < currentIndex || isAutoSubmitting
+                            ? "opacity-60 cursor-not-allowed"
+                            : ""
                         }`}
                       >
                         {idx + 1}
@@ -350,7 +368,7 @@ export default function AttemptShow(props) {
           </aside>
         </div>
 
-        {/* Feedback Modal */}
+        {/* Feedback Modal — benar/salah per soal */}
         {feedback && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-300">
@@ -395,6 +413,26 @@ export default function AttemptShow(props) {
             </div>
           </div>
         )}
+
+        {/* Error Modal — soal subtopik tidak tersedia */}
+        {errorModal && (
+          <StatusModal
+            show={true}
+            type="error"
+            title="Soal Tidak Tersedia"
+            message={errorModal.message}
+            confirmText="Kembali"
+            onConfirm={() => {
+              setErrorModal(null);
+              router.visit(route("practices.index"));
+            }}
+            onClose={() => {
+              setErrorModal(null);
+              router.visit(route("practices.index"));
+            }}
+          />
+        )}
+
       </div>
     </AppLayout>
   );

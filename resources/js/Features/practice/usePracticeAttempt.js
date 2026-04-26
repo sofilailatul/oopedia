@@ -1,8 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { router } from "@inertiajs/react";
+import { QUESTION_TYPE } from "./core";
+
+function shuffleArray(items) {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 export function usePracticeAttempt({ attempt, cfg, questions = [], savedAnswers = {} }) {
-  const total = questions.length;
+  const normalizedQuestions = useMemo(() => {
+    return questions.map((q) => {
+      if (q.type !== QUESTION_TYPE.MC || !Array.isArray(q.options)) return q;
+      return {
+        ...q,
+        options: shuffleArray(q.options),
+      };
+    });
+  }, [questions]);
+
+  const total = normalizedQuestions.length;
   const durationSeconds = cfg?.duration_seconds ?? 18 * 60;
   const storageKey = attempt?.id ? `practice_attempt_${attempt.id}_end_at` : null;
 
@@ -23,12 +43,11 @@ export function usePracticeAttempt({ attempt, cfg, questions = [], savedAnswers 
       const startedAtMs = Date.parse(attempt.started_at);
       if (!Number.isNaN(startedAtMs)) {
         endAt = startedAtMs + durationSeconds * 1000;
+
         if (storageKey) {
           try {
             window.localStorage.setItem(storageKey, String(endAt));
-          } catch {
-            // ignore storage errors
-          }
+          } catch {}
         }
       }
     }
@@ -37,142 +56,180 @@ export function usePracticeAttempt({ attempt, cfg, questions = [], savedAnswers 
     return durationSeconds;
   };
 
-  // init from saved
   const initialAnswers = useMemo(() => {
     const out = {};
-    for (const q of questions) {
+
+    for (const q of normalizedQuestions) {
       const saved = savedAnswers?.[q.id];
       if (!saved) continue;
 
-      if (q.type === "multiple_choice") {
+      if (q.type === QUESTION_TYPE.MC) {
         out[q.id] = {
-          type: "multiple_choice",
+          type: QUESTION_TYPE.MC,
           option_id: saved.practice_options_id ?? null,
           timespent: saved.timespent ?? 0,
         };
       } else {
         out[q.id] = {
-          type: "drag_drop",
+          type: QUESTION_TYPE.DRAG,
           selection_items: saved.selection_items ?? [],
           timespent: saved.timespent ?? 0,
         };
       }
     }
+
     return out;
-  }, [questions, savedAnswers]);
+  }, [normalizedQuestions, savedAnswers]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState(initialAnswers);
   const [remaining, setRemaining] = useState(getInitialRemaining);
 
-  const current = questions[currentIndex] ?? null;
+  const current = normalizedQuestions[currentIndex] ?? null;
   const currentQuestionId = current?.id ?? null;
-
-  // time tracking
   const enterAtRef = useRef(Date.now());
+  const answersRef = useRef(initialAnswers);
+  const submittingRef = useRef(false);
 
-  const commitTimeSpent = () => {
-    if (!currentQuestionId) return;
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+
+  const commitTimeSpent = useCallback(() => {
+    if (!currentQuestionId) return answersRef.current;
 
     const now = Date.now();
     const deltaSec = Math.max(0, Math.round((now - enterAtRef.current) / 1000));
 
-    setAnswers((prev) => {
-      const existing = prev[currentQuestionId];
-      if (!existing) return prev;
+    const existing = answersRef.current[currentQuestionId];
+    if (!existing) {
+      enterAtRef.current = now;
+      return answersRef.current;
+    }
 
-      return {
-        ...prev,
-        [currentQuestionId]: {
-          ...existing,
-          timespent: (existing.timespent ?? 0) + deltaSec,
-        },
-      };
-    });
+    const nextAnswers = {
+      ...answersRef.current,
+      [currentQuestionId]: {
+        ...existing,
+        timespent: (existing.timespent ?? 0) + deltaSec,
+      },
+    };
 
+    answersRef.current = nextAnswers;
+    setAnswers(nextAnswers);
     enterAtRef.current = now;
-  };
 
-  const goTo = (idx) => {
+    return nextAnswers;
+  }, [currentQuestionId]);
+
+  const goTo = useCallback((idx) => {
     if (idx < 0 || idx >= total) return;
     commitTimeSpent();
     setCurrentIndex(idx);
-  };
+  }, [total, commitTimeSpent]);
 
-  const next = () => goTo(Math.min(total - 1, currentIndex + 1));
-  const prev = () => goTo(Math.max(0, currentIndex - 1));
+  const next = useCallback(() => goTo(Math.min(total - 1, currentIndex + 1)), [goTo, total, currentIndex]);
+  const prev = useCallback(() => goTo(Math.max(0, currentIndex - 1)), [goTo, currentIndex]);
 
-  const setMC = (questionId, optionId) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        type: "multiple_choice",
-        option_id: optionId,
-        timespent: prev?.[questionId]?.timespent ?? 0,
-      },
-    }));
-  };
+  const setMC = useCallback((questionId, optionId) => {
+    setAnswers((prev) => {
+      const next = {
+        ...prev,
+        [questionId]: {
+          type: QUESTION_TYPE.MC,
+          option_id: optionId,
+          timespent: prev?.[questionId]?.timespent ?? 0,
+        },
+      };
+      answersRef.current = next;
+      return next;
+    });
+  }, []);
 
-  const setDragSelection = (questionId, selectionItems) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: {
-        type: "drag_drop",
-        selection_items: selectionItems,
-        timespent: prev?.[questionId]?.timespent ?? 0,
-      },
-    }));
-  };
+  const setDragSelection = useCallback((questionId, selectionItems) => {
+    setAnswers((prev) => {
+      const next = {
+        ...prev,
+        [questionId]: {
+          type: QUESTION_TYPE.DRAG,
+          selection_items: selectionItems,
+          timespent: prev?.[questionId]?.timespent ?? 0,
+        },
+      };
+      answersRef.current = next;
+      return next;
+    });
+  }, []);
 
-  const isAnswered = (q) => {
-    const a = answers[q.id];
+  const isAnswered = useCallback((q) => {
+    const a = answersRef.current[q.id];
     if (!a) return false;
-    if (q.type === "multiple_choice") return !!a.option_id;
+    if (q.type === QUESTION_TYPE.MC) return !!a.option_id;
     return Array.isArray(a.selection_items) && a.selection_items.length > 0;
-  };
+  }, []);
 
   const answeredCount = useMemo(() => {
-    let c = 0;
-    for (const q of questions) if (isAnswered(q)) c++;
-    return c;
-  }, [answers, questions]);
+    let count = 0;
+    for (const q of normalizedQuestions) {
+      const a = answers[q.id];
+      if (!a) continue;
+      if (q.type === QUESTION_TYPE.MC && a.option_id) count++;
+      if (q.type !== QUESTION_TYPE.MC && Array.isArray(a.selection_items) && a.selection_items.length > 0) count++;
+    }
+    return count;
+  }, [answers, normalizedQuestions]);
 
-  // timer tick
   useEffect(() => {
-    const id = setInterval(() => setRemaining((r) => Math.max(0, r - 1)), 1000);
+    const id = setInterval(() => {
+      setRemaining((r) => Math.max(0, r - 1));
+    }, 1000);
+
     return () => clearInterval(id);
   }, []);
 
-  const submit = (auto = false) => {
-    commitTimeSpent();
+  const submit = useCallback((auto = false) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
+    const finalAnswers = commitTimeSpent();
+
     if (storageKey) {
       try {
         window.localStorage.removeItem(storageKey);
-      } catch {
-        // ignore storage errors
-      }
+      } catch {}
     }
-    router.post(`/latihan-soal-attempts/${attempt.id}/answers`, {
-      answers,
-      auto_submit: auto ? 1 : 0,
-    });
-  };
 
-  // auto submit
+    router.post(
+      route("practices.attempts.submit", attempt.id),
+      {
+        answers: finalAnswers,
+        question_ids: normalizedQuestions.map((q) => q.id),
+        auto_submit: auto ? 1 : 0,
+      },
+      {
+        preserveScroll: true,
+        onFinish: () => {
+          submittingRef.current = false;
+        },
+      }
+    );
+  }, [attempt.id, normalizedQuestions, storageKey, commitTimeSpent]);
+
   useEffect(() => {
-    if (remaining === 0 && total > 0) submit(true);
-  }, [remaining]);
+    if (remaining === 0 && total > 0) {
+      submit(true);
+    }
+  }, [remaining, total, submit]);
 
   return {
     cfg,
-    questions,
+    questions: normalizedQuestions,
     total,
     currentIndex,
     current,
     remaining,
     answeredCount,
     answers,
-
     actions: {
       goTo,
       next,

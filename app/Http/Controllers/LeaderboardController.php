@@ -98,16 +98,16 @@ class LeaderboardController extends Controller
             ->select(
                 'practice_attempts.user_id',
                 'practices.material_id',
-                'practices.difficulty_level',
+                'practices.level',
                 DB::raw('MAX(practice_attempts.final_score) as best_score')
             )
-            ->groupBy('practice_attempts.user_id', 'practices.material_id', 'practices.difficulty_level')
+            ->groupBy('practice_attempts.user_id', 'practices.material_id', 'practices.level')
             ->get();
 
         // Struktur: practiceMap[user_id][material_id][difficulty] = best_score
         $practiceMap = [];
         foreach ($practiceScores as $row) {
-            $practiceMap[$row->user_id][$row->material_id][$row->difficulty_level] = (int) $row->best_score;
+            $practiceMap[$row->user_id][$row->material_id][$row->level] = (int) $row->best_score;
         }
 
         // --- QUIZ SCORES per user per material ---

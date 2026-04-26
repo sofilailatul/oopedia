@@ -3,14 +3,14 @@ import { usePage } from "@inertiajs/react";
 import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 export default function InertiaErrorPopup() {
-  const { errors } = usePage().props;
+  const { errors, flash } = usePage().props;
   const popup = usePopup();
 
   // biar ga spam popup kalau render ulang
   const lastMsgRef = useRef(null);
 
   useEffect(() => {
-    const msg = errors?.quiz; 
+    const msg = errors?.quiz || flash?.error;
     if (!msg) return;
 
     // kalau msg sama, jangan munculin lagi
@@ -22,7 +22,7 @@ export default function InertiaErrorPopup() {
       message: msg,
       tone: "danger",
     });
-  }, [errors, popup]);
+  }, [errors, flash, popup]);
 
   return null;
 }

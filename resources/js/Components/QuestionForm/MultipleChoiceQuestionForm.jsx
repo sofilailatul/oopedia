@@ -1,10 +1,12 @@
 import React from "react";
 import UploadImage from "@/Components/UploadImage";
 import Field from "@/Components/Field";
+import Dropdown from "@/Components/Dropdown";
 
 export default function MultipleChoiceQuestionForm({
   question,
   questionIndex,
+  subtopicOptions = [],
   readOnly = false,
   onQuestionFieldChange,
   onOptionFieldChange,
@@ -12,6 +14,20 @@ export default function MultipleChoiceQuestionForm({
   onImageChange,
 }) {
   const q = question;
+  const selectedSubtopicId = q.subtopic_id ?? q.sub_topic_id ?? "";
+
+  const subtopicNameFromOptions = subtopicOptions.find((item) =>
+    String(item.id) === String(selectedSubtopicId),
+  )?.name;
+  const subTopicValue =
+    q.sub_topic_name ??
+    q.subTopicName ??
+    subtopicNameFromOptions ??
+    q.sub_topic ??
+    q.subtopic ??
+    q.subTopic ??
+    "";
+  const selectedSubtopicLabel = subtopicNameFromOptions || subTopicValue || "Pilih sub-topik";
 
   return (
     <div className="space-y-5 px-5 py-4">
@@ -26,7 +42,7 @@ export default function MultipleChoiceQuestionForm({
             <div className="space-y-1">
               <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
-                {q.sub_topic || "-"}
+                {subTopicValue || "-"}
               </div>
             </div>
           </div>
@@ -41,12 +57,60 @@ export default function MultipleChoiceQuestionForm({
               placeholder="Tulis pertanyaan yang jelas dan singkat..."
             />
 
-            <Field
-              label="Sub-topik"
-              value={q.sub_topic || ""}
-              onChange={(e) => onQuestionFieldChange?.(questionIndex, "sub_topic", e.target.value)}
-              placeholder="Contoh: Encapsulation"
-            />
+            <div className="space-y-1">
+              <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
+              <Dropdown>
+                <Dropdown.Trigger>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-left text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  >
+                    <span className="truncate pr-2">{selectedSubtopicLabel}</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4 text-slate-400"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </Dropdown.Trigger>
+                <Dropdown.Content>
+                  <Dropdown.Item
+                    onClick={() => onQuestionFieldChange?.(questionIndex, "subtopic_id", null)}
+                    className={!selectedSubtopicId ? "bg-slate-100" : ""}
+                  >
+                    Pilih sub-topik
+                  </Dropdown.Item>
+
+                  {subtopicOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-[12px] text-slate-400">
+                      Sub-topik belum tersedia di materi ini.
+                    </div>
+                  ) : (
+                    subtopicOptions.map((item) => (
+                      <Dropdown.Item
+                        key={item.id}
+                        onClick={() =>
+                          onQuestionFieldChange?.(questionIndex, "subtopic_id", Number(item.id))
+                        }
+                        className={
+                          String(item.id) === String(selectedSubtopicId) ? "bg-slate-100" : ""
+                        }
+                      >
+                        {item.name}
+                      </Dropdown.Item>
+                    ))
+                  )}
+                </Dropdown.Content>
+              </Dropdown>
+            </div>
           </div>
         )}
 
@@ -102,7 +166,7 @@ export default function MultipleChoiceQuestionForm({
             return (
               <div
                 key={opt.id ?? optIdx}
-                className={`flex items-center gap-3 rounded-2xl border px-3 py-2 text-sm transition ${
+                className={`flex items-center gap-3 rounded-2xl border px-3 py-2 text-[12px] transition ${
                   isCorrect ? "border-emerald-400 bg-emerald-50" : "border-slate-200 bg-white"
                 }`}
               >
@@ -118,7 +182,7 @@ export default function MultipleChoiceQuestionForm({
                     value={opt.text}
                     onChange={(e) => onOptionFieldChange?.(questionIndex, optIdx, "text", e.target.value)}
                     placeholder={`Masukkan Kalimat Jawaban ${String.fromCharCode(65 + optIdx)}`}
-                    className="flex-1 border-none bg-transparent text-sm text-slate-800 focus:outline-none"
+                    className="flex-1 border-none bg-transparent text-[12px] text-slate-800 focus:outline-none"
                   />
                 )}
 
@@ -147,8 +211,8 @@ export default function MultipleChoiceQuestionForm({
         <div className="space-y-1">
           <p className="text-[11px] font-medium text-slate-500">Feedback jawaban BENAR</p>
           {readOnly ? (
-            <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[9px] text-slate-800">
-              <p className="text-[12px] text-slate-800">{q.feedback_correct || q.feedbackCorrect || "-"}</p>
+            <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-slate-800">
+              <p className="text-[11px] text-slate-800">{q.feedback_correct || q.feedbackCorrect || "-"}</p>
             </div>
           ) : (
             <Field
@@ -164,8 +228,8 @@ export default function MultipleChoiceQuestionForm({
         <div className="space-y-1">
           <p className="text-[11px] font-medium text-slate-500">Feedback jawaban SALAH</p>
           {readOnly ? (
-            <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[9px] text-slate-800">
-              <p className="text-[12px] text-slate-800">{q.feedback_incorrect || q.feedbackIncorrect || "-"}</p>
+            <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-slate-800">
+              <p className="text-[11px] text-slate-800">{q.feedback_incorrect || q.feedbackIncorrect || "-"}</p>
             </div>
           ) : (
             <Field

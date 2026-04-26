@@ -6,8 +6,8 @@ use App\Models\PracticeModel;
 use App\Models\PracticeAttemptModel;
 use App\Models\PracticeQuestionModel;
 use App\Models\UserPracticeAnswerModel;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class PracticeService
 {
@@ -32,13 +32,32 @@ class PracticeService
             ->groupBy('material_id')
             ->pluck('read_done', 'material_id');
 
+        $progressRows = DB::table('user_progress as up')
+            ->leftJoin('subtopics as st', 'st.id', '=', 'up.focused_subtopic_id')
+            ->where('up.user_id', $userId)
+            ->select(
+                'up.material_id',
+                'up.status',
+                'up.current_mode',
+                'up.current_level',
+                'up.pretest_score',
+                'up.last_score',
+                'up.next_action',
+                'up.focused_subtopic_id',
+                'st.name as focused_subtopic_name',
+                'up.completed_pretest_at'
+            )
+            ->get()
+            ->keyBy('material_id');
+
         $scores = $this->getLatestScores($userId);
+        $scoresByMode = $this->getLatestScoresByMode($userId);
 
         $anyAttempts = $this->getAnyAttempts($userId);
 
         $questionCounts = $this->getQuestionCounts();
 
-        return $this->groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $anyAttempts, $readProgress);
+        return $this->groupPracticesByMaterial($practiceRows, $scores, $scoresByMode, $questionCounts, $anyAttempts, $readProgress, $progressRows);
     }
 
     /**
@@ -46,31 +65,25 @@ class PracticeService
      */
     public function getPracticesForLecturer($lecturerId)
     {
-        $questionCounts = $this->getQuestionCounts();
-
-        $practiceRows = PracticeModel::query()
-            ->join('materials', 'materials.id', '=', 'practices.material_id')
-            ->where('materials.created_by', $lecturerId)
-            ->select('practices.*', 'materials.material_name')
-            ->orderBy('materials.material_name')
-            ->orderBy('practices.difficulty_level')
-            ->get();
-
-        return $practiceRows->map(function ($row) use ($questionCounts) {
-            // $questionCounts berisi Collection: practice_id => Collection(type => total)
-            $counts = $questionCounts->get($row->id, collect());
-            $totalQuestions = $counts instanceof \Illuminate\Support\Collection
-                ? (int) $counts->sum()
-                : 0;
-
-            return [
-                'id' => $row->id,
-                'material_id' => $row->material_id,
-                'material_name' => $row->material_name,
-                'difficulty_level' => $row->difficulty_level,
-                'total_questions' => $totalQuestions,
-            ];
-        });
+        return PracticeModel::query()
+            ->withCount('questions') // otomatis hitung soal
+            ->with('material:id,material_name')
+            ->whereHas('material', function ($q) use ($lecturerId) {
+                $q->where('created_by', $lecturerId);
+            })
+            ->orderBy('material_id')
+            ->orderBy('level') 
+            ->get()
+            ->map(function ($practice) {
+                return [
+                    'id' => $practice->id,
+                    'material_id' => $practice->material_id,
+                    'material_name' => $practice->material->material_name ?? '-',
+                    'type' => $practice->type ?? 'practice',
+                    'level' => $practice->level, 
+                    'total_questions' => $practice->questions_count, 
+                ];
+            });
     }
 
     /**
@@ -84,7 +97,7 @@ class PracticeService
             ->join('materials', 'materials.id', '=', 'practices.material_id')
             ->select('practices.*', 'materials.material_name')
             ->orderBy('materials.material_name')
-            ->orderBy('practices.difficulty_level')
+            ->orderBy('practices.level')
             ->get();
 
         return $practiceRows->map(function ($row) use ($questionCounts) {
@@ -97,7 +110,8 @@ class PracticeService
                 'id' => $row->id,
                 'material_id' => $row->material_id,
                 'material_name' => $row->material_name,
-                'difficulty_level' => $row->difficulty_level,
+                'type' => $row->type ?? 'practice',
+                'level' => $row->level,
                 'total_questions' => $totalQuestions,
             ];
         });
@@ -119,6 +133,39 @@ class PracticeService
             })
             ->where("$attemptTable.user_id", $userId)
             ->pluck("$attemptTable.final_score", "$attemptTable.practices_id");
+    }
+
+    private function getLatestScoresByMode($userId)
+    {
+        $rows = PracticeAttemptModel::query()
+            ->where('user_id', $userId)
+            ->where('attempt_type', 'practice')
+            ->whereNotNull('finished_at')
+            ->select('practices_id', 'mode', 'final_score', 'created_at')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return $rows
+            ->groupBy('practices_id')
+            ->map(function ($attempts) {
+                $out = [
+                    'normal' => null,
+                    'focused_remedial' => null,
+                ];
+
+                foreach ($attempts as $attempt) {
+                    $mode = $attempt->mode ?: 'normal';
+                    if (!array_key_exists($mode, $out)) {
+                        continue;
+                    }
+
+                    if ($out[$mode] === null) {
+                        $out[$mode] = $attempt->final_score !== null ? (int) $attempt->final_score : null;
+                    }
+                }
+
+                return $out;
+            });
     }
 
     private function getQuestionCounts()
@@ -152,45 +199,66 @@ class PracticeService
             ->keyBy('practices_id');
     }
 
-    private function groupPracticesByMaterial($practiceRows, $scores, $questionCounts, $activeAttempts, $readProgress)
+    private function groupPracticesByMaterial($practiceRows, $scores, $scoresByMode, $questionCounts, $activeAttempts, $readProgress, $progressRows)
     {
         $grouped = $practiceRows->groupBy('material_id');
 
-        return $grouped->map(function ($items) use ($scores, $questionCounts, $activeAttempts, $readProgress) {
+        return $grouped->map(function ($items) use ($scores, $scoresByMode, $questionCounts, $activeAttempts, $readProgress, $progressRows) {
             $material = $items->first()->material;
 
-            $easy   = $items->firstWhere('difficulty_level', 'easy');
-            $normal = $items->firstWhere('difficulty_level', 'normal');
-            $hard   = $items->firstWhere('difficulty_level', 'hard');
+            $easy = $items->firstWhere('level', 'easy');
+            $medium = $items->firstWhere('level', 'medium');
+            $hard = $items->firstWhere('level', 'hard');
 
-            $easyId   = $easy?->id;
-            $normalId = $normal?->id;
-            $hardId   = $hard?->id;
+            $easyId = $easy?->id;
+            $mediumId = $medium?->id;
+            $hardId = $hard?->id;
+
+            $easyScoresByMode = $easyId ? ($scoresByMode->get($easyId) ?? ['normal' => null, 'focused_remedial' => null]) : ['normal' => null, 'focused_remedial' => null];
+            $mediumScoresByMode = $mediumId ? ($scoresByMode->get($mediumId) ?? ['normal' => null, 'focused_remedial' => null]) : ['normal' => null, 'focused_remedial' => null];
+            $hardScoresByMode = $hardId ? ($scoresByMode->get($hardId) ?? ['normal' => null, 'focused_remedial' => null]) : ['normal' => null, 'focused_remedial' => null];
 
             $activeEasy = $easyId ? $activeAttempts->get($easyId) : null;
-            $activeNormal = $normalId ? $activeAttempts->get($normalId) : null;
+            $activeMedium = $mediumId ? $activeAttempts->get($mediumId) : null;
             $activeHard = $hardId ? $activeAttempts->get($hardId) : null;
 
-            $latestActive = collect([$activeEasy, $activeNormal, $activeHard])
+            $latestActive = collect([$activeEasy, $activeMedium, $activeHard])
                 ->filter()
                 ->sortByDesc('created_at')
                 ->first();
 
             $materialId = $material?->id;
             $hasRead = $materialId ? (bool) ($readProgress[$materialId] ?? 0) : false;
+            $progress = $materialId ? $progressRows->get($materialId) : null;
 
             return [
                 'material_id'   => $materialId,
                 'material_name' => $material?->material_name,
+                'progress' => $progress ? [
+                    'status' => $progress->status,
+                    'current_mode' => $progress->current_mode,
+                    'current_level' => $progress->current_level,
+                    'pretest_score' => $progress->pretest_score,
+                    'last_score' => $progress->last_score,
+                    'next_action' => $progress->next_action,
+                    'focused_subtopic_id' => $progress->focused_subtopic_id,
+                    'focused_subtopic_name' => $progress->focused_subtopic_name,
+                    'completed_pretest_at' => $progress->completed_pretest_at,
+                ] : null,
                 'levels' => [
-                    'easy'   => $easyId,
-                    'normal' => $normalId,
-                    'hard'   => $hardId,
+                    'easy' => $easyId,
+                    'medium' => $mediumId,
+                    'hard' => $hardId,
                 ],
                 'scores' => [
-                    'easy'   => $easyId   ? ($scores[$easyId]   ?? null) : null,
-                    'normal' => $normalId ? ($scores[$normalId] ?? null) : null,
-                    'hard'   => $hardId   ? ($scores[$hardId]   ?? null) : null,
+                    'easy' => $easyId ? ($scores[$easyId] ?? null) : null,
+                    'medium' => $mediumId ? ($scores[$mediumId] ?? null) : null,
+                    'hard' => $hardId ? ($scores[$hardId] ?? null) : null,
+                ],
+                'scores_by_mode' => [
+                    'easy' => $easyScoresByMode,
+                    'medium' => $mediumScoresByMode,
+                    'hard' => $hardScoresByMode,
                 ],
                 'has_active_attempt' => (bool) $latestActive,
                 'active_attempt' => $latestActive ? [
@@ -205,9 +273,9 @@ class PracticeService
                         'multiple_choice' => $easyId ? ($questionCounts[$easyId]['multiple_choice'] ?? 0) : 0,
                         'drag_drop'       => $easyId ? ($questionCounts[$easyId]['drag_drop'] ?? 0) : 0,
                     ],
-                    'normal' => [
-                        'multiple_choice' => $normalId ? ($questionCounts[$normalId]['multiple_choice'] ?? 0) : 0,
-                        'drag_drop'       => $normalId ? ($questionCounts[$normalId]['drag_drop'] ?? 0) : 0,
+                    'medium' => [
+                        'multiple_choice' => $mediumId ? ($questionCounts[$mediumId]['multiple_choice'] ?? 0) : 0,
+                        'drag_drop'       => $mediumId ? ($questionCounts[$mediumId]['drag_drop'] ?? 0) : 0,
                     ],
                     'hard' => [
                         'multiple_choice' => $hardId ? ($questionCounts[$hardId]['multiple_choice'] ?? 0) : 0,
@@ -256,21 +324,23 @@ class PracticeService
 
     private function createAttempt($userId, $practiceId, $data)
     {
+        $mode = $data['mode'] ?? 'normal';
+        $level = $data['level'] ?? null;
+
         $attempt = PracticeAttemptModel::create([
             'user_id' => $userId,
             'practices_id' => $practiceId,
-            'sub_topic_id' => null,
-            'attempt_mode' => $data['attempt_mode'] ?? 'regular',
-            'attempt_type' => $this->mapAttemptType($data['attempt_mode'] ?? 'regular'),
-            'attempt_no' => $this->resolveNextAttemptNo((int) $userId, (int) $practiceId),
-            'target_level' => $data['target_level'] ?? ($data['level'] ?? null),
-            'placement_level_result' => null,
-            'source_from' => $data['level'] ?? null,
+            'subtopic_id' => null,
+            'mode' => $mode,
+            'attempt_type' => $this->mapAttemptType($mode),
+            'attempt_number' => $this->resolveNextAttemptNo((int) $userId, (int) $practiceId),
+            'level' => $level,
+            'source_from' => $level,
             'next_action' => null,
             'total_questions' => (int) ($data['question_count'] ?? 10),
             'correct_answer' => 0,
             'score' => 0,
-            'weak_sub_topic' => $data['weak_sub_topic'] ?? null,
+            'focused_subtopic_id' => $data['focused_subtopic_id'] ?? null,
             'remediation_round' => (int) ($data['remediation_round'] ?? 0),
             'started_at' => now(),
             'finished_at' => null,
@@ -281,16 +351,6 @@ class PracticeService
             'total_earned' => 0,
             'final_score' => 0,
             'is_passed' => 0,
-        ]);
-
-        
-        session([
-            "attempt_cfg_{$attempt->id}" => [
-                'level' => $data['level'],
-                'question_type' => $data['question_type'],
-                'question_count' => (int)$data['question_count'],
-                'duration_seconds' => 18 * 60,
-            ],
         ]);
 
         return $attempt;
@@ -304,22 +364,24 @@ class PracticeService
     
     public function getAttemptDetail($attemptId)
     {
-        $attempt = PracticeAttemptModel::findOrFail($attemptId);
+        $attempt = PracticeAttemptModel::with('practice')->findOrFail($attemptId);
         
         
         if ($attempt->user_id !== Auth::id()) {
             abort(403);
         }
 
-        $cfg = session("attempt_cfg_{$attemptId}", [
-            'level' => $attempt->target_level ?: $attempt->practice->difficulty_level,
+        $practiceLevel = $attempt->practice?->level;
+
+        $cfg = [
+            'level' => $attempt->level ?? $practiceLevel,
             'question_type' => 'mixed',
-            'question_count' => 10,
-            'duration_seconds' => 18 * 60,
-            'attempt_mode' => $attempt->attempt_mode ?: 'regular',
-            'weak_sub_topic' => $attempt->weak_sub_topic,
+            'question_count' => (int) ($attempt->total_questions ?? 10),
+            'duration_seconds' => (int) ($attempt->duration_seconds ?? 18 * 60),
+            'mode' => $attempt->mode ?? 'normal',
+            'focused_subtopic_id' => $attempt->focused_subtopic_id ?? null,
             'remediation_round' => (int) ($attempt->remediation_round ?? 0),
-        ]);
+        ];
 
         $questions = $this->getQuestionsForAttempt($attempt->practices_id, $cfg);
         $savedAnswers = $this->getSavedAnswers($attemptId);
@@ -337,8 +399,8 @@ class PracticeService
         $query = PracticeQuestionModel::query()
             ->where('practices_id', $practiceId);
 
-        if (!empty($cfg['weak_sub_topic'])) {
-            $query->where('sub_topic', $cfg['weak_sub_topic']);
+        if (!empty($cfg['focused_subtopic_id'])) {
+            $query->where('subtopic_id', $cfg['focused_subtopic_id']);
         }
 
         if ($cfg['question_type'] !== 'mixed') {
@@ -350,7 +412,7 @@ class PracticeService
             ->limit($cfg['question_count'])
             ->get();
 
-        if ($questions->isEmpty() && !empty($cfg['weak_sub_topic'])) {
+        if ($questions->isEmpty() && !empty($cfg['focused_subtopic_id'])) {
             $fallback = PracticeQuestionModel::query()->where('practices_id', $practiceId);
 
             if ($cfg['question_type'] !== 'mixed') {
@@ -376,140 +438,6 @@ class PracticeService
 
     /**
      * =================================
-     * ✅ SUBMIT ANSWERS
-     * =================================
-     */
-    
-    public function submitAnswers($attemptId, $answers)
-    {
-        $attempt = PracticeAttemptModel::findOrFail($attemptId);
-        
-        
-        if ($attempt->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        DB::transaction(function () use ($attempt, $answers) {
-            $stats = $this->calculateAnswerStats($attempt, $answers);
-            
-            $attempt->update([
-                'finished_at' => now(),
-                'mc_correct' => $stats['mcCorrect'],
-                'mc_score' => $stats['mcScore'],
-                'drag_correct' => $stats['dragCorrect'],
-                'drag_score' => $stats['dragScore'],
-                'total_earned' => $stats['totalEarned'],
-                'final_score' => $stats['totalEarned'],
-                'correct_answer' => $stats['mcCorrect'] + $stats['dragCorrect'],
-                'score' => $stats['totalEarned'],
-                'is_passed' => ($stats['totalEarned'] >= 60) ? 1 : 0,
-            ]);
-        });
-
-        return $attempt;
-    }
-
-    private function calculateAnswerStats($attempt, $answersPayload)
-    {
-        $questionIds = array_map('intval', array_keys($answersPayload));
-        
-        $questions = PracticeQuestionModel::query()
-            ->whereIn('id', $questionIds)
-            ->with(['options', 'items'])
-            ->get()
-            ->keyBy('id');
-
-        $mcCorrect = 0; $mcScore = 0;
-        $dragCorrect = 0; $dragScore = 0;
-        $totalEarned = 0;
-
-        foreach ($answersPayload as $qid => $answerData) {
-            $qid = (int)$qid;
-            $question = $questions->get($qid);
-            
-            if (!$question) continue;
-
-            $result = $this->evaluateAnswer($question, $answerData);
-            
-            if ($result['isCorrect']) {
-                if ($result['type'] === 'multiple_choice') {
-                    $mcCorrect++;
-                    $mcScore += $result['score'];
-                } else {
-                    $dragCorrect++;
-                    $dragScore += $result['score'];
-                }
-            }
-
-            $totalEarned += $result['score'];
-            
-            
-            $this->saveUserAnswer($attempt->id, $qid, $answerData, $result);
-        }
-
-        return [
-            'mcCorrect' => $mcCorrect,
-            'mcScore' => $mcScore,
-            'dragCorrect' => $dragCorrect,
-            'dragScore' => $dragScore,
-            'totalEarned' => $totalEarned,
-        ];
-    }
-
-    private function evaluateAnswer($question, $answerData)
-    {
-        $type = $answerData['type'];
-        $isCorrect = false;
-        $score = 0;
-        $questionPoints = (int)($question->points ?? 10);
-
-        if ($type === 'multiple_choice') {
-            $optionId = isset($answerData['option_id']) ? (int)$answerData['option_id'] : null;
-            $correctOpt = $question->options->firstWhere('is_correct', true);
-
-            $isCorrect = $correctOpt && $optionId && ($correctOpt->id === $optionId);
-            $score = $isCorrect ? $questionPoints : 0;
-        } else {
-            $selectionItems = $answerData['selection_items'] ?? [];
-            $correctOrder = $question->items->pluck('item_text')->values()->all();
-
-            $isCorrect = ($selectionItems === $correctOrder);
-            $score = $isCorrect ? $questionPoints : 0;
-        }
-
-        return [
-            'type' => $type,
-            'isCorrect' => $isCorrect,
-            'score' => $score,
-            'optionId' => $answerData['option_id'] ?? null,
-            'selectionItems' => $answerData['selection_items'] ?? null,
-        ];
-    }
-
-    private function saveUserAnswer($attemptId, $questionId, $answerData, $result)
-    {
-        $prevCount = UserPracticeAnswerModel::query()
-            ->where('practice_attempts_id', $attemptId)
-            ->where('practice_questions_id', $questionId)
-            ->count();
-
-        UserPracticeAnswerModel::create([
-            'practice_attempts_id' => $attemptId,
-            'practice_attempt_id' => $attemptId,
-            'practice_questions_id' => $questionId,
-            'practice_options_id' => $result['optionId'],
-            'selected_option_id' => $result['optionId'],
-            'attempt' => $prevCount + 1,
-            'selection_items' => $result['selectionItems'],
-            'drag_answer' => $result['selectionItems'],
-            'is_correct' => $result['isCorrect'] ? 1 : 0,
-            'score' => $result['score'],
-            'timespent' => (int)($answerData['timespent'] ?? 0),
-        ]);
-    }
-
-    /**
-     * =================================
      * 📊 GET SUMMARY
      * =================================
      */
@@ -529,7 +457,11 @@ class PracticeService
 
         $answers = UserPracticeAnswerModel::query()
             ->where('practice_attempts_id', $lastAttempt->id)
-            ->with('question')
+            ->with([
+                'question.options',
+                'question.items',
+                'option',
+            ])
             ->get();
 
         return [
@@ -537,292 +469,6 @@ class PracticeService
             'attempt' => $lastAttempt,
             'answers' => $answers,
         ];
-    }
-
-    public function determineNextLevel($userId, $materialId, $currentLevel, $currentScore)
-    {
-        $plan = $this->getAdaptiveStartPlan($userId, $materialId, null);
-
-        return [
-            'next_level' => $plan['required_level'] ?? null,
-            'message' => $plan['message'],
-            'action' => $plan['action'],
-            'mode' => $plan['attempt_mode'],
-            'weak_sub_topic' => $plan['weak_sub_topic'],
-            'remediation_round' => $plan['remediation_round'],
-            'recommend_review' => $plan['recommend_review'],
-        ];
-    }
-
-    public function getAdaptiveStartPlan(int $userId, int $materialId, ?string $requestedLevel = null): array
-    {
-        $practices = PracticeModel::query()
-            ->where('material_id', $materialId)
-            ->get()
-            ->keyBy('difficulty_level');
-
-        $attempts = PracticeAttemptModel::query()
-            ->where('practice_attempts.user_id', $userId)
-            ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
-            ->where('practices.material_id', $materialId)
-            ->whereNotNull('practice_attempts.finished_at')
-            ->select('practice_attempts.*', 'practices.difficulty_level')
-            ->orderByDesc('practice_attempts.finished_at')
-            ->get();
-
-        if ($attempts->isEmpty()) {
-            return [
-                'required_level' => 'normal',
-                'attempt_mode' => 'pretest',
-                'weak_sub_topic' => null,
-                'remediation_round' => 0,
-                'action' => 'start_pretest',
-                'recommend_review' => false,
-                'message' => 'Mulai dari pre-test untuk menentukan level awal kamu.',
-                'practice_id' => $practices['normal']->id ?? null,
-            ];
-        }
-
-        $latest = $attempts->first();
-        $latestLevel = $latest->target_level ?: $latest->difficulty_level;
-        $latestMode = $latest->attempt_mode ?: 'regular';
-        $latestScore = (int) $latest->final_score;
-
-        if ($latestMode === 'pretest') {
-            $startLevel = $this->resolveInitialLevelFromPretest($latestScore);
-
-            return [
-                'required_level' => $startLevel,
-                'attempt_mode' => 'regular',
-                'weak_sub_topic' => null,
-                'remediation_round' => 0,
-                'action' => 'next_level',
-                'recommend_review' => false,
-                'message' => 'Pre-test selesai. Kamu diarahkan ke level ' . strtoupper($this->toDisplayLevel($startLevel)) . '.',
-                'practice_id' => $practices[$startLevel]->id ?? null,
-            ];
-        }
-
-        if ($latestLevel === 'easy') {
-            return $this->resolveEasyPlan($latest, $practices);
-        }
-
-        if ($latestLevel === 'normal') {
-            return $this->resolveMediumPlan($latest, $practices);
-        }
-
-        return $this->resolveHardPlan($latest, $practices);
-    }
-
-    private function resolveInitialLevelFromPretest(int $score): string
-    {
-        if ($score < 60) {
-            return 'easy';
-        }
-
-        if ($score <= 80) {
-            return 'normal';
-        }
-
-        return 'hard';
-    }
-
-    private function resolveEasyPlan(PracticeAttemptModel $latest, $practices): array
-    {
-        $score = (int) $latest->final_score;
-
-        if ($score >= 60) {
-            return [
-                'required_level' => 'normal',
-                'attempt_mode' => 'regular',
-                'weak_sub_topic' => null,
-                'remediation_round' => 0,
-                'action' => 'next_level',
-                'recommend_review' => false,
-                'message' => 'Level Easy tuntas. Lanjut ke level Medium.',
-                'practice_id' => $practices['normal']->id ?? null,
-            ];
-        }
-
-        $nextRound = (int) ($latest->remediation_round ?? 0);
-        if (($latest->attempt_mode ?? 'regular') === 'regular') {
-            $nextRound = 1;
-        } else {
-            $nextRound++;
-        }
-
-        if ($nextRound > 3) {
-            return [
-                'required_level' => 'easy',
-                'attempt_mode' => 'regular',
-                'weak_sub_topic' => $latest->weak_sub_topic,
-                'remediation_round' => 3,
-                'action' => 'review_material',
-                'recommend_review' => true,
-                'message' => 'Easy belum mencapai 60 setelah 3 remedial. Baca ulang materi pada sub-topik lemah.',
-                'practice_id' => $practices['easy']->id ?? null,
-            ];
-        }
-
-        $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id) ?? $latest->weak_sub_topic;
-
-        return [
-            'required_level' => 'easy',
-            'attempt_mode' => 'remedial',
-            'weak_sub_topic' => $weakSubTopic,
-            'remediation_round' => $nextRound,
-            'action' => 'retry',
-            'recommend_review' => false,
-            'message' => 'Remedial Easy fokus sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
-            'practice_id' => $practices['easy']->id ?? null,
-        ];
-    }
-
-    private function resolveMediumPlan(PracticeAttemptModel $latest, $practices): array
-    {
-        $score = (int) $latest->final_score;
-
-        if ($score >= 60) {
-            return [
-                'required_level' => 'hard',
-                'attempt_mode' => 'regular',
-                'weak_sub_topic' => null,
-                'remediation_round' => 0,
-                'action' => 'next_level',
-                'recommend_review' => false,
-                'message' => 'Level Medium tuntas. Lanjut ke level Hard.',
-                'practice_id' => $practices['hard']->id ?? null,
-            ];
-        }
-
-        if (($latest->attempt_mode ?? 'regular') === 'regular') {
-            $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id);
-
-            return [
-                'required_level' => 'normal',
-                'attempt_mode' => 'remedial',
-                'weak_sub_topic' => $weakSubTopic,
-                'remediation_round' => 1,
-                'action' => 'retry',
-                'recommend_review' => false,
-                'message' => 'Remedial Medium 1x pada sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
-                'practice_id' => $practices['normal']->id ?? null,
-            ];
-        }
-
-        $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
-
-        return [
-            'required_level' => 'easy',
-            'attempt_mode' => 'remedial',
-            'weak_sub_topic' => $weakSubTopic,
-            'remediation_round' => 1,
-            'action' => 'fallback_easy',
-            'recommend_review' => false,
-            'message' => 'Medium masih < 60 setelah remedial. Turun ke Easy pada sub-topik yang sama.',
-            'practice_id' => $practices['easy']->id ?? null,
-        ];
-    }
-
-    private function resolveHardPlan(PracticeAttemptModel $latest, $practices): array
-    {
-        $score = (int) $latest->final_score;
-
-        if ($score > 80) {
-            return [
-                'required_level' => null,
-                'attempt_mode' => 'regular',
-                'weak_sub_topic' => null,
-                'remediation_round' => 0,
-                'action' => 'next_material',
-                'recommend_review' => false,
-                'message' => 'Level Hard > 80. Materi ini selesai.',
-                'practice_id' => null,
-            ];
-        }
-
-        if (($latest->attempt_mode ?? 'regular') === 'regular') {
-            $weakSubTopic = $this->resolveWeakSubTopic((int) $latest->id);
-
-            return [
-                'required_level' => 'hard',
-                'attempt_mode' => 'remedial',
-                'weak_sub_topic' => $weakSubTopic,
-                'remediation_round' => 1,
-                'action' => 'retry',
-                'recommend_review' => false,
-                'message' => 'Remedial Hard fokus sub-topik: ' . ($weakSubTopic ?: 'belum terpetakan') . '.',
-                'practice_id' => $practices['hard']->id ?? null,
-            ];
-        }
-
-        if ($score < 60) {
-            $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
-
-            return [
-                'required_level' => 'normal',
-                'attempt_mode' => 'remedial',
-                'weak_sub_topic' => $weakSubTopic,
-                'remediation_round' => 1,
-                'action' => 'fallback_medium',
-                'recommend_review' => false,
-                'message' => 'Hard remedial masih < 60. Turun ke Medium pada sub-topik yang sama.',
-                'practice_id' => $practices['normal']->id ?? null,
-            ];
-        }
-
-        $weakSubTopic = $latest->weak_sub_topic ?: $this->resolveWeakSubTopic((int) $latest->id);
-
-        return [
-            'required_level' => 'hard',
-            'attempt_mode' => 'remedial',
-            'weak_sub_topic' => $weakSubTopic,
-            'remediation_round' => 1,
-            'action' => 'retry',
-            'recommend_review' => false,
-            'message' => 'Lanjut remedial Hard sampai skor > 80.',
-            'practice_id' => $practices['hard']->id ?? null,
-        ];
-    }
-
-    private function resolveWeakSubTopic(int $attemptId): ?string
-    {
-        $rows = UserPracticeAnswerModel::query()
-            ->join('practice_questions', 'practice_questions.id', '=', 'user_practice_answers.practice_questions_id')
-            ->where('user_practice_answers.practice_attempts_id', $attemptId)
-            ->whereNotNull('practice_questions.sub_topic')
-            ->where('practice_questions.sub_topic', '!=', '')
-            ->select(
-                'practice_questions.sub_topic',
-                DB::raw('COUNT(*) as total_answered'),
-                DB::raw('SUM(CASE WHEN user_practice_answers.is_correct = 1 THEN 1 ELSE 0 END) as total_correct')
-            )
-            ->groupBy('practice_questions.sub_topic')
-            ->get();
-
-        if ($rows->isEmpty()) {
-            return null;
-        }
-
-        $sorted = $rows
-            ->map(function ($row) {
-                $total = max((int) $row->total_answered, 1);
-                $correct = (int) $row->total_correct;
-
-                return [
-                    'sub_topic' => $row->sub_topic,
-                    'accuracy' => ($correct / $total) * 100,
-                ];
-            })
-            ->sortBy('accuracy')
-            ->values();
-
-        return $sorted->first()['sub_topic'] ?? null;
-    }
-
-    private function toDisplayLevel(string $level): string
-    {
-        return $level === 'normal' ? 'medium' : $level;
     }
 
     private function mapAttemptType(string $attemptMode): string
@@ -843,8 +489,17 @@ class PracticeService
         $latestNo = (int) (PracticeAttemptModel::query()
             ->where('user_id', $userId)
             ->where('practices_id', $practiceId)
-            ->max('attempt_no') ?? 0);
+            ->max('attempt_number') ?? 0);
 
         return $latestNo + 1;
+    }
+
+    //new service
+    public function getPretestPracticeByMaterial(int $materialId): ?PracticeModel
+    {
+        return PracticeModel::query()
+            ->where('material_id', $materialId)
+            ->where('type', 'pretest')
+            ->first();
     }
 }

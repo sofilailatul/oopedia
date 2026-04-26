@@ -1,199 +1,357 @@
 import React from "react";
 import { Link } from "@inertiajs/react";
-import Dropdown from "@/Components/Dropdown";
-import { FaChevronDown, FaCheck, FaTimes } from "react-icons/fa";
+import { FaTimes, FaBookOpen, FaArrowRight } from "react-icons/fa";
 import Button from "@/Components/Button";
-import { difficultyLabel } from "@/Features/practice/labels";
-import { hintToneClass, scoreBadgeClass } from "@/Features/practice/ui";
-import { calculateDifficultyRule, canSelectDifficulty } from "@/Features/practice/rules";
-import { totalQuestions } from "@/Features/practice/helpers";
+import {
+  levelLabel,
+  getFlowUI,
+  getJourneySteps,
+  PASSING_SCORE,
+  HARD_PASSING_SCORE,
+} from "@/Features/practice/core";
+
+// ─── Main component ────────────────────────────────────────────────────────────
 
 export default function PracticeSidebar({
   selectedPractice,
-  difficulty,
-  questionType,
-  onDifficultyChange,
+  progress = null,
   onClose,
   onStart,
-  canStart,
+  canStart = true,
 }) {
-  const scores = selectedPractice?.scores ?? { easy: null, normal: null, hard: null };
-  const levels = selectedPractice?.levels ?? {};
-  const questionCounts = selectedPractice?.question_counts ?? {};
+  const [openLevels, setOpenLevels] = React.useState({
+    easy: false,
+    medium: false,
+    hard: false,
+  });
+  const scores = selectedPractice?.scores ?? { easy: null, medium: null, hard: null };
+  const scoresByMode = selectedPractice?.scores_by_mode ?? {
+    easy: { normal: null, focused_remedial: null },
+    medium: { normal: null, focused_remedial: null },
+    hard: { normal: null, focused_remedial: null },
+  };
+  const flow = getFlowUI(progress);
+  const steps = getJourneySteps(progress, scores);
+  const focusedSubtopicName = progress?.focused_subtopic_name ?? null;
 
-  const rule = calculateDifficultyRule(scores);
-  const qty = totalQuestions(questionCounts, difficulty, questionType, selectedPractice?.material_name);
+  const toggleLevel = (level) => {
+    setOpenLevels((prev) => ({ ...prev, [level]: !prev[level] }));
+  };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-6 md:p-8 flex flex-col h-full overflow-y-auto">
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full overflow-y-auto">
+
       {/* Header */}
-      <div className="flex items-start justify-between pb-3">
+      <div className="flex items-start justify-between p-6 pb-4 border-b border-slate-100">
         <div>
-          <h3 className="text-xl font-bold text-slate-900 leading-snug">
+          <h3 className="text-sm font-semibold text-slate-900 leading-snug">
             {selectedPractice?.material_name ?? "Pilih Materi"}
           </h3>
+          <p className="mt-1 text-[11px] text-slate-400">{flow.stageLabel}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-          title="Tutup"
+          className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0"
         >
-          <FaTimes className="w-3.5 h-3.5" />
+          <FaTimes className="w-3 h-3" />
         </button>
       </div>
 
-      <div className="space-y-6 flex-1">
-        {/* Hint / Rules */}
-        <div className={`border rounded-2xl p-4 text-[13px] leading-relaxed font-medium ${hintToneClass(rule.tone) || 'bg-slate-50 border-slate-200 text-slate-600'}`}>
-          <div className="flex items-start gap-3">
-            <span className="text-lg mt-0.5">💡</span>
-            <p>{rule.hint}</p>
-          </div>
-        </div>
+      <div className="flex flex-col gap-3 p-5">
 
-        {/* Scores */}
-        <div className="space-y-3">
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
-            Nilai Per Level
-          </label>
-          <div className="grid grid-cols-1 gap-2">
-            {["easy", "normal", "hard"].map((level) => (
-              <div key={level} className="flex items-center justify-between bg-slate-50/50 border border-slate-100 rounded-xl px-4 py-3">
-                <span className="text-[12px] font-medium text-slate-700 capitalize">
-                  {difficultyLabel(level)}
-                </span>
-                <ScoreBadge score={scores[level]} />
-              </div>
+        {/* Journey stepper */}
+        <JourneyStepper steps={steps} />
+
+        {/* Current action card */}
+        <ActionCard flow={flow} />
+
+        {/* Placement reason / remedial counter */}
+        {flow.showPlacementReason && flow.placementReason && (
+          <ReasonBox text={flow.placementReason} tone={flow.tone} />
+        )}
+
+        {/* Focused subtopic */}
+        {flow.showSubtopic && focusedSubtopicName && (
+          <InfoSection label="Sub-topik fokus">
+            <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+              <p className="text-[13px] font-medium text-amber-800">{focusedSubtopicName}</p>
+            </div>
+          </InfoSection>
+        )}
+
+        {/* Scores per level */}
+        <InfoSection label="Nilai per level">
+          <div className="rounded-xl border border-slate-100 overflow-hidden">
+            {["easy", "medium", "hard"].map((level, i) => (
+              <LevelScoreAccordionRow
+                key={level}
+                level={level}
+                practiceId={selectedPractice?.levels?.[level] ?? null}
+                score={scores[level]}
+                modeScores={scoresByMode[level]}
+                isOpen={Boolean(openLevels[level])}
+                onToggle={() => toggleLevel(level)}
+                divider={i < 2}
+              />
             ))}
           </div>
-        </div>
+        </InfoSection>
 
-        {/* Options */}
-        <div className="space-y-3">
-          <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 block ml-1">
-            Level Kesulitan
-          </label>
-          <Dropdown>
-            <Dropdown.Trigger>
-              <Button
-                className="w-full flex items-center justify-between border border-slate-200 rounded-2xl px-4 py-3.5 bg-white hover:border-indigo-300 hover:bg-slate-50 transition-all focus:ring-4 focus:ring-indigo-50"
-              >
-                <span className="text-[12px] font-medium text-slate-700">
-                  {difficulty ? difficultyLabel(difficulty) : "Pilih Level"}
-                </span>
-                <FaChevronDown className="text-slate-400 text-[10px]" />
-              </Button>
-            </Dropdown.Trigger>
-            <Dropdown.Content align="left" width="48" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100">
-              {["easy", "normal", "hard"].map((level) => {
-                const enabled = canSelectDifficulty(level, rule);
-                const selected = difficulty === level;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    disabled={!enabled}
-                    onClick={() => enabled && onDifficultyChange(level)}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors flex items-center justify-between ${
-                      selected ? "bg-indigo-50 text-indigo-700" : (enabled ? "text-slate-700 hover:bg-slate-50" : "text-slate-300 cursor-not-allowed")
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      {selected && <FaCheck className="text-[10px]" />}
-                      {difficultyLabel(level)}
-                    </span>
-                    {!enabled && <span className="text-[10px] uppercase font-bold text-slate-300 bg-slate-50 px-2 py-0.5 rounded-md">Terkunci</span>}
-                  </button>
-                );
-              })}
-            </Dropdown.Content>
-          </Dropdown>
-        </div>
-
-        {/* Summary Info */}
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-          <span className="text-[13px] font-semibold text-slate-600">Total Soal</span>
-          <div className="flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg bg-white border border-slate-200 text-sm font-bold text-indigo-600 shadow-sm">
-            {!difficulty || !questionType ? "—" : qty}
-          </div>
-        </div>
-
-        {difficulty && questionType && qty === 0 && (
-          <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3 text-red-600">
-            <span className="text-sm mt-0.5">⚠️</span>
-            <p className="text-xs font-medium leading-relaxed">
-              Soal untuk level ini belum tersedia. Silakan pilih level lain.
-            </p>
+        {/* Read-material warning */}
+        {progress?.current_mode === "repeat_material" && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+            <FaBookOpen className="mt-0.5 text-amber-500 flex-shrink-0" style={{ fontSize: 14 }} />
+            <div>
+              <p className="text-[13px] font-medium text-amber-800">
+                Baca ulang materi sebelum latihan lagi
+              </p>
+              <p className="mt-0.5 text-[12px] text-amber-700 leading-relaxed">
+                Setelah memahami materi, kembali ke sini untuk melanjutkan.
+              </p>
+            </div>
           </div>
         )}
 
-        <div className="space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Summary</p>
-          </div>
-
-          <div className="space-y-2">
-            {(["easy", "normal", "hard"]).map((level) => {
-              const practiceId = levels[level];
-              const score = scores[level];
-
-              if (!practiceId || score == null) {
-                return null;
-              }
-
-              return (
+        {/* Summary history links */}
+        {selectedPractice?.summary_links?.length > 0 && (
+          <InfoSection label="Riwayat ringkasan">
+            <div className="space-y-1.5">
+              {selectedPractice.summary_links.map((item) => (
                 <Link
-                  key={level}
-                  href={route("practices.summary", practiceId)}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:border-indigo-300 hover:bg-indigo-50/60"
+                  key={item.id}
+                  href={item.href}
+                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors"
                 >
-                  <div>
-                    <p className="text-[12px] font-semibold uppercase tracking-[0.2em] text-slate-900">{difficultyLabel(level)}</p>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
-                    {score} points
+                  <p className="text-[12px] font-medium text-slate-700">{item.label}</p>
+                  <span className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                    {item.score ?? 0} pts
                   </span>
                 </Link>
-              );
-            })}
-
-            {(["easy", "normal", "hard"]).every((level) => !levels[level] || scores[level] == null) && (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
-                Summary akan muncul setelah kamu menyelesaikan latihan.
-              </div>
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          </InfoSection>
+        )}
       </div>
 
-      <div className="mt-8 pt-6 border-t border-slate-100">
+      {/* CTA */}
+      <div className="p-5 pt-2">
         <Button
+          type="button"
           disabled={!canStart}
-          onClick={() => onStart(qty)}
+          onClick={() => onStart?.()}
           variant="solid"
           color="indigo"
           size="lg"
-          className={`w-full rounded-2xl font-bold py-4 shadow-[0_4px_14px_0_rgb(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:bg-indigo-700 disabled:shadow-none transition-all ${
-            !canStart && "bg-slate-100 text-slate-400 border border-slate-200"
-          }`}
+          className={`w-full rounded-2xl font-semibold py-3.5 transition-all
+            ${!canStart
+              ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none"
+              : "shadow-[0_4px_14px_0_rgb(79,70,229,0.3)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.2)] hover:bg-indigo-700"
+            }`}
         >
-          {canStart ? "Mulai Kerjakan" : "Hubungi Dosen"}
+          <span className="inline-flex items-center gap-2 text-sm">
+            {flow.button}
+            <FaArrowRight style={{ fontSize: 11 }} />
+          </span>
         </Button>
       </div>
     </div>
   );
 }
 
-function ScoreBadge({ score }) {
-  const badgeClass = scoreBadgeClass(score);
-  const display = score == null ? "0" : `${score} pts`;
+// ─── Journey stepper ───────────────────────────────────────────────────────────
+
+const STEP_STYLES = {
+  done:    { dot: "bg-green-100 text-green-700",    label: "text-green-700" },
+  active:  { dot: "bg-blue-100 text-blue-700 ring-2 ring-blue-300 ring-offset-1", label: "text-blue-700 font-medium" },
+  skipped: { dot: "bg-slate-100 text-slate-400",    label: "text-slate-400" },
+  locked:  { dot: "bg-slate-50 text-slate-300 border border-slate-200", label: "text-slate-300" },
+};
+
+const STEP_ICONS = {
+  done:    "✓",
+  active:  "●",
+  skipped: "—",
+  locked:  "○",
+};
+
+function JourneyStepper({ steps }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
+        Perjalananmu
+      </p>
+      <div className="flex items-center">
+        {steps.map((step, i) => (
+          <React.Fragment key={step.key}>
+            <div className="flex flex-col items-center gap-1 flex-shrink-0">
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${STEP_STYLES[step.state].dot}`}>
+                {STEP_ICONS[step.state]}
+              </div>
+              <span className={`text-[9px] ${STEP_STYLES[step.state].label}`}>
+                {step.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`flex-1 h-px mx-1 mb-4 ${
+                step.state === "done" ? "bg-green-300" : "bg-slate-200"
+              }`} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Action card ───────────────────────────────────────────────────────────────
+
+const TONE_STYLES = {
+  blue:  "bg-blue-50 border-blue-100",
+  amber: "bg-amber-50 border-amber-100",
+  red:   "bg-red-50 border-red-100",
+  green: "bg-emerald-50 border-emerald-100",
+  slate: "bg-slate-50 border-slate-200",
+};
+
+const TONE_TITLE = {
+  blue:  "text-blue-800",
+  amber: "text-amber-800",
+  red:   "text-red-800",
+  green: "text-emerald-800",
+  slate: "text-slate-800",
+};
+
+const TONE_HINT = {
+  blue:  "text-blue-700",
+  amber: "text-amber-700",
+  red:   "text-red-700",
+  green: "text-emerald-700",
+  slate: "text-slate-600",
+};
+
+function ActionCard({ flow }) {
+  return (
+    <div className={`rounded-xl border px-4 py-3.5 ${TONE_STYLES[flow.tone] ?? TONE_STYLES.slate}`}>
+      <p className={`text-[12px] font-semibold mb-1 ${TONE_TITLE[flow.tone] ?? TONE_TITLE.slate}`}>
+        {flow.title}
+      </p>
+      <p className={`text-[11px] leading-relaxed ${TONE_HINT[flow.tone] ?? TONE_HINT.slate}`}>
+        {flow.hint}
+      </p>
+    </div>
+  );
+}
+
+// ─── Reason box ────────────────────────────────────────────────────────────────
+
+const REASON_STYLES = {
+  slate: "bg-slate-50 text-slate-600 border-slate-200",
+  amber: "bg-amber-50 text-amber-700 border-amber-100",
+  red:   "bg-red-50 text-red-700 border-red-100",
+};
+
+function ReasonBox({ text, tone }) {
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 text-[11px] leading-relaxed ${REASON_STYLES[tone] ?? REASON_STYLES.slate}`}>
+      {text}
+    </div>
+  );
+}
+
+// ─── Level score row ───────────────────────────────────────────────────────────
+
+const LEVEL_DOT = {
+  easy:   "bg-teal-400",
+  medium: "bg-amber-400",
+  hard:   "bg-blue-500",
+};
+
+function formatModeScore(level, score) {
+  if (score == null) {
+    return { label: "Belum ada nilai", tone: "text-slate-400" };
+  }
+
+  const threshold = level === "hard" ? HARD_PASSING_SCORE : PASSING_SCORE;
+  if (score >= threshold) {
+    return { label: `${score} - lulus`, tone: "text-emerald-700" };
+  }
+
+  return { label: `${score} - belum lulus`, tone: "text-red-600" };
+}
+
+function LevelScoreAccordionRow({ level, practiceId, score, modeScores, isOpen, onToggle, divider }) {
+  const normalScore = modeScores?.normal ?? null;
+  const remedialScore = modeScores?.focused_remedial ?? null;
+  const hasAttempt = normalScore != null || remedialScore != null || score != null;
+  const summary = score != null ? `${score}` : "Belum pernah dikerjakan";
+  const summaryTone = hasAttempt ? "text-slate-700" : "text-slate-400";
+  const normalHref = practiceId ? `${route("practices.summary", practiceId)}?mode=normal` : null;
+  const remedialHref = practiceId ? `${route("practices.summary", practiceId)}?mode=focused_remedial` : null;
 
   return (
-    <span className={`text-[10px] font-medium px-2.5 py-1 rounded-md tracking-wider uppercase ${badgeClass} border ${
-      score == null ? "bg-slate-100 text-slate-500 border-slate-200" : badgeClass
-    }`}>
-      {display}
-    </span>
+    <div className={`${divider ? "border-b border-slate-100" : ""} ${!hasAttempt ? "bg-slate-100/70" : "bg-slate-50/50"}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!hasAttempt}
+        className={`w-full flex items-center justify-between px-3 py-2.5 text-left ${!hasAttempt ? "cursor-not-allowed" : "cursor-pointer"}`}
+      >
+        <span className="flex items-center gap-2 text-[11px] font-medium text-slate-600">
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${hasAttempt ? LEVEL_DOT[level] : "bg-slate-300"}`} />
+          {levelLabel(level)}
+        </span>
+        <span className="flex items-center gap-2">
+          <span className={`text-[10px] ${summaryTone}`}>{summary}</span>
+          <span className={`text-[10px] ${hasAttempt ? "text-slate-500" : "text-slate-300"}`}>
+            {isOpen ? "▾" : "▸"}
+          </span>
+        </span>
+      </button>
+
+      {isOpen && hasAttempt && (
+        <div className="px-3 pb-3 space-y-1.5">
+          <Link
+            href={normalHref ?? "#"}
+            className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 ${
+              normalScore != null && normalHref
+                ? "border-slate-100 bg-white hover:border-indigo-200 hover:bg-indigo-50/30"
+                : "border-slate-100 bg-slate-50 pointer-events-none"
+            }`}
+          >
+            <span className="text-[10px] font-medium text-slate-500">Mode Normal</span>
+            <span className={`text-[10px] font-medium ${formatModeScore(level, normalScore).tone}`}>
+              {formatModeScore(level, normalScore).label}
+            </span>
+          </Link>
+          <Link
+            href={remedialHref ?? "#"}
+            className={`flex items-center justify-between rounded-lg border px-2.5 py-1.5 ${
+              remedialScore != null && remedialHref
+                ? "border-slate-100 bg-white hover:border-amber-200 hover:bg-amber-50/30"
+                : "border-slate-100 bg-slate-50 pointer-events-none"
+            }`}
+          >
+            <span className="text-[10px] font-medium text-slate-500">Mode Remedial</span>
+            <span className={`text-[10px] font-medium ${formatModeScore(level, remedialScore).tone}`}>
+              {formatModeScore(level, remedialScore).label}
+            </span>
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Info section wrapper ──────────────────────────────────────────────────────
+
+function InfoSection({ label, children }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+        {label}
+      </p>
+      {children}
+    </div>
   );
 }

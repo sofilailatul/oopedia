@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, router, usePage } from "@inertiajs/react";
-import AdminLayout from "@/Layouts/AdminLayout";
+import AppLayout from "@/Layouts/AppLayout";
 
 export default function Show({ user }) {
 	const { flash } = usePage().props;
@@ -15,7 +15,7 @@ export default function Show({ user }) {
 	};
 
 	return (
-		<AdminLayout title="Detail User">
+		<AppLayout title="Detail User">
 			<div className="mb-6 flex items-center justify-between gap-4">
 				<div>
 					<h1 className="text-2xl font-bold text-slate-900">Detail User</h1>
@@ -97,6 +97,6 @@ export default function Show({ user }) {
 					</div>
 				</div>
 			</div>
-		</AdminLayout>
+		</AppLayout>
 	);
 }

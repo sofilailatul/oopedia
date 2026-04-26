@@ -10,7 +10,7 @@ function MetaItem({ label, value, children, disabled = true }) {
       </p>
       {children ?? (
         <div
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium shadow-sm backdrop-blur ${
+          className={`rounded-2xl border px-3 py-3 text-[12px] font-medium shadow-sm backdrop-blur ${
             disabled
               ? "border-slate-200/80 bg-slate-100/90 text-slate-500"
               : "border-slate-200/80 bg-white/80 text-slate-700"
@@ -26,7 +26,6 @@ function MetaItem({ label, value, children, disabled = true }) {
 export default function PracticeMetaPanel({
   teacherName,
   materialName,
-  levelLabel,
   typeLabel = "Multiple Choice",
   typeControl,
   enableTypeSelect = false,
@@ -48,10 +47,9 @@ export default function PracticeMetaPanel({
 
   return (
     <div className={`rounded-3xl border border-slate-200/80 bg-slate-50/65 p-4 shadow-sm ${className}`.trim()}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetaItem label="Pembuat" value={teacherName || "Dosen"} disabled />
         <MetaItem label="Materi" value={materialName || "Pilih Materi"} disabled />
-        <MetaItem label="Level Soal" value={levelLabel || "Pilih Level"} disabled />
         <MetaItem label="Tipe Soal" value={typeLabel} disabled={!showTypeSelect && !typeControl}>
           {typeControl}
           {showTypeSelect ? (
@@ -59,7 +57,7 @@ export default function PracticeMetaPanel({
               <Dropdown.Trigger>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200/80 bg-white px-4 py-3 text-[12px] font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
                 >
                   <span className="truncate">{selectedOption.label}</span>
                   <FaChevronDown className="text-[11px] text-slate-400" />

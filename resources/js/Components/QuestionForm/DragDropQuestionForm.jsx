@@ -1,10 +1,12 @@
 import React from "react";
 import UploadImage from "@/Components/UploadImage";
 import Button from "@/Components/Button";
+import Dropdown from "@/Components/Dropdown";
 
 export default function DragDropQuestionForm({
   question,
   questionIndex,
+  subtopicOptions = [],
   readOnly = false,
   onQuestionFieldChange,
   onOptionFieldChange,
@@ -13,6 +15,17 @@ export default function DragDropQuestionForm({
   onImageChange,
 }) {
   const q = question;
+  const selectedSubtopicId = q.subtopic_id ?? q.sub_topic_id ?? "";
+  const subtopicNameFromOptions = subtopicOptions.find((item) =>
+    String(item.id) === String(selectedSubtopicId),
+  )?.name;
+  const subTopicValue =
+    q.sub_topic_name ??
+    q.subTopicName ??
+    subtopicNameFromOptions ??
+    q.sub_topic ??
+    "";
+  const selectedSubtopicLabel = subtopicNameFromOptions || subTopicValue || "Pilih sub-topik";
 
   return (
     <div className="space-y-5 px-5 py-4">
@@ -37,16 +50,37 @@ export default function DragDropQuestionForm({
             <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
             {readOnly ? (
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
-                {q.sub_topic || "-"}
+                {subTopicValue || "-"}
               </div>
             ) : (
-              <input
-                type="text"
-                value={q.sub_topic || ""}
-                onChange={(e) => onQuestionFieldChange?.(questionIndex, "sub_topic", e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-                placeholder="Contoh: Polymorphism"
-              />
+              <Dropdown className="w-full">
+                <Dropdown.Trigger>
+                  <div className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800">
+                    {selectedSubtopicLabel}
+                  </div>
+                </Dropdown.Trigger>
+                <Dropdown.Content align="left" width="64">
+                  <Dropdown.Item
+                    onClick={() => onQuestionFieldChange?.(questionIndex, "subtopic_id", null)}
+                    className={!selectedSubtopicId ? "bg-slate-100" : ""}
+                  >
+                    Pilih sub-topik
+                  </Dropdown.Item>
+                  {subtopicOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-[12px] text-slate-400">Sub-topik belum tersedia di materi ini.</div>
+                  ) : (
+                    subtopicOptions.map((item) => (
+                      <Dropdown.Item
+                        key={item.id}
+                        onClick={() => onQuestionFieldChange?.(questionIndex, "subtopic_id", Number(item.id))}
+                        className={String(item.id) === String(selectedSubtopicId) ? "bg-slate-100" : ""}
+                      >
+                        {item.name}
+                      </Dropdown.Item>
+                    ))
+                  )}
+                </Dropdown.Content>
+              </Dropdown>
             )}
           </div>
 
@@ -54,7 +88,7 @@ export default function DragDropQuestionForm({
             <p className="text-[11px] font-medium text-slate-500">Output Code</p>
             {readOnly ? (
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
-                {q.output_code || q.outputCode || "-"}
+                {q.code_snippet || q.outputCode || "-"}
               </div>
             ) : (
               <input

@@ -35,6 +35,11 @@ class HandleInertiaRequests extends Middleware
                     ? $request->user()->load('classes:id,class_name') // ✅ ambil class name
                     : null,
             ],
+            'flash' => [
+                'success' => fn() => $request->session()->get('success'),
+                'error' => fn() => $request->session()->get('error'),
+                'info' => fn() => $request->session()->get('info'),
+            ],
         ]);
     }
 

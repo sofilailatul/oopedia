@@ -1,22 +1,21 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Mahasiswa;
 
-use App\Models\QuizModel;
-use App\Models\QuizAttemptModel;
-use App\Models\UserQuizAnswerModel;
-use App\Models\QuizQuestionsModel;
-use App\Models\QuizOptionModel;
-use App\Models\QuizMapModel;
-use App\Models\UserProgressModel;
-use App\Models\QuizAttemptMaterialScoreModel;
+use App\Http\Controllers\Controller;
 use App\Models\MaterialRecommendationModel;
-
+use App\Models\QuizAttemptMaterialScoreModel;
+use App\Models\QuizAttemptModel;
+use App\Models\QuizMapModel;
+use App\Models\QuizModel;
+use App\Models\QuizQuestionsModel;
+use App\Models\UserProgressModel;
+use App\Models\UserQuizAnswerModel;
+use App\Services\QuizService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use App\Services\QuizService;
 
 class QuizController extends Controller
 {
@@ -34,7 +33,6 @@ class QuizController extends Controller
 
         $classIds = $user->classes()->pluck('classes.id');
 
-        // Semua kuis yang bisa diakses user: class_id harus salah satu kelas user
         $accessibleQuizIds = QuizModel::query()
             ->whereIn('class_id', $classIds)
             ->pluck('id');
@@ -66,7 +64,6 @@ class QuizController extends Controller
             ])
             ->keyBy('quizzes_id');
 
-        // Ambil mapping quiz -> materi (id + nama)
         $materialsRaw = DB::table('quiz_materials')
             ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
             ->select('quiz_materials.quizzes_id', 'materials.id as material_id', 'materials.material_name')
@@ -80,7 +77,6 @@ class QuizController extends Controller
                 return $rows->pluck('material_name')->values()->all();
             });
 
-        // Progress membaca + latihan per materi untuk user ini
         $materialIds = $materialsRaw->pluck('material_id')->unique()->values();
 
         $progressByClassAndMaterial = collect();
@@ -100,7 +96,6 @@ class QuizController extends Controller
                     return $rows->keyBy('material_id');
                 });
 
-            // Fallback flags lintas class_id untuk antisipasi data progress tersimpan di row class berbeda/null
             $progressFlagsByMaterial = $progressRows
                 ->groupBy('material_id')
                 ->map(function ($rows) {
@@ -117,12 +112,12 @@ class QuizController extends Controller
                 ->pluck('material_id')
                 ->flip();
         }
-        
+
         $questionCountByQuiz = DB::table('quiz_map')
             ->select('quiz_id', DB::raw('COUNT(*) as total'))
             ->groupBy('quiz_id')
             ->pluck('total', 'quiz_id');
-        
+
         $quizzes = QuizModel::query()
             ->with(['creator:id,nama'])
             ->whereIn('id', $accessibleQuizIds)
@@ -134,18 +129,19 @@ class QuizController extends Controller
 
             $isDone = $attempt && !is_null($attempt->finished_at);
 
-            
             $now = now();
             $availableByTime = true;
-            if ($q->start_at && $now->lt($q->start_at)) $availableByTime = false;
-            if ($q->end_at && $now->gt($q->end_at)) $availableByTime = false;
+            if ($q->start_at && $now->lt($q->start_at)) {
+                $availableByTime = false;
+            }
+            if ($q->end_at && $now->gt($q->end_at)) {
+                $availableByTime = false;
+            }
 
-            // Cek apakah semua materi yang diuji sudah dibaca & latihan selesai
             $requirements = $materialsRaw->where('quizzes_id', $q->id);
 
             $progressOk = true;
             if ($requirements->isNotEmpty()) {
-                // Progress diambil berdasarkan class_id kuis (karena kuis hanya untuk satu kelas)
                 $classProgress = $progressByClassAndMaterial->get($q->class_id, collect());
                 foreach ($requirements as $row) {
                     $materialId = $row->material_id;
@@ -161,8 +157,6 @@ class QuizController extends Controller
                     $readyFromClassProgress = $p && !is_null($p->read_at) && !is_null($p->completed_practice_at);
                     $readyFromFallback = (bool)($fallbackFlags['ready_for_quiz'] ?? false);
 
-                    // Untuk materi yang punya latihan, wajib read_at + completed_practice_at sama-sama terisi.
-                    // Untuk materi tanpa latihan, cukup read_at.
                     $progressSatisfied = $hasPractice
                         ? ($readyFromClassProgress || $readyFromFallback)
                         : $hasRead;
@@ -174,14 +168,12 @@ class QuizController extends Controller
                 }
             }
 
-            // is_available dipakai UI untuk status Terkunci karena progress.
-            // Batas waktu ditangani terpisah di frontend lewat start_at/end_at.
             $isAvailable = $progressOk;
 
             return [
                 'id' => $q->id,
                 'title' => $q->title,
-                'description' => null, 
+                'description' => null,
                 'teacher_name' => $q->creator?->nama ?? 'Dosen',
                 'duration' => (int) $q->duration,
                 'start_at' => $q->start_at,
@@ -213,7 +205,6 @@ class QuizController extends Controller
             ->latest('id')
             ->first();
 
-        // Fetch materials for this quiz from quiz_material
         $materials = DB::table('quiz_materials')
             ->join('materials', 'materials.id', '=', 'quiz_materials.material_id')
             ->where('quiz_materials.quizzes_id', $quiz->id)
@@ -233,10 +224,9 @@ class QuizController extends Controller
                 'status' => ($attempt && $attempt->finished_at) ? 'done' : 'not_done',
                 'score' => ($attempt && $attempt->finished_at) ? $attempt->total_score : null,
                 'materials' => $materials,
-            ]
+            ],
         ]);
     }
-
 
     public function questions(Request $request, QuizModel $quiz)
     {
@@ -250,7 +240,7 @@ class QuizController extends Controller
                 'image_path' => $q->image_path,
                 'feedback_correct' => $q->feedback_correct,
                 'feedback_incorrect' => $q->feedback_incorrect,
-                'points' => (int)($q->pivot?->points ?? 1),
+                'points' => (int) ($q->pivot?->points ?? 1),
                 'options' => $q->options->map(fn($opt) => [
                     'id' => $opt->id,
                     'option_text' => $opt->option_text,
@@ -284,13 +274,12 @@ class QuizController extends Controller
             ]);
         } catch (\Exception $e) {
             return back()->withErrors([
-                'quiz' => $e->getMessage(), // ini yang masuk ke props.errors.quiz
+                'quiz' => $e->getMessage(),
             ]);
         }
 
         return redirect()->route('quiz_attempts.show', $attempt->id);
     }
-
 
     public function attemptShow(Request $request, QuizAttemptModel $attempt)
     {
@@ -301,16 +290,14 @@ class QuizController extends Controller
         $quiz = QuizModel::with(['questions.options'])->findOrFail($attempt->quizzes_id);
 
         $cfg = session("quiz_cfg_{$attempt->id}", [
-            'duration_seconds' => (int)$quiz->duration * 60,
+            'duration_seconds' => (int) $quiz->duration * 60,
         ]);
 
-        
         $savedAnswers = UserQuizAnswerModel::query()
             ->where('quiz_attempts_id', $attempt->id)
             ->get()
             ->keyBy('quiz_questions_id');
 
-        
         $questions = $quiz->questions->map(function ($q) {
             return [
                 'id' => $q->id,
@@ -319,7 +306,7 @@ class QuizController extends Controller
                 'image_path' => $q->image_path,
                 'feedback_correct' => $q->feedback_correct,
                 'feedback_incorrect' => $q->feedback_incorrect,
-                'points' => (int)($q->pivot?->points ?? 1),
+                'points' => (int) ($q->pivot?->points ?? 1),
                 'options' => $q->options->map(fn($o) => [
                     'id' => $o->id,
                     'option_text' => $o->option_text,
@@ -354,7 +341,7 @@ class QuizController extends Controller
 
         $data = $request->validate([
             'question_id' => ['required', 'integer'],
-            'option_id'   => ['required', 'integer'],
+            'option_id' => ['required', 'integer'],
         ]);
 
         $question = QuizQuestionsModel::with('options')
@@ -362,11 +349,11 @@ class QuizController extends Controller
             ->firstOrFail();
 
         $correctOpt = $question->options->firstWhere('is_correct', 1);
-        $isCorrect  = $correctOpt && (int)$correctOpt->id === (int)$data['option_id'];
+        $isCorrect = $correctOpt && (int) $correctOpt->id === (int) $data['option_id'];
 
         return response()->json([
             'is_correct' => $isCorrect,
-            'feedback'   => $isCorrect
+            'feedback' => $isCorrect
                 ? $question->feedback_correct
                 : $question->feedback_incorrect,
         ]);
@@ -381,10 +368,10 @@ class QuizController extends Controller
         }
 
         $data = $request->validate([
-            'answers' => ['required','array'],
-            'answers.*.option_id' => ['nullable','integer'],
-            'answers.*.timespent' => ['nullable','integer','min:0'],
-            'auto_submit' => ['nullable','in:0,1'],
+            'answers' => ['required', 'array'],
+            'answers.*.option_id' => ['nullable', 'integer'],
+            'answers.*.timespent' => ['nullable', 'integer', 'min:0'],
+            'auto_submit' => ['nullable', 'in:0,1'],
         ]);
 
         $answersPayload = $data['answers'];
@@ -410,18 +397,19 @@ class QuizController extends Controller
         DB::transaction(function () use ($attempt, $answersPayload, $questions, $allQuizQuestions) {
             $totalScore = 0;
 
-            // Simpan jawaban user
             foreach ($answersPayload as $qid => $a) {
-                $qid = (int)$qid;
+                $qid = (int) $qid;
                 $q = $questions->get($qid);
-                if (!$q) continue;
+                if (!$q) {
+                    continue;
+                }
 
-                $selectedOptId = isset($a['option_id']) ? (int)$a['option_id'] : null;
+                $selectedOptId = isset($a['option_id']) ? (int) $a['option_id'] : null;
                 $correctOpt = $q->options->firstWhere('is_correct', 1);
 
-                $isCorrect = $correctOpt && $selectedOptId && ((int)$correctOpt->id === $selectedOptId);
+                $isCorrect = $correctOpt && $selectedOptId && ((int) $correctOpt->id === $selectedOptId);
                 if ($isCorrect) {
-                    $totalScore += (int)($q->points ?? 1);
+                    $totalScore += (int) ($q->points ?? 1);
                 }
 
                 UserQuizAnswerModel::updateOrCreate(
@@ -440,11 +428,11 @@ class QuizController extends Controller
                 'finished_at' => now(),
                 'total_score' => $totalScore,
             ]);
-            $materialStats = []; 
+            $materialStats = [];
 
             foreach ($allQuizQuestions as $q) {
-                $points = (int)($q->points ?? 1);
-                $materialId = (int)$q->material_id;
+                $points = (int) ($q->points ?? 1);
+                $materialId = (int) $q->material_id;
 
                 if (!isset($materialStats[$materialId])) {
                     $materialStats[$materialId] = ['earned' => 0, 'max' => 0, 'correct' => 0];
@@ -453,9 +441,9 @@ class QuizController extends Controller
 
                 $answer = $answersPayload[$q->id] ?? null;
                 if ($answer) {
-                    $selectedOptId = isset($answer['option_id']) ? (int)$answer['option_id'] : null;
+                    $selectedOptId = isset($answer['option_id']) ? (int) $answer['option_id'] : null;
                     $correctOpt = $q->options->firstWhere('is_correct', 1);
-                    $isCorrect = $correctOpt && $selectedOptId && ((int)$correctOpt->id === $selectedOptId);
+                    $isCorrect = $correctOpt && $selectedOptId && ((int) $correctOpt->id === $selectedOptId);
 
                     if ($isCorrect) {
                         $materialStats[$materialId]['earned'] += $points;
@@ -465,25 +453,24 @@ class QuizController extends Controller
             }
 
             foreach ($materialStats as $materialId => $stat) {
-                $pct = $stat['max'] > 0 ? (int)round(($stat['earned'] / $stat['max']) * 100) : 0;
+                $pct = $stat['max'] > 0 ? (int) round(($stat['earned'] / $stat['max']) * 100) : 0;
 
                 QuizAttemptMaterialScoreModel::updateOrCreate(
                     [
                         'quiz_attempts_id' => $attempt->id,
-                        'material_id'      => $materialId,
+                        'material_id' => $materialId,
                     ],
                     [
                         'correct_count' => $stat['correct'],
-                        'earned_score'  => $stat['earned'],
-                        'max_score'     => $stat['max'],
-                        'percentage'    => $pct,
+                        'earned_score' => $stat['earned'],
+                        'max_score' => $stat['max'],
+                        'percentage' => $pct,
                     ]
                 );
             }
         });
 
-        // Tandai completed_quiz_at untuk semua materi yang tercantum di kuis ini.
-        $this->updateCompletedQuizAt((int)$request->user()->id, (int)$attempt->quizzes_id);
+        $this->updateCompletedQuizAt((int) $request->user()->id, (int) $attempt->quizzes_id);
 
         return redirect()->route('quiz_attempts.completed', $attempt->id);
     }
@@ -491,9 +478,9 @@ class QuizController extends Controller
     public function completed(Request $request, QuizAttemptModel $attempt)
     {
         abort_unless($attempt->user_id === $request->user()->id, 403);
-        abort_unless(!is_null($attempt->finished_at), 404); 
+        abort_unless(!is_null($attempt->finished_at), 404);
 
-        $attempt->load('quiz'); 
+        $attempt->load('quiz');
         $rows = DB::table('quiz_attempt_material_scores')
             ->join('materials', 'materials.id', '=', 'quiz_attempt_material_scores.material_id')
             ->where('quiz_attempt_material_scores.quiz_attempts_id', $attempt->id)
@@ -504,32 +491,30 @@ class QuizController extends Controller
                 'quiz_attempt_material_scores.earned_score',
                 'quiz_attempt_material_scores.max_score'
             )
-            ->orderBy('quiz_attempt_material_scores.percentage', 'asc') 
+            ->orderBy('quiz_attempt_material_scores.percentage', 'asc')
             ->get();
 
         $recommendations = $rows
-            ->filter(fn($r) => (int)$r->percentage < 70)
+            ->filter(fn($r) => (int) $r->percentage < 70)
             ->take(3)
             ->values()
             ->map(function ($r) {
                 return [
-                    'material_id' => (int)$r->material_id,
+                    'material_id' => (int) $r->material_id,
                     'name' => $r->material_name,
-                    'percentage' => (int)$r->percentage,
-                    'earned_score' => (int)$r->earned_score,
-                    'max_score' => (int)$r->max_score,
+                    'percentage' => (int) $r->percentage,
+                    'earned_score' => (int) $r->earned_score,
+                    'max_score' => (int) $r->max_score,
                 ];
             });
 
-        // Simpan semua materi quiz ke tabel material_recommendations.
-        // Yang lulus tetap masuk dengan is_completed = true.
         foreach ($rows as $row) {
-            $isCompleted = ((int)$row->percentage >= 70);
+            $isCompleted = ((int) $row->percentage >= 70);
 
             MaterialRecommendationModel::updateOrCreate(
                 [
                     'user_id' => $request->user()->id,
-                    'material_id' => (int)$row->material_id,
+                    'material_id' => (int) $row->material_id,
                     'quizzes_id' => $attempt->quizzes_id,
                 ],
                 [
@@ -554,11 +539,11 @@ class QuizController extends Controller
             ->orderByDesc('material_recommendations.id')
             ->get()
             ->map(fn($r) => [
-                'material_id' => (int)$r->material_id,
+                'material_id' => (int) $r->material_id,
                 'name' => $r->name,
-                'percentage' => (int)$r->percentage,
-                'earned_score' => (int)$r->earned_score,
-                'max_score' => (int)$r->max_score,
+                'percentage' => (int) $r->percentage,
+                'earned_score' => (int) $r->earned_score,
+                'max_score' => (int) $r->max_score,
             ]);
 
         if ($savedRecommendations->isNotEmpty()) {
@@ -570,15 +555,15 @@ class QuizController extends Controller
                 'id' => $attempt->id,
                 'quiz_id' => $attempt->quizzes_id,
                 'title' => $attempt->quiz?->title,
-                'total_score' => (int)$attempt->total_score,
+                'total_score' => (int) $attempt->total_score,
                 'finished_at' => $attempt->finished_at,
             ],
             'materialScores' => $rows->map(fn($r) => [
-                'material_id' => (int)$r->material_id,
+                'material_id' => (int) $r->material_id,
                 'name' => $r->material_name,
-                'percentage' => (int)$r->percentage,
-                'earned_score' => (int)$r->earned_score,
-                'max_score' => (int)$r->max_score,
+                'percentage' => (int) $r->percentage,
+                'earned_score' => (int) $r->earned_score,
+                'max_score' => (int) $r->max_score,
             ])->values(),
             'recommendations' => $recommendations,
         ]);
@@ -598,7 +583,6 @@ class QuizController extends Controller
 
         $answersByQuestion = $attempt->answers->keyBy('quiz_questions_id');
 
-        // Rekomendasi materi
         $materialRows = DB::table('quiz_attempt_material_scores')
             ->join('materials', 'materials.id', '=', 'quiz_attempt_material_scores.material_id')
             ->where('quiz_attempt_material_scores.quiz_attempts_id', $attempt->id)
@@ -613,15 +597,15 @@ class QuizController extends Controller
             ->get();
 
         $recommendations = $materialRows
-            ->filter(fn($r) => (int)$r->percentage < 70)
+            ->filter(fn($r) => (int) $r->percentage < 70)
             ->take(3)
             ->values()
             ->map(fn($r) => [
-                'material_id' => (int)$r->material_id,
+                'material_id' => (int) $r->material_id,
                 'name' => $r->material_name,
-                'percentage' => (int)$r->percentage,
-                'earned_score' => (int)$r->earned_score,
-                'max_score' => (int)$r->max_score,
+                'percentage' => (int) $r->percentage,
+                'earned_score' => (int) $r->earned_score,
+                'max_score' => (int) $r->max_score,
             ]);
 
         $savedRecommendations = MaterialRecommendationModel::query()
@@ -639,11 +623,11 @@ class QuizController extends Controller
             ->orderByDesc('material_recommendations.id')
             ->get()
             ->map(fn($r) => [
-                'material_id' => (int)$r->material_id,
+                'material_id' => (int) $r->material_id,
                 'name' => $r->name,
-                'percentage' => (int)$r->percentage,
-                'earned_score' => (int)$r->earned_score,
-                'max_score' => (int)$r->max_score,
+                'percentage' => (int) $r->percentage,
+                'earned_score' => (int) $r->earned_score,
+                'max_score' => (int) $r->max_score,
             ]);
 
         if ($savedRecommendations->isNotEmpty()) {
@@ -687,7 +671,9 @@ class QuizController extends Controller
             ->where('user_id', $userId)
             ->value('class_id');
 
-        if (!$classId) return;
+        if (!$classId) {
+            return;
+        }
 
         $materialIds = QuizMapModel::query()
             ->join('quiz_questions', 'quiz_questions.id', '=', 'quiz_map.quiz_question_id')
@@ -695,469 +681,14 @@ class QuizController extends Controller
             ->pluck('quiz_questions.material_id')
             ->unique();
 
-        if ($materialIds->isEmpty()) return;
+        if ($materialIds->isEmpty()) {
+            return;
+        }
 
         UserProgressModel::query()
             ->where('user_id', $userId)
             ->where('class_id', $classId)
             ->whereIn('material_id', $materialIds)
             ->update(['completed_quiz_at' => now()]);
-    }
-
-    public function dosenIndexPage()
-    {
-        $user = Auth::user();
-
-        if ($user && $user->role === 'superadmin') {
-            $quizzes = $this->quizService->getQuizzesForAdmin();
-
-            $classes = \App\Models\ClassModel::query()
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-        } else {
-            $userId = $user?->id;
-
-            $quizzes = $this->quizService->getQuizzesForLecturer($userId);
-
-            $classes = \App\Models\ClassModel::query()
-                ->where('created_by', $userId)
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-        }
-
-        return Inertia::render('ManageQuizzes/Index', [
-            'quizzes' => $quizzes,
-            'classes' => $classes,
-            'authUser' => $user,
-        ]);
-    }
-
-    public function dosenShowPage(QuizModel $quiz)
-    {
-        $user = Auth::user();
-
-        $canManage = (int) $quiz->created_by === (int) $user->id
-            || $user->role === 'superadmin';
-
-        abort_unless($canManage, 403);
-
-        $quiz->load(['questions.options', 'class']);
-
-        $materials = $quiz->materials()
-            ->orderBy('material_name')
-            ->get(['materials.id', 'materials.material_name']);
-
-        $questions = $quiz->questions->map(function ($q) use ($materials) {
-            $matName = 'Tidak ada materi';
-            if ($q->material_id) {
-                $mat = $materials->firstWhere('id', $q->material_id);
-                $matName = $mat ? $mat->material_name : 'Materi Dihapus';
-            }
-
-            return [
-                'id' => $q->id,
-                'material_id' => $q->material_id,
-                'material_name' => $matName,
-                'quiz_text' => $q->quiz_text,
-                'image_path' => $q->image_path,
-                'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
-                'feedback_correct' => $q->feedback_correct,
-                'feedback_incorrect' => $q->feedback_incorrect,
-                'points' => (int) ($q->pivot->points ?? 1),
-                'options' => $q->options->map(function ($opt) {
-                    return [
-                        'id' => $opt->id,
-                        'option_text' => $opt->option_text,
-                        'is_correct' => (bool) $opt->is_correct,
-                    ];
-                }),
-            ];
-        });
-
-        return Inertia::render('ManageQuizzes/Show', [
-            'quiz' => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'description' => $quiz->description ?? null,
-                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
-                'duration' => $quiz->duration,
-                'passing_score' => $quiz->passing_score,
-                'start_at' => $quiz->start_at,
-                'end_at' => $quiz->end_at,
-                'materials' => $materials,
-            ],
-            'questions' => $questions,
-            'authUser' => $user,
-        ]);
-    }
-
-    public function dosenCreatePage()
-    {
-        $user = Auth::user();
-
-        if ($user && $user->role === 'superadmin') {
-            $classes = \App\Models\ClassModel::query()
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-
-            $materials = \App\Models\MaterialModel::query()
-                ->orderBy('material_name')
-                ->get(['id', 'material_name']);
-        } else {
-            $classes = \App\Models\ClassModel::query()
-                ->where('created_by', $user->id)
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-
-            $materials = \App\Models\MaterialModel::query()
-                ->where('created_by', $user->id)
-                ->orderBy('material_name')
-                ->get(['id', 'material_name']);
-        }
-
-        return Inertia::render('ManageQuizzes/Create', [
-            'classes' => $classes,
-            'materials' => $materials,
-            'authUser' => $user,
-        ]);
-    }
-
-    public function store(Request $request)
-    {
-        $user = Auth::user();
-
-        $validated = $request->validate([
-            'class_ids' => ['required', 'array', 'min:1'],
-            'class_ids.*' => ['integer', 'exists:classes,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'duration' => ['required', 'integer', 'min:1'],
-            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
-            'start_at' => ['nullable', 'date'],
-            'end_at' => ['nullable', 'date'],
-            'material_ids' => ['required', 'array', 'min:1'],
-            'material_ids.*' => ['exists:materials,id'],
-        ]);
-
-        $createdQuizzes = [];
-
-        foreach ($validated['class_ids'] as $classId) {
-            $quiz = QuizModel::create([
-                'class_id' => $classId,
-                'title' => $validated['title'],
-                'duration' => $validated['duration'],
-                'passing_score' => $validated['passing_score'],
-                'start_at' => $validated['start_at'],
-                'end_at' => $validated['end_at'],
-                'created_by' => $user->id,
-            ]);
-
-            // Hubungkan kuis dengan materi yang dipilih
-            $quiz->materials()->sync($validated['material_ids']);
-
-            $createdQuizzes[] = $quiz;
-        }
-
-        $firstQuiz = $createdQuizzes[0] ?? null;
-
-        if ($firstQuiz) {
-            return redirect()->route('dosen.quizzes.show', $firstQuiz->id)
-                ->with('success', 'Kuis berhasil dibuat untuk ' . count($createdQuizzes) . ' kelas. Silakan kelola pertanyaan melalui halaman ini.');
-        }
-
-        return redirect()->route('dosen.quizzes.index')
-            ->with('success', 'Kuis berhasil dibuat.');
-    }
-
-    public function dosenEditPage(QuizModel $quiz)
-    {
-        $user = Auth::user();
-
-        $canManage = (int) $quiz->created_by === (int) $user->id
-            || $user->role === 'superadmin';
-
-        abort_unless($canManage, 403);
-
-        $quiz->load(['questions.options', 'class']);
-
-        if ($user && $user->role === 'superadmin') {
-            $classes = \App\Models\ClassModel::query()
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-        } else {
-            $classes = \App\Models\ClassModel::query()
-                ->where('created_by', $user->id)
-                ->orderBy('class_name')
-                ->get(['id', 'class_name']);
-        }
-
-        $questions = $quiz->questions->map(function ($q) {
-            return [
-                'id' => $q->id,
-                'material_id' => $q->material_id,
-                'quiz_text' => $q->quiz_text,
-                'image_path' => $q->image_path,
-                'feedback_correct' => $q->feedback_correct,
-                'feedback_incorrect' => $q->feedback_incorrect,
-                'points' => (int) ($q->pivot->points ?? 1),
-                'options' => $q->options->map(function ($opt) {
-                    return [
-                        'id' => $opt->id,
-                        'option_text' => $opt->option_text,
-                        'is_correct' => (bool) $opt->is_correct,
-                    ];
-                }),
-            ];
-        });
-
-        $materials = $quiz->materials()
-            ->orderBy('material_name')
-            ->get(['materials.id', 'materials.material_name']);
-
-        return Inertia::render('ManageQuizzes/Edit', [
-            'materials' => $materials,
-            'classes' => $classes,
-            'quiz' => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'description' => $quiz->description ?? null,
-                'class_id' => $quiz->class_id,
-                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
-                'duration' => $quiz->duration,
-                'passing_score' => $quiz->passing_score,
-                'start_at' => $quiz->start_at ? \Carbon\Carbon::parse($quiz->start_at)->format('Y-m-d\TH:i') : "",
-                'end_at' => $quiz->end_at ? \Carbon\Carbon::parse($quiz->end_at)->format('Y-m-d\TH:i') : "",
-            ],
-            'questions' => $questions,
-            'authUser' => $user,
-        ]);
-    }
-
-    public function dosenSaveQuestions(Request $request, QuizModel $quiz)
-    {
-        $user = Auth::user();
-        $canManage = (int) $quiz->created_by === (int) $user->id
-            || $user->role === 'superadmin';
-
-        abort_unless($canManage, 403);
-
-        $validated = $request->validate([
-            'class_id' => ['required', 'integer', 'exists:classes,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'duration' => ['required', 'integer', 'min:1'],
-            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
-            'start_at' => ['nullable', 'date'],
-            'end_at' => ['nullable', 'date'],
-            
-            'questions' => ['nullable', 'array'],
-            'questions.*.id' => ['nullable', 'integer'],
-            'questions.*.material_id' => ['nullable', 'integer'],
-            'questions.*.quiz_text' => ['required', 'string'],
-            'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'questions.*.feedback_correct' => ['nullable', 'string'],
-            'questions.*.feedback_incorrect' => ['nullable', 'string'],
-            'questions.*.image' => ['nullable', 'image', 'max:2048'],
-            'questions.*.options' => ['required', 'array', 'min:2'],
-            'questions.*.options.*.text' => ['required', 'string'],
-            'questions.*.options.*.is_correct' => ['required', 'boolean'],
-        ]);
-
-        DB::transaction(function () use ($quiz, $validated, $request) {
-            $quiz->update([
-            'class_id' => $validated['class_id'],
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'duration' => $validated['duration'],
-                'passing_score' => $validated['passing_score'],
-                'start_at' => $validated['start_at'] ?? null,
-                'end_at' => $validated['end_at'] ?? null,
-            ]);
-
-            $questionsInput = $validated['questions'] ?? [];
-            
-            $existingMap = QuizMapModel::where('quiz_id', $quiz->id)->get()->keyBy('quiz_question_id');
-            $keptQuestionIds = [];
-
-            foreach ($questionsInput as $index => $qData) {
-                $qid = isset($qData['id']) ? (int) $qData['id'] : null;
-                
-                if ($qid && $existingMap->has($qid)) {
-                    $question = \App\Models\QuizQuestionsModel::find($qid);
-                    $question->material_id = $qData['material_id'] ?? $question->material_id;
-                } else {
-                    $question = new \App\Models\QuizQuestionsModel();
-                    $question->material_id = $qData['material_id'] ?? null;
-                }
-
-                $question->quiz_text = $qData['quiz_text'];
-
-                $feedbackCorrect = $qData['feedback_correct'] ?? 'Jawaban kamu benar.';
-                $feedbackIncorrect = $qData['feedback_incorrect'] ?? 'Jawaban kamu salah.';
-                
-                $question->feedback_correct = $feedbackCorrect;
-                $question->feedback_incorrect = $feedbackIncorrect;
-
-                // handle image upload
-                $imageKey = "questions.$index.image";
-                if ($request->hasFile($imageKey)) {
-                    if ($question->image_path) {
-                        \Illuminate\Support\Facades\Storage::disk('public')->delete($question->image_path);
-                    }
-                    $path = $request->file($imageKey)->store('quizzes', 'public');
-                    $question->image_path = $path;
-                }
-
-                $question->save();
-                
-                $keptQuestionIds[] = $question->id;
-
-                // Update mapped points
-                \App\Models\QuizMapModel::updateOrCreate(
-                    [
-                        'quiz_id' => $quiz->id,
-                        'quiz_question_id' => $question->id
-                    ],
-                    [
-                        'points' => $qData['points'] ?? 10
-                    ]
-                );
-
-                // Re-create options
-                $question->options()->delete();
-                foreach ($qData['options'] as $optData) {
-                    \App\Models\QuizOptionModel::create([
-                        'quiz_questions_id' => $question->id,
-                        'option_text' => $optData['text'],
-                        'is_correct' => $optData['is_correct'] ? 1 : 0,
-                    ]);
-                }
-            }
-
-            // Remove unkept mapping
-            if (!empty($keptQuestionIds)) {
-                $unkept = \App\Models\QuizMapModel::where('quiz_id', $quiz->id)
-                    ->whereNotIn('quiz_question_id', $keptQuestionIds)->get();
-                foreach($unkept as $u) {
-                    $u->delete();
-                }
-            } else {
-                \App\Models\QuizMapModel::where('quiz_id', $quiz->id)->delete();
-            }
-        });
-
-        // Kembali ke halaman edit agar StatusModal di frontend bisa tampil,
-        // lalu dari modal user bisa memilih untuk kembali ke detail kuis.
-        $routeName = $user->role === 'superadmin'
-            ? 'superadmin.quizzes.edit'
-            : 'dosen.quizzes.edit';
-
-        return redirect()->route($routeName, $quiz->id)
-            ->with('success', 'Kuis dan soal berhasil disimpan.');
-    }
-
-    public function update(Request $request, QuizModel $quiz)
-    {
-        $user = $request->user();
-        $canManage = (int) $quiz->created_by === (int) $user->id
-            || $user->role === 'superadmin';
-
-        abort_unless($canManage, 403);
-
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'duration' => ['required', 'integer', 'min:1'],
-            'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
-            'start_at' => ['nullable', 'date'],
-            'end_at' => ['nullable', 'date'],
-        ]);
-
-        $quiz->update($data);
-
-        $routeName = $user->role === 'superadmin'
-            ? 'superadmin.quizzes.show'
-            : 'dosen.quizzes.show';
-
-        return redirect()->route($routeName, $quiz->id)->with('success', 'Quiz updated successfully');
-    }
-
-    public function duplicateToClasses(Request $request, QuizModel $quiz)
-    {
-        $user = $request->user();
-
-        $canManage = (int) $quiz->created_by === (int) $user->id
-            || $user->role === 'superadmin';
-
-        abort_unless($canManage, 403);
-
-        $data = $request->validate([
-            'class_ids' => ['required', 'array', 'min:1'],
-            'class_ids.*' => ['integer', 'exists:classes,id'],
-        ]);
-
-        $classIds = collect($data['class_ids'])
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->reject(fn ($id) => $id === (int) $quiz->class_id)
-            ->values();
-
-        if ($classIds->isEmpty()) {
-            return back()->with('success', 'Tidak ada kelas baru yang dipilih untuk duplikasi.');
-        }
-
-        $quiz->load(['materials', 'questions.options']);
-
-        DB::transaction(function () use ($quiz, $classIds, $user) {
-            $materialIds = $quiz->materials->pluck('id')->all();
-            $questions = $quiz->questions;
-
-            foreach ($classIds as $classId) {
-                // Untuk dosen, pastikan hanya boleh ke kelas yang dia buat
-                if ($user->role !== 'superadmin') {
-                    $ownsClass = \App\Models\ClassModel::where('id', $classId)
-                        ->where('created_by', $user->id)
-                        ->exists();
-
-                    if (! $ownsClass) {
-                        continue;
-                    }
-                }
-
-                $newQuiz = QuizModel::create([
-                    'class_id' => $classId,
-                    'title' => $quiz->title,
-                    'description' => $quiz->description,
-                    'duration' => $quiz->duration,
-                    'passing_score' => $quiz->passing_score,
-                    'start_at' => $quiz->start_at,
-                    'end_at' => $quiz->end_at,
-                    'created_by' => $user->id,
-                ]);
-
-                if (! empty($materialIds)) {
-                    $newQuiz->materials()->sync($materialIds);
-                }
-
-                foreach ($questions as $question) {
-                    $newQuestion = $question->replicate();
-                    $newQuestion->push();
-
-                    QuizMapModel::create([
-                        'quiz_id' => $newQuiz->id,
-                        'quiz_question_id' => $newQuestion->id,
-                        'points' => (int) ($question->pivot->points ?? 10),
-                    ]);
-
-                    foreach ($question->options as $opt) {
-                        QuizOptionModel::create([
-                            'quiz_questions_id' => $newQuestion->id,
-                            'option_text' => $opt->option_text,
-                            'is_correct' => (int) $opt->is_correct,
-                        ]);
-                    }
-                }
-            }
-        });
-
-        return back()->with('success', 'Kuis berhasil diduplikasi ke kelas yang dipilih.');
     }
 }

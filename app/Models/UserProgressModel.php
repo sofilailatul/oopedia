@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class UserProgressModel extends Model
 {
@@ -18,15 +19,30 @@ class UserProgressModel extends Model
         'material_id',
         'class_id',
         'status',
+        'current_level',
+        'current_mode',
+        'focused_subtopic_id',
+        'pretest_score',
+        'last_score',
+        'easy_remidial_score',
+        'medium_remidial_score',
+        'hard_remidial_score',
+        'easy_remedial_count',
+        'medium_remedial_count',
+        'hard_remedial_count',
+        'next_action',
+        'passed_at',
         'read_at',
+        'completed_pretest_at',
         'completed_practice_at',
         'completed_quiz_at',
     ];
 
     protected $casts = [
-    'read_at' => 'datetime',
-    'completed_practice_at' => 'datetime',
-    'completed_quiz_at' => 'datetime',
+        'read_at' => 'datetime',
+        'completed_pretest_at' => 'datetime',
+        'completed_practice_at' => 'datetime',
+        'completed_quiz_at' => 'datetime',
     ];
 
 
@@ -43,5 +59,10 @@ class UserProgressModel extends Model
     public function class()
     {
         return $this->belongsTo(ClassModel::class, 'class_id');
+    }
+    
+    public function focusedSubtopic(): BelongsTo
+    {
+        return $this->belongsTo(SubtopicModel::class, 'focused_subtopic_id');
     }
 }

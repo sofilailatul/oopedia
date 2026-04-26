@@ -26,7 +26,7 @@ export default function Field({
       <div className={`space-y-1 ${className}`}>
         <label className="text-[11px] font-medium text-slate-500">{label}</label>
         <div
-          className={`rounded-2xl border px-3 py-2 text-sm transition-colors ${
+          className={`rounded-2xl border px-3 py-2 text-[12px] transition-colors ${
             disabled
               ? "border-slate-200 bg-slate-100 text-slate-500"
               : "border-slate-200 bg-white text-slate-800"
@@ -37,7 +37,7 @@ export default function Field({
             value={value}
             disabled={disabled}
             rows={as === "textarea" ? rows : undefined}
-            className={`w-full border-none bg-transparent text-sm text-inherit focus:outline-none focus:ring-0 ${
+            className={`w-full border-none bg-transparent text-[12px] text-inherit focus:outline-none focus:ring-0 ${
               as === "textarea" ? "resize-y min-h-[84px]" : ""
             } ${inputClassName}`}
             {...props}

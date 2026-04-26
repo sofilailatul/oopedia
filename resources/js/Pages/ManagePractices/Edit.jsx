@@ -4,8 +4,7 @@ import { router } from "@inertiajs/react";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
 import { usePopup } from "@/Components/PopUp/PopUpProvider";
-import { QUESTION_TYPE } from "@/Features/practice/constants";
-import { difficultyLabel, questionTypeLabel } from "@/Features/practice/labels";
+import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from "@/Features/practice/core";
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
@@ -14,7 +13,8 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
 		id: null,
 		question_text: "",
-		sub_topic: "",
+		subtopic_id: null,
+		sub_topic_name: "",
 		points: 10,
 		feedbackCorrect: "",
 		feedbackIncorrect: "",
@@ -32,34 +32,67 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 }
 
 function normalizeInitialQuestions(initial = []) {
-	if (!Array.isArray(initial) || initial.length === 0) {
-		return [createEmptyQuestion()];
-	}
+  if (!Array.isArray(initial) || initial.length === 0) {
+    return [createEmptyQuestion()];
+  }
 
-	return initial.map((q) => {
-		const base = createEmptyQuestion();
-		return {
-			...base,
-			...q,
-			sub_topic: q.sub_topic ?? q.subTopic ?? base.sub_topic,
-			type: q.type ?? base.type,
-			feedbackCorrect:
-				q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
-			feedbackIncorrect:
-				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
-			outputCode: q.output_code ?? q.outputCode ?? base.outputCode,
-			imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
-			options:
-				Array.isArray(q.options) && q.options.length
-					? q.options.map((opt) => ({
-						id: opt.id ?? null,
-						text: opt.text ?? "",
-						is_correct: !!opt.is_correct,
-					}))
-					: base.options,
-			_localId: Math.random().toString(36).slice(2),
-		};
-	});
+  return initial.map((q) => {
+    const normalizedType = q.type ?? QUESTION_TYPE.MC;
+    const base = createEmptyQuestion(normalizedType);
+
+    const normalizedOptions =
+      normalizedType === QUESTION_TYPE.DRAG
+        ? (
+            Array.isArray(q.items) && q.items.length
+              ? q.items
+              : Array.isArray(q.options) && q.options.length
+                ? q.options
+                : []
+          ).map((item, index) => ({
+            id: item.id ?? null,
+            text:
+              item.text ??
+              item.item_text ??
+              item.option_text ??
+              "",
+            is_correct:
+              typeof item.is_correct !== "undefined"
+                ? !!Number(item.is_correct) || item.is_correct === true
+                : index === 0,
+          }))
+        : (
+            Array.isArray(q.options) && q.options.length
+              ? q.options
+              : base.options
+          ).map((opt, index) => ({
+            id: opt.id ?? null,
+            text:
+              opt.text ??
+              opt.option_text ??
+              opt.item_text ??
+              "",
+            is_correct:
+              typeof opt.is_correct !== "undefined"
+                ? !!Number(opt.is_correct) || opt.is_correct === true
+                : index === 0,
+          }));
+
+    return {
+      ...base,
+      ...q,
+      subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? null,
+      sub_topic_name: q.sub_topic_name ?? q.sub_topic ?? q.subTopic ?? "",
+      type: normalizedType,
+      feedbackCorrect:
+        q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
+      feedbackIncorrect:
+        q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
+      outputCode: q.code_snippet ?? q.outputCode ?? base.outputCode,
+      imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
+      options: normalizedOptions,
+      _localId: Math.random().toString(36).slice(2),
+    };
+  });
 }
 
 function getErrorReason(errors) {
@@ -116,7 +149,7 @@ function getQuestionsSnapshot(items = []) {
 		(items ?? []).map((q) => ({
 			id: q.id ?? null,
 			question_text: q.question_text ?? "",
-			sub_topic: q.sub_topic ?? "",
+			subtopic_id: q.subtopic_id ?? null,
 			type: q.type ?? QUESTION_TYPE.MC,
 			points: Number(q.points ?? 0),
 			feedbackCorrect: q.feedbackCorrect ?? "",
@@ -133,10 +166,65 @@ function getQuestionsSnapshot(items = []) {
 	);
 }
 
+function mergeDraftWithServerQuestions(draftQuestions = [], serverQuestions = []) {
+  if (!Array.isArray(draftQuestions) || draftQuestions.length === 0) {
+    return serverQuestions;
+  }
+
+  const serverById = new Map(
+    (serverQuestions || [])
+      .filter((q) => q?.id != null)
+      .map((q) => [String(q.id), q]),
+  );
+
+  return draftQuestions.map((draftQ, index) => {
+    const fromServerById =
+      draftQ?.id != null ? serverById.get(String(draftQ.id)) : null;
+    const serverQ = fromServerById ?? serverQuestions[index] ?? null;
+
+    const mergedOptions =
+      (draftQ?.options ?? []).length > 0
+        ? draftQ.options.map((opt, optIdx) => {
+            const serverOpt = serverQ?.options?.[optIdx] ?? null;
+            return {
+              ...(serverOpt || {}),
+              ...(opt || {}),
+              text:
+                opt?.text && String(opt.text).trim() !== ""
+                  ? opt.text
+                  : serverOpt?.text ??
+                    serverOpt?.item_text ??
+                    serverOpt?.option_text ??
+                    "",
+            };
+          })
+        : (serverQ?.options ?? []);
+
+    return {
+      ...(serverQ || {}),
+      ...(draftQ || {}),
+      options: mergedOptions,
+      feedbackCorrect:
+        draftQ?.feedbackCorrect ??
+        draftQ?.feedback_correct ??
+        serverQ?.feedbackCorrect ??
+        serverQ?.feedback_correct ??
+        "",
+      feedbackIncorrect:
+        draftQ?.feedbackIncorrect ??
+        draftQ?.feedback_incorrect ??
+        serverQ?.feedbackIncorrect ??
+        serverQ?.feedback_incorrect ??
+        "",
+    };
+  });
+}
+
 export default function ManagePracticesEdit({
 	practice,
 	teacher,
 	questions: initialQuestions = [],
+	subtopics = [],
 	authUser,
 }) {
 	const backHandlerRef = React.useRef(null);
@@ -163,6 +251,7 @@ export default function ManagePracticesEdit({
 				practice={practice}
 				teacher={teacher}
 				initialQuestions={initialQuestions}
+				subtopics={subtopics}
 				registerBackHandler={registerBackHandler}
 				backRoute={backRoute}
 				authUser={authUser}
@@ -175,17 +264,37 @@ function PracticeEditContent({
 	practice,
 	teacher,
 	initialQuestions = [],
+	subtopics = [],
 	registerBackHandler,
 	backRoute,
 	authUser,
 }) {
-	const initialSnapshot = React.useMemo(
-		() => getQuestionsSnapshot(normalizeInitialQuestions(initialQuestions)),
+	const STORAGE_VERSION = "v3";
+	const STORAGE_KEY = `practice_draft_${practice?.id}_${STORAGE_VERSION}`;
+	const normalizedServerQuestions = React.useMemo(
+		() => normalizeInitialQuestions(initialQuestions),
 		[initialQuestions],
 	);
-	const [questions, setQuestions] = React.useState(() =>
-		normalizeInitialQuestions(initialQuestions),
+
+	const initialSnapshot = React.useMemo(
+		() => getQuestionsSnapshot(normalizedServerQuestions),
+		[normalizedServerQuestions],
 	);
+
+	const [questions, setQuestions] = React.useState(() => {
+		try {
+			const stored = sessionStorage.getItem(STORAGE_KEY);
+			if (stored) {
+				const parsed = JSON.parse(stored);
+				if (Array.isArray(parsed) && parsed.length > 0) {
+					return mergeDraftWithServerQuestions(parsed, normalizedServerQuestions);
+				}
+			}
+		} catch (err) {
+			console.warn('[Practice Edit] Failed to restore from storage:', err);
+		}
+		return normalizedServerQuestions;
+	});
 	const [selectedType, setSelectedType] = React.useState(QUESTION_TYPE.MC);
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
@@ -232,6 +341,15 @@ function PracticeEditContent({
 			registerBackHandler?.(null);
 		};
 	}, [handleBackToIndex, registerBackHandler]);
+
+	// Save questions to sessionStorage whenever they change
+	React.useEffect(() => {
+		try {
+			sessionStorage.setItem(STORAGE_KEY, JSON.stringify(questions));
+		} catch (err) {
+			console.warn('[Practice Edit] Failed to save to storage:', err);
+		}
+	}, [questions, STORAGE_KEY]);
 
 	const handleAddQuestion = () => {
 		setQuestions((prev) => [...prev, createEmptyQuestion(selectedType)]);
@@ -307,7 +425,8 @@ function PracticeEditContent({
 					? {
 							...q,
 							imageFile: file || null,
-							imageUrl: file ? URL.createObjectURL(file) : q.imageUrl ?? null,
+							imageUrl: file ? URL.createObjectURL(file) : null,
+							remove_image: !file,
 						}
 					: q,
 				),
@@ -325,9 +444,9 @@ function PracticeEditContent({
 			formData.append(`questions[${index}][id]`, q.id ?? "");
 			formData.append(`questions[${index}][type]`, q.type ?? QUESTION_TYPE.MC);
 			formData.append(`questions[${index}][question_text]`, q.question_text ?? "");
-			formData.append(`questions[${index}][sub_topic]`, q.sub_topic ?? "");
+			formData.append(`questions[${index}][subtopic_id]`, q.subtopic_id ?? "");
 			formData.append(`questions[${index}][points]`, q.points ?? "");
-			formData.append(`questions[${index}][output_code]`, q.outputCode ?? "");
+			formData.append(`questions[${index}][code_snippet]`, q.outputCode ?? "");
 			formData.append(
 				`questions[${index}][feedback_correct]`,
 				q.feedbackCorrect ?? "",
@@ -351,6 +470,10 @@ function PracticeEditContent({
 			if (q.imageFile) {
 				formData.append(`questions[${index}][image]`, q.imageFile);
 			}
+
+			if (q.remove_image) {
+				formData.append(`questions[${index}][remove_image]`, "1");
+			}
 		});
 
 		const saveRouteName = (authUser?.role || "").toLowerCase() === "superadmin"
@@ -361,6 +484,7 @@ function PracticeEditContent({
 			forceFormData: true,
 			onSuccess: () => {
 				setSubmitting(false);
+				try { sessionStorage.removeItem(STORAGE_KEY); } catch (err) {}
 				console.log("[Practice Edit] Berhasil menyimpan pertanyaan", {
 					practiceId: practice?.id,
 					questionCount: questions.length,
@@ -398,7 +522,7 @@ function PracticeEditContent({
 				<PracticeMetaPanel
 					teacherName={teacher?.name ?? "Dosen"}
 					materialName={practice?.material?.name ?? "Pilih Materi"}
-					levelLabel={difficultyLabel(practice?.difficulty_level) ?? "Pilih Level"}
+					levelLabel={difficultyLabel(practice?.level) ?? "Pilih Level"}
 					enableTypeSelect
 					selectedType={selectedType}
 					onTypeChange={setSelectedType}
@@ -472,6 +596,7 @@ function PracticeEditContent({
 							<DragDropQuestionForm
 								question={q}
 								questionIndex={idx}
+								subtopicOptions={subtopics}
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onAddCodeBlock={handleAddCodeBlock}
@@ -482,6 +607,7 @@ function PracticeEditContent({
 							<MultipleChoiceQuestionForm
 								question={q}
 								questionIndex={idx}
+								subtopicOptions={subtopics}
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onSetCorrectOption={setCorrectOption}

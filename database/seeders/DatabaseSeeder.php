@@ -15,6 +15,8 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ClassSeeder::class,
             PboClassObjectSeeder::class,
+            PboEncapsulationSeeder::class,
+            PboInheritanceSeeder::class,
         ]);
     }
 }

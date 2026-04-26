@@ -10,6 +10,8 @@ export default function UploadImage({
   file = null,
   url = null,
   onFileChange,
+  onRemove,
+  onDeleteFromServer,
 }) {
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -50,8 +52,24 @@ export default function UploadImage({
   };
 
   const clearFile = () => {
+    // reset input supaya bisa upload file yang sama lagi
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+
+    // reset state lokal di parent, baik file baru maupun url existing
     if (onFileChange) {
       onFileChange(null);
+    }
+
+    // kalau file dari server
+    if (url && onDeleteFromServer) {
+      onDeleteFromServer();
+    }
+
+    // callback umum (optional)
+    if (onRemove) {
+      onRemove();
     }
   };
 
@@ -113,6 +131,7 @@ export default function UploadImage({
                   href={url}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200 hover:text-slate-700"
                   title="Download / buka"
                 >
@@ -121,7 +140,11 @@ export default function UploadImage({
               )}
               <button
                 type="button"
-                onClick={clearFile}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  clearFile();
+                }}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-red-500"
                 title="Hapus"
               >
@@ -129,8 +152,13 @@ export default function UploadImage({
               </button>
               <button
                 type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleClick();
+                }}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200"
-                title="Opsi"
+                title="Ganti file"
               >
                 <FiMoreHorizontal className="h-3.5 w-3.5" />
               </button>
