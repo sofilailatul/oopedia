@@ -11,25 +11,29 @@ function medalColor(rank) {
 }
 
 const DETAIL_COLUMNS = [
-  { key: "easy",   label: "Easy",   dot: "bg-emerald-400", text: "text-emerald-600", activeBg: "bg-emerald-50 text-emerald-700", footerText: "text-emerald-700" },
-  { key: "normal", label: "Normal", dot: "bg-amber-400",   text: "text-amber-600",   activeBg: "bg-amber-50 text-amber-700",     footerText: "text-amber-700" },
-  { key: "hard",   label: "Hard",   dot: "bg-red-400",     text: "text-red-500",     activeBg: "bg-red-50 text-red-700",         footerText: "text-red-600" },
-  { key: "quiz",   label: "Kuis",   dot: "bg-blue-400",    text: "text-blue-600",    activeBg: "bg-blue-50 text-blue-700",       footerText: "text-blue-700" },
+  { key: "pretest",      label: "Pre-test", dot: "bg-slate-400",    text: "text-slate-600",    activeBg: "bg-slate-50 text-slate-700",   footerText: "text-slate-700" },
+  { key: "easy",         label: "Easy",     dot: "bg-emerald-400",  text: "text-emerald-600",  activeBg: "bg-emerald-50 text-emerald-700", footerText: "text-emerald-700" },
+  { key: "remed_easy",   label: "R-Easy",   dot: "bg-emerald-300",  text: "text-emerald-500",  activeBg: "bg-emerald-50 text-emerald-600", footerText: "text-emerald-600" },
+  { key: "normal",       label: "Medium",   dot: "bg-amber-400",    text: "text-amber-600",    activeBg: "bg-amber-50 text-amber-700",     footerText: "text-amber-700" },
+  { key: "remed_normal", label: "R-Medium", dot: "bg-amber-300",    text: "text-amber-500",    activeBg: "bg-amber-50 text-amber-600",     footerText: "text-amber-600" },
+  { key: "hard",         label: "Hard",     dot: "bg-red-400",      text: "text-red-500",      activeBg: "bg-red-50 text-red-700",         footerText: "text-red-600" },
+  { key: "remed_hard",   label: "R-Hard",   dot: "bg-red-300",      text: "text-red-400",      activeBg: "bg-red-50 text-red-600",         footerText: "text-red-500" },
+  { key: "quiz",         label: "Kuis",     dot: "bg-blue-400",     text: "text-blue-600",     activeBg: "bg-blue-50 text-blue-700",       footerText: "text-blue-700" },
 ];
 
 function DetailTable({ materialsData, materialsList }) {
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white px-5 py-5  border-b border-slate-100">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 ml-10 shadow-sm">
-        <table className="w-full text-sm">
+    <div className="bg-gradient-to-b from-slate-50 to-white px-5 py-5 border-b border-slate-100">
+      <div className="overflow-x-auto rounded-xl border border-slate-200 ml-0 sm:ml-10 shadow-sm bg-white">
+        <table className="min-w-[1000px] w-full text-sm">
           <thead>
             <tr className="bg-gradient-to-r from-blue-50 to-indigo-50">
               <th className="text-left py-3 px-4">
                 <Text variant="caption" className="uppercase tracking-wider font-semibold text-slate-700">Materi</Text>
               </th>
               {DETAIL_COLUMNS.map((col) => (
-                <th key={col.key} className="text-center py-3 px-3">
-                  <Text variant="caption" className={`inline-flex items-center gap-1 uppercase tracking-wider font-semibold ${col.text}`}>
+                <th key={col.key} className="text-center py-3 px-2">
+                  <Text variant="caption" className={`inline-flex items-center gap-1 uppercase tracking-wider font-semibold ${col.text} whitespace-nowrap`}>
                     <span className={`w-2 h-2 rounded-full ${col.dot}`}></span>{col.label}
                   </Text>
                 </th>
@@ -43,25 +47,43 @@ function DetailTable({ materialsData, materialsList }) {
             {materialsData.map((mat) => {
               const material = materialsList.find((m) => m.id === mat.material_id);
               return (
-                <tr key={mat.material_id} className="hover:bg-blue-50/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <Text variant="contentSection" className="font-medium text-slate-800">
-                      {material?.name ?? `Materi ${mat.material_id}`}
-                    </Text>
-                  </td>
-                  {DETAIL_COLUMNS.map((col) => (
-                    <td key={col.key} className="py-3 px-3 text-center">
-                      <Text variant="caption" className={`inline-block min-w-[32px] rounded-md px-2 py-0.5 font-semibold ${mat[col.key] > 0 ? col.activeBg : "text-slate-400"}`}>
-                        {mat[col.key]}
+                <React.Fragment key={mat.material_id}>
+                  <tr className="hover:bg-blue-50/40 transition-colors">
+                    <td className="py-3 px-4 max-w-[200px]">
+                      <Text variant="contentSection" className="font-medium text-slate-800 truncate" title={material?.name}>
+                        {material?.name ?? `Materi ${mat.material_id}`}
                       </Text>
                     </td>
-                  ))}
-                  <td className="py-3 px-4 text-center">
-                    <Text variant="caption" className="inline-block min-w-[40px] rounded-lg bg-slate-800 px-3 py-1 font-bold text-white">
-                      {mat.total}
-                    </Text>
-                  </td>
-                </tr>
+                    {DETAIL_COLUMNS.map((col) => (
+                      <td key={col.key} className="py-3 px-2 text-center">
+                        <Text variant="caption" className={`inline-block min-w-[32px] rounded-md px-2 py-0.5 font-semibold ${mat[col.key] > 0 ? col.activeBg : "text-slate-400"}`}>
+                          {mat[col.key]}
+                        </Text>
+                      </td>
+                    ))}
+                    <td className="py-3 px-4 text-center">
+                      <Text variant="caption" className="inline-block min-w-[40px] rounded-lg bg-slate-800 px-3 py-1 font-bold text-white shadow-sm">
+                        {mat.total}
+                      </Text>
+                    </td>
+                  </tr>
+                  {mat.weak_subtopics && mat.weak_subtopics.length > 0 && (
+                    <tr className="bg-rose-50/30">
+                      <td colSpan={DETAIL_COLUMNS.length + 2} className="px-4 py-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Subtopik Lemah:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {mat.weak_subtopics.map((sub, i) => (
+                              <span key={i} className="inline-flex rounded-full border border-rose-100 bg-white px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                                {sub}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>
@@ -71,15 +93,15 @@ function DetailTable({ materialsData, materialsList }) {
                 <Text variant="titleSection" className="text-slate-900">Grand Total</Text>
               </td>
               {DETAIL_COLUMNS.map((col) => (
-                <td key={col.key} className="py-3 px-3 text-center">
+                <td key={col.key} className="py-3 px-2 text-center">
                   <Text variant="contentSection" className={`font-bold ${col.footerText}`}>
-                    {materialsData.reduce((s, m) => s + m[col.key], 0)}
+                    {materialsData.reduce((s, m) => s + (m[col.key] || 0), 0)}
                   </Text>
                 </td>
               ))}
               <td className="py-3 px-4 text-center">
                 <Text variant="caption" className="inline-block min-w-[48px] rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm">
-                  {materialsData.reduce((s, m) => s + m.total, 0)}
+                  {materialsData.reduce((s, m) => s + (m.total || 0), 0)}
                 </Text>
               </td>
             </tr>

@@ -5,6 +5,9 @@ import Button from "@/Components/Button";
 import { useQuizAttempt } from "@/Features/quiz/useQuizAttempt";
 import { useQuizPopups } from "@/Features/quiz/QuizPopUp";
 import { formatMMSS } from "@/Features/quiz/time";
+import { useTour } from "@/Hooks/useTour";
+import { FaQuestionCircle } from "react-icons/fa";
+
 
 export default function AttemptShow(props) {
   return (
@@ -51,9 +54,47 @@ function AttemptContent(props) {
     }
   }, [current, currentIndex, total, answers, actions, props.attempt.id, popups, isLastQuestion]);
 
+  const { startTour, addSteps, next, back, cancel, complete } = useTour();
+
+  React.useEffect(() => {
+    addSteps([
+      {
+        id: 'question',
+        title: 'Pertanyaan Kuis',
+        text: 'Ini adalah area pertanyaan kuis. Pilih satu jawaban yang menurutmu benar.',
+        attachTo: { element: '#tour-quiz-question', on: 'bottom' },
+        buttons: [
+          { text: 'Lewati', action: cancel, classes: 'shepherd-button-secondary' },
+          { text: 'Lanjut', action: next }
+        ]
+      },
+      {
+        id: 'sidebar',
+        title: 'Panel Kontrol',
+        text: 'Lihat sisa waktu, jumlah soal yang sudah dijawab, dan navigasi soal di sini.',
+        attachTo: { element: '#tour-quiz-aside', on: 'left' },
+        buttons: [
+          { text: 'Kembali', action: back, classes: 'shepherd-button-secondary' },
+          { text: 'Selesai', action: complete }
+        ]
+      }
+    ]);
+  }, []);
+
+
   return (
       <div className=" mx-auto">
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={startTour}
+            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            <FaQuestionCircle className="text-rose-500 h-4 w-4" />
+            Butuh panduan?
+          </button>
+        </div>
         <div className="flex gap-6">
+
           <main className="flex-1">
             <div className="flex items-center gap-3 mb-5">
               <button
@@ -73,7 +114,10 @@ function AttemptContent(props) {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+
+
+            <div id="tour-quiz-question" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+
               {!current ? (
                 <div className="text-slate-500">Soal tidak tersedia.</div>
               ) : (
@@ -126,7 +170,8 @@ function AttemptContent(props) {
             </div>
           </main>
 
-          <aside className="w-[360px] shrink-0">
+          <aside id="tour-quiz-aside" className="w-[360px] shrink-0">
+
             <div className="bg-white rounded-2xl border shadow-sm p-5 sticky top-6 space-y-2">
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-2xl border border-slate-200 p-4">

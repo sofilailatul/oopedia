@@ -7,7 +7,7 @@ export default function PublicLayout({ children }) {
       <div className="absolute left-10 top-8 flex items-center gap-3">
         <Link href={route("welcome")} className="flex items-center gap-3">
             <span className="w-36 font-bold italic text-white text-[28px] tracking-[2.80px] leading-7 [font-family:'Poppins-BoldItalic',Helvetica]">
-              Oopedia
+              OOpedia
               <span className="font-bold italic text-primary text-[28px] tracking-[2.80px] leading-7 [font-family:'Poppins-BoldItalic',Helvetica]">
                 .
               </span>

@@ -11,7 +11,19 @@ function shuffleItems(items) {
 }
 
 function buildDragState(question, savedSelection = []) {
-  const correctItems = question?.items?.map((item) => item.item_text) ?? [];
+  // Prioritas: items (tabel practice_items) 
+  // Cadangan: options (tabel practice_options - untuk soal lama)
+  let rawItems = [...(question?.items ?? [])]
+    .sort((a, b) => Number(a.id) - Number(b.id))
+    .map((item) => item.item_text);
+  
+  if (rawItems.length === 0) {
+    rawItems = [...(question?.options ?? [])]
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .map((opt) => opt.option_text || opt.text);
+  }
+
+  const correctItems = rawItems.filter(Boolean);
   const slotCount = correctItems.length;
 
   const slots = Array.from({ length: slotCount }, (_, idx) => savedSelection[idx] ?? null);

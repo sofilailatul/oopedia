@@ -22,6 +22,7 @@ class UserProgressModel extends Model
         'current_level',
         'current_mode',
         'focused_subtopic_id',
+        'focused_subtopic_ids',
         'pretest_score',
         'last_score',
         'easy_remidial_score',

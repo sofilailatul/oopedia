@@ -1,27 +1,125 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ── localStorage draft helpers ──────────────────────────────────────────────
+
+const DRAFT_KEY_PREFIX = "oopedia_material_draft_";
+
+function getDraftKey(materialId) {
+  return `${DRAFT_KEY_PREFIX}${materialId ?? "new"}`;
+}
+
+function saveDraft(key, data) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify({ ...data, _savedAt: Date.now() }));
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+}
+
+function loadDraft(key) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft(key) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+/** Strip non-serializable fields (imageFile) from sections for storage */
+function serializeSections(sections) {
+  return sections.map((s) => ({
+    id: s.id,
+    title: s.title || "",
+    subTopicId: s.subTopicId || "",
+    content: s.content || "",
+    // previewUrl from existing server images are kept; blob: URLs are not
+    previewUrl: s.previewUrl && !s.previewUrl.startsWith("blob:") ? s.previewUrl : null,
+  }));
+}
+
+// ── Hook ────────────────────────────────────────────────────────────────────
 
 export function useDosenMaterialCreate({ authUser, material = null, subTopics = [] }) {
-  const [title, setTitle] = useState(material?.material_name || "");
-  const [description, setDescription] = useState(material?.description || "");
-  const [sections, setSections] = useState([
-    ...(material?.contents?.length
-      ? material.contents.map((content) => ({
-          id: content.id,
-          title: content.title || "",
-          subTopicId: content.subtopic_id || "",
-          content: content.content_text || "",
-          imageFile: null,
-          previewUrl: content.image_url || null,
-        }))
-      : [
-          { id: 1, title: "", subTopicId: subTopics?.[0]?.id || "", content: "", imageFile: null, previewUrl: null },
-        ]),
-  ]);
+  const materialId = material?.id || null;
+  const draftKey = getDraftKey(materialId);
+
+  // Try to restore draft on first render
+  const draft = useRef(loadDraft(draftKey)).current;
+
+  const buildInitialSections = () => {
+    // If editing existing material with contents, use those as base
+    if (material?.contents?.length) {
+      return material.contents.map((content) => ({
+        id: content.id,
+        title: content.title || "",
+        subTopicId: content.subtopic_id || "",
+        content: content.content_text || "",
+        imageFile: null,
+        previewUrl: content.image_url || null,
+      }));
+    }
+    return [
+      { id: 1, title: "", subTopicId: subTopics?.[0]?.id || "", content: "", imageFile: null, previewUrl: null },
+    ];
+  };
+
+  // Restore text fields from draft if available (only for create / same material)
+  const initialTitle = draft?.title ?? material?.material_name ?? "";
+  const initialDescription = draft?.description ?? material?.description ?? "";
+  const initialSections = draft?.sections?.length
+    ? draft.sections.map((s) => ({
+        ...s,
+        imageFile: null, // can't restore File from localStorage
+        previewUrl: s.previewUrl || null,
+      }))
+    : buildInitialSections();
+
+  const [title, setTitle] = useState(initialTitle);
+  const [description, setDescription] = useState(initialDescription);
+  const [sections, setSections] = useState(initialSections);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(!!draft);
 
   const creatorName = authUser?.name || authUser?.nama || "-";
 
-  const materialId = material?.id || null;
+  // ── Auto-save draft (debounced 800ms) ───────────────────────────────────
+  const saveTimerRef = useRef(null);
+
+  const scheduleSave = useCallback(() => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveDraft(draftKey, {
+        title,
+        description,
+        sections: serializeSections(sections),
+      });
+    }, 800);
+  }, [title, description, sections, draftKey]);
+
+  useEffect(() => {
+    scheduleSave();
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [scheduleSave]);
+
+  // Dismiss "draft restored" banner after 5 seconds
+  useEffect(() => {
+    if (!draftRestored) return;
+    const t = setTimeout(() => setDraftRestored(false), 5000);
+    return () => clearTimeout(t);
+  }, [draftRestored]);
+
+  // ── Actions ─────────────────────────────────────────────────────────────
 
   function addSection() {
     setSections((prev) => [
@@ -36,22 +134,30 @@ export function useDosenMaterialCreate({ authUser, material = null, subTopics = 
     );
   }
 
-  function updateSectionImage(id, file) {
+  function updateSectionImage(id, payload) {
+    const file = payload?.file !== undefined ? payload.file : payload;
+    const previewUrl = payload?.previewUrl || (file ? URL.createObjectURL(file) : null);
+
     setSections((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s;
 
-        if (s.previewUrl) {
+        if (s.previewUrl && typeof s.previewUrl === "string" && s.previewUrl.startsWith("blob:")) {
           URL.revokeObjectURL(s.previewUrl);
         }
 
         return {
           ...s,
           imageFile: file,
-          previewUrl: file ? URL.createObjectURL(file) : null,
+          previewUrl: previewUrl,
         };
       }),
     );
+  }
+
+  function discardDraft() {
+    clearDraft(draftKey);
+    setDraftRestored(false);
   }
 
   async function publish(e, options = {}) {
@@ -96,6 +202,10 @@ export function useDosenMaterialCreate({ authUser, material = null, subTopics = 
       await window.axios.post(targetEndpoint, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      // ✅ Clear draft on successful publish
+      clearDraft(draftKey);
+
       if (typeof onSuccess === "function") {
         onSuccess();
       }
@@ -109,13 +219,14 @@ export function useDosenMaterialCreate({ authUser, material = null, subTopics = 
   }
 
   return {
-    state: { title, description, sections, isSubmitting, creatorName, subTopics, materialId },
+    state: { title, description, sections, isSubmitting, creatorName, subTopics, materialId, draftRestored },
     actions: {
       setTitle,
       setDescription,
       addSection,
       updateSectionField,
       updateSectionImage,
+      discardDraft,
       publish,
     },
   };

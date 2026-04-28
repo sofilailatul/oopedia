@@ -8,11 +8,12 @@ use Illuminate\Support\Facades\DB;
 
 class LearningPathService
 {
-    public function handlePretest(UserProgressModel $progress, int $score, ?int $weakSubtopicId): UserProgressModel
+    public function handlePretest(UserProgressModel $progress, int $score, ?array $weakSubtopicIds): UserProgressModel
     {
         $progress->pretest_score = $score;
         $progress->last_score    = $score;
-        $progress->focused_subtopic_id = null; // pretest belum ada remedial
+        $progress->focused_subtopic_id = $weakSubtopicIds[0] ?? null;
+        $progress->focused_subtopic_ids = !empty($weakSubtopicIds) ? json_encode($weakSubtopicIds) : null;
 
         if ($score < 60) {
             $progress->current_level = 'easy';
@@ -39,16 +40,28 @@ class LearningPathService
     {
         $score          = (int) $attempt->final_score;
         $level          = $attempt->level;
-        $weakSubtopicId = $attempt->focused_subtopic_id;
+        $score          = (int) $attempt->final_score;
+        $level          = $attempt->level;
+        
+        $weakSubtopicIds = $this->calculateUpdatedWeakSubtopics($progress, $attempt->id);
+        $primaryWeakId   = $weakSubtopicIds[0] ?? null;
+        $jsonWeakIds     = count($weakSubtopicIds) > 0 ? json_encode($weakSubtopicIds) : null;
 
         $progress->last_score = $score;
 
-        return match ($level) {
-            'easy'   => $this->handleEasy($progress, $score, $weakSubtopicId),
-            'medium' => $this->handleMedium($progress, $score, $weakSubtopicId),
-            'hard'   => $this->handleHard($progress, $score, $weakSubtopicId),
-            default  => $progress,
-        };
+        if ($level === 'easy') {
+            return $this->handleEasy($progress, $score, $primaryWeakId, $jsonWeakIds);
+        }
+
+        if ($level === 'medium' || $level === 'normal') {
+            return $this->handleMedium($progress, $score, $primaryWeakId, $jsonWeakIds);
+        }
+
+        if ($level === 'hard') {
+            return $this->handleHard($progress, $score, $primaryWeakId, $jsonWeakIds);
+        }
+
+        return $progress;
     }
 
     // ---------------------------------------------------------------
@@ -60,13 +73,14 @@ class LearningPathService
     //   focused_remedial easy < 60  → ulangi lagi (max 3x total)
     //   sudah 3x dan tetap < 60   → repeat_material
     // ---------------------------------------------------------------
-    private function handleEasy(UserProgressModel $progress, int $score, ?int $weakSubtopicId): UserProgressModel
+    private function handleEasy(UserProgressModel $progress, int $score, ?int $weakSubtopicId, ?string $jsonWeakIds): UserProgressModel
     {
         if ($score >= 60) {
             // Lulus easy → naik medium
             $progress->current_level         = 'medium';
             $progress->current_mode          = 'normal';
             $progress->focused_subtopic_id   = null;
+            $progress->focused_subtopic_ids  = null;
             $progress->easy_remedial_count   = 0;
             $progress->next_action           = 'start_medium';
 
@@ -76,6 +90,7 @@ class LearningPathService
 
         // Gagal — naikkan counter remedial
         $progress->focused_subtopic_id = $weakSubtopicId;
+        $progress->focused_subtopic_ids = $jsonWeakIds;
         $progress->easy_remedial_count = ($progress->easy_remedial_count ?? 0) + 1;
 
         if ($progress->easy_remedial_count >= 3) {
@@ -100,13 +115,14 @@ class LearningPathService
     //   focused_remedial medium >= 60   → naik hard
     //   focused_remedial medium < 60    → turun easy focused_remedial
     // ---------------------------------------------------------------
-    private function handleMedium(UserProgressModel $progress, int $score, ?int $weakSubtopicId): UserProgressModel
+    private function handleMedium(UserProgressModel $progress, int $score, ?int $weakSubtopicId, ?string $jsonWeakIds): UserProgressModel
     {
         if ($score >= 60) {
             // Lulus medium → naik hard
             $progress->current_level         = 'hard';
             $progress->current_mode          = 'normal';
             $progress->focused_subtopic_id   = null;
+            $progress->focused_subtopic_ids  = null;
             $progress->medium_remedial_count = 0;
             $progress->easy_remedial_count   = 0;
             $progress->next_action           = 'start_hard';
@@ -117,6 +133,7 @@ class LearningPathService
 
         // Gagal
         $progress->focused_subtopic_id   = $weakSubtopicId;
+        $progress->focused_subtopic_ids  = $jsonWeakIds;
         $progress->medium_remedial_count = ($progress->medium_remedial_count ?? 0) + 1;
 
         $isAlreadyInRemedial = $progress->current_mode === 'focused_remedial';
@@ -147,7 +164,7 @@ class LearningPathService
     //   focused_remedial hard 60-79     → turun medium focused_remedial
     //   (semua gagal di hard remedial → turun medium)
     // ---------------------------------------------------------------
-    private function handleHard(UserProgressModel $progress, int $score, ?int $weakSubtopicId): UserProgressModel
+    private function handleHard(UserProgressModel $progress, int $score, ?int $weakSubtopicId, ?string $jsonWeakIds): UserProgressModel
     {
         if ($score >= 80) {
             // Lulus hard → selesai
@@ -155,6 +172,7 @@ class LearningPathService
             $progress->current_mode   = 'passed';
             $progress->current_level  = null;
             $progress->focused_subtopic_id = null;
+            $progress->focused_subtopic_ids = null;
             $progress->completed_practice_at = now();
             $progress->passed_at      = now();
             $progress->next_action    = 'go_next_material';
@@ -165,6 +183,7 @@ class LearningPathService
 
         // Gagal hard
         $progress->focused_subtopic_id  = $weakSubtopicId;
+        $progress->focused_subtopic_ids = $jsonWeakIds;
         $progress->hard_remedial_count  = ($progress->hard_remedial_count ?? 0) + 1;
 
         $isAlreadyInRemedial = $progress->current_mode === 'focused_remedial';
@@ -187,25 +206,67 @@ class LearningPathService
 
     /**
      * Detect weakest subtopic dari attempt tertentu.
-     * Return subtopic dengan rata-rata skor terendah.
+     * Return subtopics dengan rata-rata skor di bawah threshold (default 70).
      */
-    public function detectWeakSubtopic(int $attemptId): ?object
+    public function detectWeakSubtopics(int $attemptId): \Illuminate\Support\Collection
     {
+        $attempt = PracticeAttemptModel::find($attemptId);
+        $level = $attempt->level ?? 'easy';
+        $threshold = ($level === 'hard') ? 80 : 60;
+
         return DB::table('user_practice_answers as upa')
             ->join('practice_questions as pq', 'pq.id', '=', 'upa.practice_questions_id')
             ->select(
                 'pq.subtopic_id',
-                DB::raw('SUM(upa.score) as total_score'),
                 DB::raw('COUNT(*) as total_questions'),
                 DB::raw('SUM(CASE WHEN upa.is_correct = 1 THEN 1 ELSE 0 END) as correct_count'),
-                DB::raw('ROUND(AVG(upa.score), 2) as avg_score')
+                DB::raw('((SUM(CASE WHEN upa.is_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100) as percentage_score')
             )
             ->where('upa.practice_attempts_id', $attemptId)
             ->whereNotNull('pq.subtopic_id')
             ->groupBy('pq.subtopic_id')
-            ->orderBy('avg_score', 'asc')   // subtopic dengan rata-rata terendah = paling lemah
-            ->orderBy('correct_count', 'asc')
-            ->first();
+            ->having('percentage_score', '<', $threshold)
+            ->pluck('pq.subtopic_id');
+    }
+
+    /**
+     * Hitung skor 0–100 berdasarkan total poin yang didapat
+     * dibagi total poin maksimal yang mungkin.
+     */
+    public function calculateUpdatedWeakSubtopics(UserProgressModel $progress, int $attemptId): array
+    {
+        $attempt = PracticeAttemptModel::find($attemptId);
+        $level = $attempt->level ?? 'easy';
+        $threshold = ($level === 'hard') ? 80 : 60;
+
+        $currentWeakIds = json_decode($progress->focused_subtopic_ids ?? '[]', true) 
+            ?: ($progress->focused_subtopic_id ? [$progress->focused_subtopic_id] : []);
+        
+        $attemptResults = DB::table('user_practice_answers as upa')
+            ->join('practice_questions as pq', 'pq.id', '=', 'upa.practice_questions_id')
+            ->select(
+                'pq.subtopic_id', 
+                DB::raw('((SUM(CASE WHEN upa.is_correct = 1 THEN 1 ELSE 0 END) / COUNT(*)) * 100) as percentage_score')
+            )
+            ->where('upa.practice_attempts_id', $attemptId)
+            ->whereNotNull('pq.subtopic_id')
+            ->groupBy('pq.subtopic_id')
+            ->get();
+
+        foreach ($attemptResults as $res) {
+            $score = (float) $res->percentage_score;
+            if ($score >= $threshold) {
+                // Passed this subtopic -> remove from list
+                $currentWeakIds = array_diff($currentWeakIds, [(int) $res->subtopic_id]);
+            } else {
+                // Failed this subtopic -> add/keep in list
+                if (!in_array((int) $res->subtopic_id, $currentWeakIds)) {
+                    $currentWeakIds[] = (int) $res->subtopic_id;
+                }
+            }
+        }
+
+        return array_values(array_unique($currentWeakIds));
     }
 
     /**

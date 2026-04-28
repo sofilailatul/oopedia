@@ -3,33 +3,11 @@ import { router } from "@inertiajs/react";
 import AppLayout from "@/Layouts/AppLayout";
 import Button from "@/Components/Button";
 import Icons from "@/icons";
+import React from "react";
+import { useTour } from "@/Hooks/useTour";
+import { FaQuestionCircle } from "react-icons/fa";
+
 import axios from "axios";
-
-// ─── Reading progress bar ─────────────────────────────────────────────────────
-function ReadingProgressBar() {
-  const [pct, setPct] = useState(0);
-
-  useEffect(() => {
-    const onScroll = () => {
-      const scrollTop = window.scrollY;
-      const docH = document.documentElement.scrollHeight - window.innerHeight;
-      setPct(docH > 0 ? Math.min((scrollTop / docH) * 100, 100) : 0);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 h-1 bg-transparent pointer-events-none">
-      <div
-        className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 transition-all duration-150"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
 // ─── Success Modal ────────────────────────────────────────────────────────────
 function SuccessModal({ progressData, onNext, onBack }) {
   const hasPractice = progressData.has_practice;
@@ -140,26 +118,6 @@ function InfoPill({ children }) {
   );
 }
 
-function InsightCard({ title = "Ingat ini", children, tone = "blue" }) {
-  const tones = {
-    blue: "bg-sky-50 border-sky-100 text-sky-900",
-    amber: "bg-amber-50 border-amber-100 text-amber-900",
-    emerald: "bg-emerald-50 border-emerald-100 text-emerald-900",
-  };
-
-  return (
-    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
-      <div className="mb-2 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/80">
-          <Icons.CheckCircle className="h-4 w-4" />
-        </div>
-        <h3 className="text-xs font-bold">{title}</h3>
-      </div>
-      <div className="text-xs leading-6 text-slate-700">{children}</div>
-    </div>
-  );
-}
-
 function EmptyState() {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
@@ -179,8 +137,9 @@ function SectionNav({ contents, activeId, onSelectSection }) {
   if (!contents?.length) return null;
 
   return (
-    <div className="sticky top-3 z-30 rounded-2xl border border-slate-200 bg-white/85 p-2 shadow-sm backdrop-blur">
-      <div className="flex w-full justify-center gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+    <div id="tour-section-nav" className="sticky top-3 z-30 rounded-2xl border border-slate-200 bg-white/85 p-2 shadow-sm backdrop-blur">
+
+      <div className="flex w-full justify-start gap-2 overflow-x-auto px-2 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
         {contents.map((content, i) => {
           const id = `section-${content.id}`;
           const active = activeId === id;
@@ -216,8 +175,9 @@ function ContentBlock({ content, index }) {
   return (
     <section
       id={sectionId}
-      className="scroll-mt-28 rounded-3xl border border-slate-200 bg-white shadow-sm"
+      className="tour-content-block scroll-mt-28 rounded-3xl border border-slate-200 bg-white shadow-sm"
     >
+
       <div className="border-b border-slate-100 px-4 py-4 sm:px-8">
         <div className="flex items-center gap-4">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100">
@@ -242,12 +202,12 @@ function ContentBlock({ content, index }) {
             }`}
           >
             <div className={variant === 1 ? "lg:order-2" : ""}>
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {(content.content_text ?? "")
                   .split("\n")
                   .filter((line) => line.trim() !== "")
                   .map((line, i) => (
-                    <p key={i} className="text-xs leading-6 text-slate-700">
+                    <p key={i} className="text-sm leading-relaxed text-slate-700 text-justify">
                       {line}
                     </p>
                   ))}
@@ -272,18 +232,15 @@ function ContentBlock({ content, index }) {
                   }}
                 />
               </div>
-              <p className="mt-3 text-xs text-slate-400">
-                Ilustrasi pendukung untuk membantu memahami materi.
-              </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-6">
             {(content.content_text ?? "")
               .split("\n")
               .filter((line) => line.trim() !== "")
               .map((line, i) => (
-                <p key={i} className="text-xs leading-5 text-slate-700">
+                <p key={i} className="text-sm leading-relaxed text-slate-700 text-justify">
                   {line}
                 </p>
               ))}
@@ -304,6 +261,33 @@ export default function Show({ material }) {
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
+
+  const { startTour, addSteps, next, back, cancel, complete } = useTour();
+
+  useEffect(() => {
+    addSteps([
+      {
+        id: 'nav',
+        title: 'Navigasi Bagian',
+        text: 'Kamu bisa berpindah antar bagian materi dengan cepat melalui menu navigasi ini.',
+        attachTo: { element: '#tour-section-nav', on: 'bottom' },
+        buttons: [
+          { text: 'Kembali', action: back, classes: 'shepherd-button-secondary' },
+          { text: 'Lanjut', action: next }
+        ]
+      },
+      {
+        id: 'content',
+        title: 'Materi Belajar',
+        text: 'Baca materi dengan teliti. Beberapa materi memiliki gambar untuk memudahkan pemahaman.',
+        attachTo: { element: '.tour-content-block', on: 'top' },
+        buttons: [
+          { text: 'Kembali', action: back, classes: 'shepherd-button-secondary' },
+          { text: 'Selesai', action: complete }
+        ]
+      }
+    ]);
+  }, []);
 
   const scrollTimeoutRef = useRef(null);
   const progress = material.progress ?? {};
@@ -450,9 +434,17 @@ export default function Show({ material }) {
       backHref="/materi"
       backLabel="Daftar Materi"
     >
-      <ReadingProgressBar />
+      <div className="flex justify-end mb-2 mr-4">
+        <button
+          onClick={startTour}
+          className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+        >
+          <FaQuestionCircle className="text-indigo-500 h-4 w-4" />
+          Panduan Belajar
+        </button>
+      </div>
 
-      <div className="py-6 sm:px-4 lg:px-6">
+      <div className="py-1">
         <div className="space-y-5">
           {/* Header */}
           <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-sky-50 shadow-sm">
@@ -485,8 +477,9 @@ export default function Show({ material }) {
                     {material.material_name}
                   </h1>
 
+
                   {material.description && (
-                    <p className="mt-4 max-w-2xl text-[12px] leading-5 text-slate-600">
+                    <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-600">
                       {material.description}
                     </p>
                   )}
@@ -546,7 +539,9 @@ export default function Show({ material }) {
       {hasReachedBottom && !alreadyRead && (
         <div className="fixed bottom-7 left-1/2 z-40 -translate-x-1/2">
           <button
+            id="tour-finish-button"
             onClick={handleFinishReading}
+
             disabled={isSubmitting}
             className={`inline-flex items-center gap-2.5 rounded-full px-6 py-3.5 text-xs font-bold shadow-lg transition-all duration-300 ${
               isSubmitting

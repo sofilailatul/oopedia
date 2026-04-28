@@ -7,53 +7,69 @@ import Field from "@/Components/Field";
 import StatusModal from "@/Components/StatusModal";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import Dropdown from "@/Components/Dropdown";
+import CheckboxCard from "@/Components/CheckboxCard";
+import {
+  appendQuestionImageToFormData,
+  normalizeQuestionImage,
+  updateQuestionImage,
+} from "@/Features/questionImage";
 
 function createEmptyQuestion() {
-	return {
-		id: null,
-		material_id: "",
-		question_text: "",
-		points: 10,
-		feedbackCorrect: "",
-		feedbackIncorrect: "",
-		imageUrl: null,
-		options: [
-			{ id: null, text: "", is_correct: true },
-			{ id: null, text: "", is_correct: false },
-			{ id: null, text: "", is_correct: false },
-			{ id: null, text: "", is_correct: false },
-		],
-		_localId: Math.random().toString(36).slice(2),
-	};
+  return {
+    id: null,
+    material_id: "",
+    subtopic_id: "",
+    question_text: "",
+    points: 10,
+    feedbackCorrect: "",
+    feedbackIncorrect: "",
+    imageFile: null,
+    imageUrl: null,
+    image_url: null,
+    image_path: null,
+    remove_image: false,
+    options: [
+      { id: null, text: "", is_correct: true },
+      { id: null, text: "", is_correct: false },
+      { id: null, text: "", is_correct: false },
+      { id: null, text: "", is_correct: false },
+    ],
+    _localId: Math.random().toString(36).slice(2),
+  };
 }
 
 function normalizeInitialQuestions(initial = []) {
-	if (!Array.isArray(initial) || initial.length === 0) {
-		return [createEmptyQuestion()];
-	}
+  if (!Array.isArray(initial) || initial.length === 0) {
+    return [createEmptyQuestion()];
+  }
 
-	return initial.map((q) => {
-		const base = createEmptyQuestion();
-		return {
-			...base,
-			...q,
-			material_id: q.material_id ?? base.material_id,
-			question_text: q.quiz_text ?? q.question_text ?? base.question_text,
-			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
-			feedbackIncorrect:
-				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
-			imageUrl: q.image_url ?? q.image_path ?? q.imageUrl ?? base.imageUrl,
-			options:
-				Array.isArray(q.options) && q.options.length
-					? q.options.map((opt) => ({
-							id: opt.id ?? null,
-							text: opt.option_text ?? opt.text ?? "",
-							is_correct: !!opt.is_correct,
-					  }))
-					: base.options,
-			_localId: Math.random().toString(36).slice(2),
-		};
-	});
+  return initial.map((q) => {
+    const base = createEmptyQuestion();
+
+    return {
+      ...base,
+      ...q,
+      material_id: q.material_id ?? base.material_id,
+      subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? base.subtopic_id,
+      question_text: q.quiz_text ?? q.question_text ?? base.question_text,
+      feedbackCorrect:
+        q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
+      feedbackIncorrect:
+        q.feedback_incorrect ??
+        q.feedbackIncorrect ??
+        base.feedbackIncorrect,
+      ...normalizeQuestionImage(q, base),
+      options:
+        Array.isArray(q.options) && q.options.length
+          ? q.options.map((opt) => ({
+              id: opt.id ?? null,
+              text: opt.option_text ?? opt.text ?? "",
+              is_correct: !!opt.is_correct,
+            }))
+          : base.options,
+      _localId: Math.random().toString(36).slice(2),
+    };
+  });
 }
 
 function getErrorReason(errors) {
@@ -118,22 +134,27 @@ const hasKeyOrMessage = (pattern) =>
 }
 
 function getQuestionsSnapshot(items = []) {
-	return JSON.stringify(
-		(items ?? []).map((q) => ({
-			id: q.id ?? null,
-			question_text: q.question_text ?? "",
-			points: Number(q.points ?? 0),
-			feedbackCorrect: q.feedbackCorrect ?? "",
-			feedbackIncorrect: q.feedbackIncorrect ?? "",
-			imageUrl: q.imageUrl ?? null,
-			hasImageFile: !!q.imageFile,
-			options: (q.options ?? []).map((opt) => ({
-				id: opt.id ?? null,
-				text: opt.text ?? "",
-				is_correct: !!opt.is_correct,
-			})),
-		})),
-	);
+  return JSON.stringify(
+    (items ?? []).map((q) => ({
+      id: q.id ?? null,
+      material_id: q.material_id ?? "",
+      subtopic_id: q.subtopic_id ?? "",
+      question_text: q.question_text ?? "",
+      points: Number(q.points ?? 0),
+      feedbackCorrect: q.feedbackCorrect ?? "",
+      feedbackIncorrect: q.feedbackIncorrect ?? "",
+      imageUrl: q.imageUrl ?? null,
+      image_url: q.image_url ?? null,
+      image_path: q.image_path ?? null,
+      remove_image: !!q.remove_image,
+      hasImageFile: !!q.imageFile,
+      options: (q.options ?? []).map((opt) => ({
+        id: opt.id ?? null,
+        text: opt.text ?? "",
+        is_correct: !!opt.is_correct,
+      })),
+    })),
+  );
 }
 
 export default function ManageQuizzesEdit({
@@ -204,7 +225,7 @@ function QuizEditContent({
 	);
 
 	const [formData, setFormData] = React.useState({
-		class_id: quiz.class_id || "",
+		class_ids: quiz.existing_class_ids || [quiz.class_id],
 		title: quiz.title || "",
 		description: quiz.description || "",
 		duration: quiz.duration || 30,
@@ -214,8 +235,6 @@ function QuizEditContent({
 	});
 
 	const [submitting, setSubmitting] = React.useState(false);
-	const [duplicating, setDuplicating] = React.useState(false);
-	const [duplicateClassId, setDuplicateClassId] = React.useState("");
 	const [error, setError] = React.useState("");
 
 	const isDirty = React.useMemo(
@@ -321,20 +340,10 @@ function QuizEditContent({
 		);
 	};
 
-	const handleImageUpload = (qIdx, file) => {
-		setQuestions((prev) =>
-			prev.map((q, i) =>
-				i === qIdx
-					? {
-							...q,
-							imageFile: file || null,
-							imageUrl: file
-								? URL.createObjectURL(file)
-								: q.imageUrl ?? null,
-						}
-					: q,
-				),
-		);
+	const handleQuestionImageChange = (questionIndex, payload) => {
+	setQuestions((prev) =>
+		updateQuestionImage(prev, questionIndex, payload),
+	);
 	};
 
 	const handleSubmit = (e) => {
@@ -345,7 +354,9 @@ function QuizEditContent({
 
 		const formDataPost = new FormData();
 
-		formDataPost.append("class_id", formData.class_id || "");
+		formData.class_ids.forEach((id) => {
+			formDataPost.append("class_ids[]", id);
+		});
 		formDataPost.append("title", formData.title);
 		formDataPost.append("description", formData.description || "");
 		formDataPost.append("duration", formData.duration);
@@ -373,6 +384,8 @@ function QuizEditContent({
 				q.feedbackIncorrect ?? "",
 			);
 
+			appendQuestionImageToFormData(formDataPost, q, index);
+
 			q.options.forEach((opt, optIdx) => {
 				formDataPost.append(
 					`questions[${index}][options][${optIdx}][text]`,
@@ -384,9 +397,6 @@ function QuizEditContent({
 				);
 			});
 
-			if (q.imageFile) {
-				formDataPost.append(`questions[${index}][image]`, q.imageFile);
-			}
 		});
 
 		router.post(route(saveRouteName, quiz.id), formDataPost, {
@@ -419,126 +429,49 @@ function QuizEditContent({
 		});
 	};
 
-	const handleDuplicate = () => {
-		const selectedClassId = Number(duplicateClassId);
-		const availableClassIds = classes
-			.filter((c) => c.id !== formData.class_id)
-			.map((c) => c.id);
-
-		if (!availableClassIds.length) {
-			setModalState({
-				show: true,
-				type: "error",
-				title: "Kelas Tujuan Tidak Tersedia",
-				message:
-					"Tidak ada kelas lain yang tersedia untuk menerima duplikasi kuis ini. Tambahkan kelas baru terlebih dahulu.",
-				confirmText: "Tutup",
-			});
-			return;
-		}
-
-		if (!selectedClassId || !availableClassIds.includes(selectedClassId)) {
-			setModalState({
-				show: true,
-				type: "error",
-				title: "Pilih Kelas Tujuan",
-				message: "Silakan pilih kelas tujuan terlebih dahulu dari dropdown.",
-				confirmText: "Tutup",
-			});
-			return;
-		}
-
-		setDuplicating(true);
-
-		const role = (authUser?.role || "").toLowerCase();
-		const isSuperadmin = role === "superadmin";
-		const baseRouteName = isSuperadmin ? "superadmin.quizzes" : "dosen.quizzes";
-
-		router.post(
-			route(`${baseRouteName}.duplicate`, quiz.id),
-			{ class_ids: [selectedClassId] },
-			{
-				onFinish: () => setDuplicating(false),
-				onSuccess: () => {
-					setModalState({
-						show: true,
-						type: "success",
-						title: "Berhasil Diduplikasi",
-						message:
-							"Kuis berhasil diduplikasi ke kelas tujuan yang dipilih. Cek daftar kuis untuk melihat hasilnya.",
-						confirmText: "Tutup",
-					});
-				},
-				onError: (errors) => {
-					const reason = getErrorReason(errors);
-					setModalState({
-						show: true,
-						type: "error",
-						title: "Gagal Duplikasi",
-						message: `Gagal menduplikasi kuis. ${reason}`,
-						confirmText: "Tutup",
-					});
-				},
-			},
-		);
+	const toggleClass = (id) => {
+		setFormData((prev) => ({
+			...prev,
+			class_ids: prev.class_ids.includes(id)
+				? prev.class_ids.filter((c) => c !== id)
+				: [...prev.class_ids, id],
+		}));
 	};
 
-	const duplicateTargetClass = classes.find((c) => String(c.id) === String(duplicateClassId));
-	const availableDuplicateClasses = classes.filter((c) => c.id !== formData.class_id);
+
 
 	return (
 		<div className="mx-auto space-y-6">
-			<header className="space-y-4 px-2">
-				<div className="flex items-center gap-4">
-					<div>
-						<h1 className="text-xl font-bold text-slate-900">
-							{formData.title || quiz.title}
-						</h1>
-						<p className="text-xs text-slate-600">
-							Kelas: {classes.find((c) => c.id === formData.class_id)?.class_name || quiz.class_name}
-						</p>
-					</div>
-				</div>
-			</header>
-
 			{/* Kuis Meta */}
-			<Card className="rounded-3xl border border-slate-200/80 bg-slate-50/65 p-5 shadow-sm">
+			<Card className="rounded-3xl border border-slate-200/80 bg-slate-50/65 p-8 shadow-sm">
 				<div className="mb-4">
-					<h3 className="text-sm font-semibold text-slate-800">Pengaturan Kuis</h3>
-					<p className="text-[11px] text-slate-500">
-						Ubah detail utama kuis Anda.
-					</p>
+					<h3 className="text-sm font-semibold text-slate-800">Detail Kuis</h3>
 				</div>
 				<div className="grid gap-4">
-					<div className="space-y-1">
+					<div className="space-y-3">
 						<label className="text-xs font-medium text-slate-700">
-							Kelas yang Bisa Mengikuti
+						Kelas yang Mengikuti Kuis
 						</label>
-						<select
-							value={formData.class_id}
-							onChange={(e) =>
-								setFormData({
-									...formData,
-									class_id: Number(e.target.value) || "",
-								})
-							}
-							className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-						>
-							<option value="">Pilih kelas</option>
-							{classes.map((cls) => (
-								<option key={cls.id} value={cls.id}>
-									{cls.class_name}
-								</option>
-							))}
-						</select>
+
+						<div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+						{classes.map((cls) => (
+							<CheckboxCard
+							key={cls.id}
+							label={cls.class_name}
+							checked={formData.class_ids.includes(cls.id)}
+							onClick={() => toggleClass(cls.id)}
+							/>
+						))}
+						</div>
 						<p className="mt-1 text-[10px] text-slate-400">
-							Mahasiswa di kelas ini yang akan melihat dan mengerjakan kuis.
+							Centang kelas mana saja yang akan diberikan kuis ini. Menambah kelas akan menduplikasi kuis, melepas centang akan menghapus kuis dari kelas tersebut.
 						</p>
 					</div>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field
 							as="input"
 							label="Judul Kuis"
+							size="sm"
 							value={formData.title}
 							onChange={(e) => setFormData({ ...formData, title: e.target.value })}
 							placeholder="Masukkan judul kuis"
@@ -548,6 +481,7 @@ function QuizEditContent({
 								as="input"
 								type="number"
 								label="Durasi (Menit)"
+								size="sm"
 								min="1"
 								value={formData.duration}
 								onChange={(e) =>
@@ -561,6 +495,7 @@ function QuizEditContent({
 								as="input"
 								type="number"
 								label="Batas Lulus (0-100)"
+								size="sm"
 								min="0"
 								max="100"
 								value={formData.passing_score}
@@ -574,20 +509,24 @@ function QuizEditContent({
 						</div>
 					</div>
 					<Field
-						as="textarea"
-						label="Deskripsi Kuis (Opsional)"
-						rows={3}
-						value={formData.description}
-						onChange={(e) =>
-							setFormData({ ...formData, description: e.target.value })
-						}
-						placeholder="Tambahkan instruksi kuis atau capaian belajar jika perlu..."
+					as="textarea"
+					name="description"
+					label="Deskripsi Kuis (Opsional)"
+					value={formData.description}
+					onChange={(e) =>
+						setFormData({
+						...formData,
+						description: e.target.value,
+						})
+					}
+					placeholder="Tambahkan instruksi kuis"
 					/>
 					<div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
 						<Field
 							as="input"
 							type="datetime-local"
-							label="Mulai (Opsional)"
+							label="Tanggal Dimulai"
+							size="sm"
 							value={formData.start_at}
 							onChange={(e) =>
 								setFormData({ ...formData, start_at: e.target.value })
@@ -596,7 +535,8 @@ function QuizEditContent({
 						<Field
 							as="input"
 							type="datetime-local"
-							label="Selesai (Opsional)"
+							label="Tanggal Berakhir"
+							size="sm"
 							value={formData.end_at}
 							onChange={(e) =>
 								setFormData({ ...formData, end_at: e.target.value })
@@ -606,73 +546,7 @@ function QuizEditContent({
 				</div>
 			</Card>
 
-			<Card className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
-				<div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-					<div className="space-y-1">
-						<h3 className="text-sm font-semibold text-slate-900">
-							Duplikasi Kuis ke Kelas Lain
-						</h3>
-						<p className="text-[11px] text-slate-500 leading-relaxed">
-							Pilih satu kelas tujuan untuk menyalin kuis beserta semua soalnya.
-						</p>
-					</div>
-					<div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-						{availableDuplicateClasses.length} kelas tersedia
-					</div>
-				</div>
 
-				<div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-					<div className="space-y-1.5">
-						<label className="text-xs font-medium text-slate-700">
-							Kelas tujuan
-						</label>
-						<Dropdown className="w-full">
-							<Dropdown.Trigger>
-								<div className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
-									<span className={duplicateTargetClass ? "text-slate-900" : "text-slate-400"}>
-										{duplicateTargetClass?.class_name || "Pilih kelas tujuan"}
-									</span>
-									<span className="text-slate-400">▾</span>
-								</div>
-							</Dropdown.Trigger>
-							<Dropdown.Content align="left" width="64" contentClasses="py-2 bg-white rounded-2xl shadow-xl border border-slate-100 max-h-64 overflow-y-auto">
-								{availableDuplicateClasses.length === 0 ? (
-									<div className="px-4 py-2 text-xs text-slate-400">Tidak ada kelas lain yang bisa dipilih</div>
-								) : (
-									availableDuplicateClasses.map((cls) => {
-										const isSelected = duplicateClassId === String(cls.id);
-										return (
-											<Dropdown.Item
-												key={cls.id}
-												onClick={() => setDuplicateClassId(String(cls.id))}
-												className={`flex items-center justify-between ${isSelected ? "bg-slate-900 text-white" : ""}`}
-											>
-												<span>{cls.class_name}</span>
-												{isSelected && <span className="text-[10px] font-semibold uppercase tracking-wide">Terpilih</span>}
-											</Dropdown.Item>
-										);
-									})
-								)}
-							</Dropdown.Content>
-						</Dropdown>
-						<p className="text-[11px] text-slate-500">
-							Kelas yang sedang aktif tidak bisa dipilih agar tidak terjadi duplikasi ke kelas yang sama.
-						</p>
-					</div>
-
-					<Button
-						type="button"
-						variant="solid"
-						color="blue"
-						size="sm"
-						disabled={duplicating || !duplicateClassId || availableDuplicateClasses.length === 0}
-						onClick={handleDuplicate}
-						className="rounded-2xl px-5"
-					>
-						{duplicating ? "Menduplikasi..." : "Duplikasikan"}
-					</Button>
-				</div>
-			</Card>
 
 			{/* Questions */}
 			{questions.length === 0 && (
@@ -702,30 +576,6 @@ function QuizEditContent({
 						</div>
 						<div className="flex items-center gap-4 text-xs text-slate-500">
 							<div className="flex items-center gap-2">
-								<span>Materi</span>
-								<Dropdown className="w-32">
-									<Dropdown.Trigger>
-										<div className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-700 bg-white cursor-pointer">
-											{materials.find((m) => m.id === q.material_id)?.material_name ||
-													"Pilih materi"}
-										</div>
-									</Dropdown.Trigger>
-									<Dropdown.Content align="left" width="48">
-										{materials.map((m) => (
-											<Dropdown.Item
-													key={m.id}
-													onClick={() => updateQuestionField(idx, "material_id", m.id)}
-													className={
-														q.material_id === m.id ? "bg-blue-100 text-blue-900" : ""
-													}
-											>
-												{m.material_name}
-											</Dropdown.Item>
-										))}
-									</Dropdown.Content>
-								</Dropdown>
-							</div>
-							<div className="flex items-center gap-2">
 								<span>Points</span>
 								<input
 									type="number"
@@ -748,12 +598,16 @@ function QuizEditContent({
 						</div>
 					</div>
 					<MultipleChoiceQuestionForm
-						question={q}
-						questionIndex={idx}
-						onQuestionFieldChange={updateQuestionField}
-						onOptionFieldChange={updateOptionField}
-						onSetCorrectOption={setCorrectOption}
-						onImageChange={handleImageUpload}
+					question={q}
+					questionIndex={idx}
+					onQuestionFieldChange={updateQuestionField}
+					onOptionFieldChange={updateOptionField}
+					onSetCorrectOption={setCorrectOption}
+					onImageChange={handleQuestionImageChange}
+					materials={materials}
+					onMaterialChange={(qIdx, materialId) =>
+						updateQuestionField(qIdx, "material_id", materialId)
+					}
 					/>
 				</Card>
 			))}

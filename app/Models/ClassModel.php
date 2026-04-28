@@ -30,16 +30,6 @@ class ClassModel extends Model
         ->withPivot('joined_at');
     }
 
-    public function materials()
-    {
-        return $this->belongsToMany(
-            MaterialModel::class,
-            'material_class',
-            'class_id',
-            'material_id'
-        )->withPivot(['publish_date', 'is_active', 'actived_at', 'deactived_at'])
-         ->withTimestamps();
-    }
 
     public function progress()
     {

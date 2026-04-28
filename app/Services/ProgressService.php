@@ -201,6 +201,17 @@ class ProgressService
         // Update atau create progress dengan read_at
         if ($progress) {
             $progress->read_at = now();
+
+            // Jika mahasiswa diwajibkan baca ulang materi (setelah 3x remedial gagal),
+            // reset mode ke focused_remedial agar bisa lanjut latihan Easy lagi
+            // tanpa harus mengulang pretest.
+            if ($progress->current_mode === 'repeat_material') {
+                $progress->current_mode       = 'focused_remedial';
+                $progress->current_level      = $progress->current_level ?? 'easy';
+                $progress->easy_remedial_count = 0; // reset hitungan remedial
+                $progress->next_action        = 'repeat_easy_subtopic';
+            }
+
             $progress->save();
         } else {
             UserProgress::create([

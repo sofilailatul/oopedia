@@ -16,13 +16,14 @@ export default function ManageMaterialCreate(props) {
 	const indexUrl = route(indexRouteName);
 
 	const { state, actions } = useDosenMaterialCreate({ authUser, material, subTopics });
-	const { title, description, sections, isSubmitting, creatorName } = state;
+	const { title, description, sections, isSubmitting, creatorName, draftRestored } = state;
 	const {
 		setTitle,
 		setDescription,
 		addSection,
 		updateSectionField,
 		updateSectionImage,
+		discardDraft,
 		publish,
 	} = actions;
 
@@ -160,6 +161,29 @@ export default function ManageMaterialCreate(props) {
 			<div className="mx-auto flex flex-col lg:flex-row gap-4 pb-16 px-2">
 				{/* -- Form Area -- */}
 				<div className="flex-1 w-full space-y-4">
+					{/* Draft Restored Banner */}
+					{draftRestored && (
+						<div className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-5 py-3.5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-500">
+							<div className="flex items-center gap-3">
+								<div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shrink-0">
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+										<path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+									</svg>
+								</div>
+								<div>
+									<p className="text-xs font-bold text-amber-800">Draft otomatis dipulihkan</p>
+									<p className="text-[11px] text-amber-600/80">Teks yang belum tersimpan sebelumnya sudah dikembalikan.</p>
+								</div>
+							</div>
+							<button
+								type="button"
+								onClick={discardDraft}
+								className="text-[10px] font-bold text-amber-600 hover:text-amber-800 uppercase tracking-widest shrink-0 transition-colors"
+							>
+								Tutup
+							</button>
+						</div>
+					)}
 					{/* Header Text Input */}
 					<div className="px-2 py-2">
 						<textarea
@@ -274,15 +298,6 @@ export default function ManageMaterialCreate(props) {
 											onFileChange={(file) => updateSectionImage(section.id, file)}
 											className="rounded-2xl border-dashed border-2 border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
 										/>
-										{section.previewUrl && (
-											<div className="mt-4 rounded-2xl overflow-hidden border border-slate-200/60 shadow-[0_4px_20px_rgb(0,0,0,0.05)] inline-block">
-												<img
-													src={section.previewUrl}
-													alt={section.title || `Preview gambar section ${index + 1}`}
-													className="max-h-72 object-cover object-center w-full block hover:scale-105 transition-transform duration-500"
-												/>
-											</div>
-										)}
 								</div>
 							</div>
 						))}
@@ -369,7 +384,7 @@ export default function ManageMaterialCreate(props) {
 				show={showBackConfirm}
 				type="confirm"
 				title="Yah, progresmu belum disimpan"
-				message="Masih ada teks atau gambar yang belum kamu Publish. Yakin mau keluar halaman sekarang? Perubahanmu bakalan hilang lho."
+				message="Masih ada teks atau gambar yang belum kamu Publish. Yakin mau keluar halaman sekarang? Teks kamu akan disimpan sebagai draft otomatis."
 				confirmText="Biarin, Keluar Aja"
 				cancelText="Tetap di Sini"
 				onConfirm={() => {

@@ -170,11 +170,20 @@ Route::middleware('auth')->group(function () {
         // ===== KELAS (halaman ManageClasses untuk dosen) =====
         Route::get('/dosen/kelas', [ClassController::class, 'manageIndex'])->name('dosen.classes.index');
 
-        // ===== PRACTICE =====
+    });
+
+    // API kelas (dipakai di halaman ManageClasses) untuk dosen & superadmin
+    Route::middleware('role:dosen,superadmin')->group(function () {
+        Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
+        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
+        Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
+        Route::delete('/classes/{class}', [ClassController::class, 'destroy'])->name('classes.destroy');
+
+        // ===== PRACTICE (Common) =====
         Route::post('/practices', [DosenPracticeController::class, 'store'])->name('dosen.practices.store');
         Route::delete('/practices/{practice}', [DosenPracticeController::class, 'destroy'])->name('dosen.practices.destroy');
 
-        // ===== QUIZ =====
+        // ===== QUIZ (Common) =====
         Route::post('/quizzes', [DosenQuizController::class, 'store'])->name('quizzes.store');
         Route::put('/quizzes/{quiz}', [DosenQuizController::class, 'update'])->name('quizzes.update');
         Route::delete('/quizzes/{quiz}', [DosenQuizController::class, 'destroy'])->name('quizzes.destroy');
@@ -191,15 +200,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/quizzes/{quiz}/map', [DosenQuizController::class, 'mapAttach'])->name('quizzes.map.attach');
         Route::put('/quizzes/{quiz}/map/{question}', [DosenQuizController::class, 'mapUpdate'])->name('quizzes.map.update');
         Route::delete('/quizzes/{quiz}/map/{question}', [DosenQuizController::class, 'mapDetach'])->name('quizzes.map.detach');
-
-    });
-
-    // API kelas (dipakai di halaman ManageClasses) untuk dosen & superadmin
-    Route::middleware('role:dosen,superadmin')->group(function () {
-        Route::get('/classes/{class}', [ClassController::class, 'show'])->name('classes.show');
-        Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
-        Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
-        Route::delete('/classes/{class}', [ClassController::class, 'destroy'])->name('classes.destroy');
     });
 
     /*
@@ -255,6 +255,9 @@ Route::middleware('auth')->group(function () {
         // Simpan soal latihan (superadmin) menggunakan method yang sama dengan dosen
         Route::post('/superadmin/latihan-soal/{practice}/questions', [DosenPracticeController::class, 'saveQuestions'])
             ->name('superadmin.practices.questions.save');
+
+        Route::post('/superadmin/practices', [DosenPracticeController::class, 'store'])->name('superadmin.practices.store');
+        Route::delete('/superadmin/practices/{practice}', [DosenPracticeController::class, 'destroy'])->name('superadmin.practices.destroy');
 
         // Kelola Kuis (superadmin) -> gunakan halaman ManageQuizzes
         Route::prefix('superadmin/kuis')->name('superadmin.quizzes.')->group(function () {

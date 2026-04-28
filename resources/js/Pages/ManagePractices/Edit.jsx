@@ -8,6 +8,11 @@ import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from 
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
+import {
+  appendQuestionImageToFormData,
+  normalizeQuestionImage,
+  updateQuestionImage,
+} from "@/Features/questionImage";
 
 function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
@@ -37,59 +42,30 @@ function normalizeInitialQuestions(initial = []) {
   }
 
   return initial.map((q) => {
-    const normalizedType = q.type ?? QUESTION_TYPE.MC;
-    const base = createEmptyQuestion(normalizedType);
-
-    const normalizedOptions =
-      normalizedType === QUESTION_TYPE.DRAG
-        ? (
-            Array.isArray(q.items) && q.items.length
-              ? q.items
-              : Array.isArray(q.options) && q.options.length
-                ? q.options
-                : []
-          ).map((item, index) => ({
-            id: item.id ?? null,
-            text:
-              item.text ??
-              item.item_text ??
-              item.option_text ??
-              "",
-            is_correct:
-              typeof item.is_correct !== "undefined"
-                ? !!Number(item.is_correct) || item.is_correct === true
-                : index === 0,
-          }))
-        : (
-            Array.isArray(q.options) && q.options.length
-              ? q.options
-              : base.options
-          ).map((opt, index) => ({
-            id: opt.id ?? null,
-            text:
-              opt.text ??
-              opt.option_text ??
-              opt.item_text ??
-              "",
-            is_correct:
-              typeof opt.is_correct !== "undefined"
-                ? !!Number(opt.is_correct) || opt.is_correct === true
-                : index === 0,
-          }));
+    const base = createEmptyQuestion();
 
     return {
       ...base,
       ...q,
-      subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? null,
-      sub_topic_name: q.sub_topic_name ?? q.sub_topic ?? q.subTopic ?? "",
-      type: normalizedType,
+      material_id: q.material_id ?? base.material_id,
+      subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? base.subtopic_id,
+      outputCode: q.code_snippet ?? q.output_code ?? q.outputCode ?? base.outputCode,
+      question_text: q.question_text ?? q.practice_text ?? base.question_text,
       feedbackCorrect:
         q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
       feedbackIncorrect:
-        q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
-      outputCode: q.code_snippet ?? q.outputCode ?? base.outputCode,
-      imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
-      options: normalizedOptions,
+        q.feedback_incorrect ??
+        q.feedbackIncorrect ??
+        base.feedbackIncorrect,
+      ...normalizeQuestionImage(q, base),
+      options:
+        Array.isArray(q.options) && q.options.length
+          ? q.options.map((opt) => ({
+              id: opt.id ?? null,
+              text: opt.option_text ?? opt.text ?? "",
+              is_correct: !!opt.is_correct,
+            }))
+          : base.options,
       _localId: Math.random().toString(36).slice(2),
     };
   });
@@ -156,6 +132,8 @@ function getQuestionsSnapshot(items = []) {
 			feedbackIncorrect: q.feedbackIncorrect ?? "",
 			outputCode: q.outputCode ?? "",
 			imageUrl: q.imageUrl ?? null,
+			image_path: q.image_path ?? null,
+			remove_image: !!q.remove_image,
 			hasImageFile: !!q.imageFile,
 			options: (q.options ?? []).map((opt) => ({
 				id: opt.id ?? null,
@@ -418,18 +396,9 @@ function PracticeEditContent({
 		);
 	};
 
-	const handleImageUpload = (qIdx, file) => {
+	const handleQuestionImageChange = (questionIndex, payload) => {
 		setQuestions((prev) =>
-			prev.map((q, i) =>
-				i === qIdx
-					? {
-							...q,
-							imageFile: file || null,
-							imageUrl: file ? URL.createObjectURL(file) : null,
-							remove_image: !file,
-						}
-					: q,
-				),
+			updateQuestionImage(prev, questionIndex, payload),
 		);
 	};
 
@@ -455,6 +424,8 @@ function PracticeEditContent({
 				`questions[${index}][feedback_incorrect]`,
 				q.feedbackIncorrect ?? "",
 			);
+
+			appendQuestionImageToFormData(formData, q, index);
 
 			q.options.forEach((opt, optIdx) => {
 				formData.append(
@@ -594,14 +565,14 @@ function PracticeEditContent({
 
 						{(q.type || QUESTION_TYPE.MC) === QUESTION_TYPE.DRAG ? (
 							<DragDropQuestionForm
-								question={q}
-								questionIndex={idx}
-								subtopicOptions={subtopics}
-								onQuestionFieldChange={updateQuestionField}
-								onOptionFieldChange={updateOptionField}
-								onAddCodeBlock={handleAddCodeBlock}
-								onRemoveCodeBlock={handleRemoveCodeBlock}
-								onImageChange={handleImageUpload}
+							question={q}
+							questionIndex={idx}
+							subtopicOptions={subtopics}
+							onQuestionFieldChange={updateQuestionField}
+							onOptionFieldChange={updateOptionField}
+							onAddCodeBlock={handleAddCodeBlock}
+							onRemoveCodeBlock={handleRemoveCodeBlock}
+							onImageChange={handleQuestionImageChange}
 							/>
 						) : (
 							<MultipleChoiceQuestionForm
@@ -611,7 +582,7 @@ function PracticeEditContent({
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onSetCorrectOption={setCorrectOption}
-								onImageChange={handleImageUpload}
+								onImageChange={handleQuestionImageChange}
 							/>
 						)}
 					</Card>

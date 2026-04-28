@@ -28,7 +28,7 @@ export default function Welcome() {
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-7 text-white/75 md:text-lg">
-                Oopedia bantu kamu belajar Pemrograman Berbasis Objek dengan
+                OOpedia bantu kamu belajar Pemrograman Berbasis Objek dengan
                 materi bertahap, latihan soal adaptif, feedback instan, dan
                 rekomendasi materi yang sesuai progres belajarmu.
               </p>
@@ -67,7 +67,7 @@ export default function Welcome() {
             <div className="w-full max-w-md">
               <div className="rounded-3xl border border-white/15 bg-white/10 p-6 text-white shadow-2xl backdrop-blur-md">
                 <h2 className="text-2xl font-semibold">
-                  Kenapa harus Oopedia?
+                  Kenapa harus OOpedia?
                 </h2>
                 <p className="mt-2 text-white/70">
                   Karena belajar coding nggak harus selalu bikin stres.

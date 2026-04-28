@@ -228,22 +228,41 @@ class QuizService
                 ->join('quiz_map', 'quiz_map.quiz_question_id', '=', 'quiz_questions.id')
                 ->where('quiz_map.quiz_id', $attempt->quizzes_id)
                 ->whereIn('quiz_questions.id', $questionIds)
-                ->select('quiz_questions.*', 'quiz_map.points')
+                ->select(
+                    'quiz_questions.*',
+                    'quiz_map.points'
+                )
                 ->with('options')
                 ->get()
                 ->keyBy('id');
 
             $totalScore = 0;
+            $materialScores = [];
 
             foreach ($answersPayload as $qid => $a) {
-                $q = $questions->get((int)$qid);
+                $q = $questions->get((int) $qid);
                 if (!$q) continue;
 
+                $points = (int) ($q->points ?? 0);
+                $materialId = $q->material_id;
+
                 $correctOpt = $q->options->firstWhere('is_correct', 1);
-                $isCorrect = $correctOpt && ((int)$a['option_id'] === (int)$correctOpt->id);
+                $isCorrect = $correctOpt && ((int) $a['option_id'] === (int) $correctOpt->id);
+
+                if (!isset($materialScores[$materialId])) {
+                    $materialScores[$materialId] = [
+                        'correct_count' => 0,
+                        'earned_score' => 0,
+                        'max_score' => 0,
+                    ];
+                }
+
+                $materialScores[$materialId]['max_score'] += $points;
 
                 if ($isCorrect) {
-                    $totalScore += (int) $q->points; 
+                    $totalScore += $points;
+                    $materialScores[$materialId]['correct_count'] += 1;
+                    $materialScores[$materialId]['earned_score'] += $points;
                 }
 
                 UserQuizAnswerModel::updateOrCreate(
@@ -263,48 +282,89 @@ class QuizService
                 'total_score' => $totalScore,
             ]);
 
+            DB::table('quiz_attempt_material_scores')
+                ->where('quiz_attempts_id', $attempt->id)
+                ->delete();
+
+            foreach ($materialScores as $materialId => $scoreData) {
+                $maxScore = (int) ($scoreData['max_score'] ?? 0);
+                $earnedScore = (int) ($scoreData['earned_score'] ?? 0);
+
+                DB::table('quiz_attempt_material_scores')->insert([
+                    'quiz_attempts_id' => $attempt->id,
+                    'material_id' => $materialId,
+                    'correct_count' => (int) ($scoreData['correct_count'] ?? 0),
+                    'earned_score' => $earnedScore,
+                    'max_score' => $maxScore,
+                    'percentage' => $maxScore > 0
+                        ? round(($earnedScore / $maxScore) * 100, 2)
+                        : 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
             return $attempt;
         });
     }
 
     public function getQuizzesForLecturer($lecturerId)
     {
-        return QuizModel::query()
+        $quizzes = QuizModel::query()
             ->where('created_by', $lecturerId)
             ->with('class')
             ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($quiz) {
-                return [
-                    'id' => $quiz->id,
-                    'title' => $quiz->title,
-                    'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
-                    'total_questions' => $quiz->questions()->count(),
-                    'duration' => $quiz->duration,
-                    'passing_score' => $quiz->passing_score,
-                    'start_at' => $quiz->start_at,
-                    'end_at' => $quiz->end_at,
-                ];
-            });
+            ->get();
+
+        return $this->groupQuizzesByContent($quizzes);
     }
 
     public function getQuizzesForAdmin()
     {
-        return QuizModel::query()
+        $quizzes = QuizModel::query()
             ->with('class')
             ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($quiz) {
-                return [
-                    'id' => $quiz->id,
-                    'title' => $quiz->title,
-                    'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+            ->get();
+
+        return $this->groupQuizzesByContent($quizzes);
+    }
+
+    /**
+     * Group quizzes that share the same title + duration + passing_score + created_by
+     * into a single row so that quizzes created for multiple classes appear once.
+     */
+    private function groupQuizzesByContent($quizzes)
+    {
+        $grouped = [];
+
+        foreach ($quizzes as $quiz) {
+            // Grouping key: same title, duration, passing_score, and owner
+            $key = implode('|', [
+                $quiz->title,
+                $quiz->duration,
+                $quiz->passing_score,
+                $quiz->created_by,
+            ]);
+
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'id'              => $quiz->id,   // primary ID (Show/Edit)
+                    'title'          => $quiz->title,
+                    'duration'       => $quiz->duration,
+                    'passing_score'  => $quiz->passing_score,
+                    'start_at'       => $quiz->start_at,
+                    'end_at'         => $quiz->end_at,
                     'total_questions' => $quiz->questions()->count(),
-                    'duration' => $quiz->duration,
-                    'passing_score' => $quiz->passing_score,
-                    'start_at' => $quiz->start_at,
-                    'end_at' => $quiz->end_at,
+                    'classes'        => [],
                 ];
-            });
+            }
+
+            $grouped[$key]['classes'][] = [
+                'id'         => $quiz->id,
+                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
+            ];
+        }
+
+        return array_values($grouped);
     }
 }

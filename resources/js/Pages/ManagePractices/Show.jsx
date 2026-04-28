@@ -7,6 +7,9 @@ import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from 
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
+import { useTour } from "@/Hooks/useTour";
+import { FaQuestionCircle } from "react-icons/fa";
+
 
 export default function ManagePracticesShow({
 	practice,
@@ -31,6 +34,65 @@ export default function ManagePracticesShow({
 		[typeFilter, questions]
 	);
 
+	const { startTour, addSteps, next, back, cancel, complete } = useTour();
+
+	React.useEffect(() => {
+		addSteps([
+			{
+				id: 'intro',
+				title: 'Selamat Datang!',
+				text: 'Ini adalah halaman detail latihan soal. Mari kita lihat fitur-fitur yang ada.',
+				attachTo: { element: '#tour-header', on: 'bottom' },
+				buttons: [
+					{
+						text: 'Lewati',
+						action: cancel,
+						classes: 'shepherd-button-secondary'
+					},
+					{
+						text: 'Lanjut',
+						action: next
+					}
+				]
+			},
+			{
+				id: 'edit',
+				title: 'Edit Latihan',
+				text: 'Klik tombol ini untuk mengubah informasi latihan atau menambah soal baru.',
+				attachTo: { element: '#tour-edit-button', on: 'left' },
+				buttons: [
+					{
+						text: 'Kembali',
+						action: back,
+						classes: 'shepherd-button-secondary'
+					},
+					{
+						text: 'Lanjut',
+						action: next
+					}
+				]
+			},
+			{
+				id: 'filter',
+				title: 'Filter Soal',
+				text: 'Gunakan panel ini untuk melihat informasi materi dan memfilter tipe soal.',
+				attachTo: { element: '#tour-meta-panel', on: 'bottom' },
+				buttons: [
+					{
+						text: 'Kembali',
+						action: back,
+						classes: 'shepherd-button-secondary'
+					},
+					{
+						text: 'Selesai',
+						action: complete
+					}
+				]
+			}
+		]);
+	}, []);
+
+
 	return (
 		<AppLayout
 			title="Detail Latihan Soal"
@@ -39,28 +101,45 @@ export default function ManagePracticesShow({
 			backLabel="Kembali ke daftar latihan"
 		>
 			<div className="mx-auto  space-y-3">
+				<div className="flex justify-end">
+					<button
+						onClick={startTour}
+						className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+					>
+						<FaQuestionCircle className="text-blue-500 h-4 w-4" />
+						Butuh panduan?
+					</button>
+				</div>
 				{/* Header */}
 
-					<div className="flex flex-wrap items-start justify-between gap-4 px-3 py-2">
+
+					<div id="tour-header" className="flex flex-wrap items-start justify-between gap-4 px-3 py-2">
+
 						<div className="space-y-1">
 							<h1 className="text-lg font-semibold tracking-tight text-slate-900">
 								{practice?.material?.name ?? "Nama materi belum diatur"}
 							</h1>
 						</div>
+
+
 						<Button
 							as={Link}
 							href={route(`${baseRouteName}.edit`, practice?.id)}
 							variant="solid"
 							color="blue"
 							size="sm"
+							id="tour-edit-button"
 							className="rounded-full px-4"
 						>
+
 							Edit Latihan & Soal
 						</Button>
 					</div>
 
 				{/* Meta & Filter */}
-				<PracticeMetaPanel
+				<div id="tour-meta-panel">
+					<PracticeMetaPanel
+
 					teacherName={teacher?.name ?? "Dosen"}
 					materialName={practice?.material?.name ?? "Pilih Materi"}
 					levelLabel={difficultyLabel(practice?.level) ?? "Pilih Level"}
@@ -73,6 +152,8 @@ export default function ManagePracticesShow({
 						{ value: QUESTION_TYPE.DRAG, label: questionTypeLabel(QUESTION_TYPE.DRAG) },
 					]}
 				/>
+				</div>
+
 
 				<section className="space-y-4">
 					{filteredQuestions.length === 0 ? (

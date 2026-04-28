@@ -114,15 +114,15 @@ function deriveActionMeta(action, nextLvl, currentLevel) {
 // ─── Tone style maps ──────────────────────────────────────────────────────────
 
 const TONE_BTN = {
-  purple: "purple",
-  green: "emerald",
-  amber: "amber",
-  red: "rose",
-  slate: "indigo",
+  purple: "blue",
+  green: "green",
+  amber: "yellow",
+  red: "red",
+  slate: "gray",
 };
 
 const TONE_ICON_BG = {
-  purple: "bg-purple-100 text-purple-600",
+  purple: "bg-indigo-100 text-indigo-600",
   green: "bg-emerald-100 text-emerald-600",
   amber: "bg-amber-100 text-amber-600",
   red: "bg-rose-100 text-rose-600",
@@ -180,7 +180,7 @@ export default function Summary({ practice, attempt, answers, cfg, nextLevel }) 
       backHref={route("practices.index")}
       backLabel="Kembali ke Daftar"
     >
-      <div className="mx-auto w-full max-w-7xl space-y-6 pb-8">
+      <div className="mx-auto space-y-6 pb-8">
         <HeroBanner
           isPassed={isPassed}
           finalScore={finalScore}
@@ -188,10 +188,20 @@ export default function Summary({ practice, attempt, answers, cfg, nextLevel }) 
           materialName={materialName}
           levelText={levelText}
           attemptTypeLabel={attemptTypeLabel}
+          attemptType={attemptType}
           today={today}
+          actionMeta={actionMeta}
+          nextMessage={nextMessage}
+          weakSubTopic={weakSubTopic}
         />
 
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid gap-6 lg:grid-cols-[2fr_1fr] items-start">
+          <AnswerReview
+            reviewedAnswers={reviewedAnswers}
+            showCorrectAnswers={showCorrectAnswers}
+            threshold={threshold}
+          />
+
           <ScoreCard
             finalScore={finalScore}
             threshold={threshold}
@@ -199,18 +209,7 @@ export default function Summary({ practice, attempt, answers, cfg, nextLevel }) 
             totalAnswers={totalAnswers}
             subtopicScores={subtopicScores}
           />
-          <NextActionCard
-            actionMeta={actionMeta}
-            nextMessage={nextMessage}
-            weakSubTopic={weakSubTopic}
-          />
         </div>
-
-        <AnswerReview
-          reviewedAnswers={reviewedAnswers}
-          showCorrectAnswers={showCorrectAnswers}
-          threshold={threshold}
-        />
       </div>
     </AppLayout>
   );
@@ -218,42 +217,86 @@ export default function Summary({ practice, attempt, answers, cfg, nextLevel }) 
 
 // ─── Hero banner ──────────────────────────────────────────────────────────────
 
-function HeroBanner({ isPassed, finalScore, threshold, materialName, levelText, attemptTypeLabel, today }) {
+function HeroBanner({ isPassed, finalScore, threshold, materialName, levelText, attemptTypeLabel, today, attemptType, actionMeta, nextMessage, weakSubTopic }) {
+  const IconComp = Icons[actionMeta.icon] ?? Icons.ChevronRight;
+  const btnColor = TONE_BTN[actionMeta.tone] ?? "indigo";
+  const iconBg = TONE_ICON_BG[actionMeta.tone] ?? TONE_ICON_BG.slate;
+
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sky-500 via-indigo-500 to-violet-600 p-6 md:p-8 text-white shadow-lg shadow-indigo-200">
-      <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-14 -left-6 h-32 w-32 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+    <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-sky-50 via-white to-blue-50 p-7 text-slate-900 border border-sky-100 shadow-xl shadow-slate-200/40 transition-all duration-500">
+      {/* Decorative Orbs */}
+      <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-sky-200/20 blur-[80px] pointer-events-none" />
+      <div className="absolute -bottom-32 -left-20 h-72 w-72 rounded-full bg-blue-200/20 blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
         <div className="space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-50 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+          <div className="inline-flex items-center gap-2 rounded-full bg-white border border-sky-100 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-600 shadow-sm backdrop-blur-md">
+            <span className={`h-2 w-2 rounded-full animate-pulse ${isPassed ? "bg-emerald-400" : "bg-rose-400"}`} />
             {today}
           </div>
+          
           <div>
-            <p className="text-sm font-medium text-sky-100/90">
-              {attemptTypeLabel} · {materialName} · Level {levelText}
-            </p>
-            <h1 className="mt-1 text-xl md:text-2xl font-semibold tracking-tight leading-tight">
-              {isPassed ? "Mantap, kamu lulus level ini!" : "Belum lulus — tapi ini bukan akhir"}
+            <div className="flex items-center gap-2 text-slate-500 mb-2">
+              <span className="text-xs font-medium uppercase tracking-widest">{attemptTypeLabel}</span>
+              <span className="h-1 w-1 rounded-full bg-slate-300" />
+              <span className="text-xs font-medium uppercase tracking-widest">{materialName}</span>
+              {attemptType !== "pretest" && (
+                <>
+                  <span className="h-1 w-1 rounded-full bg-slate-300" />
+                  <span className="text-xs font-medium uppercase tracking-widest">Level {levelText}</span>
+                </>
+              )}
+            </div>
+            
+            <h1 className="text-3xl font-black tracking-tight leading-tight text-slate-900">
+              {isPassed ? "KERJA BAGUS!" : "JANGAN MENYERAH!"}
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-sky-100/85">
+            
+            <p className="mt-4 max-w-xl text-[12px] text-slate-500 font-normal leading-relaxed">
               {isPassed
-                ? `Nilai kamu ${finalScore} — melewati batas minimum ${threshold}. Lihat arahan berikutnya di bawah.`
-                : `Nilai kamu ${finalScore} — butuh minimal ${threshold} untuk lulus. Cek review jawaban untuk tahu yang perlu diperbaiki.`}
+                ? `Kamu berhasil melewati tantangan ini dengan skor ${finalScore}. Terus pertahankan semangat belajarmu!`
+                : `Skor kamu ${finalScore}, sedikit lagi mencapai target ${threshold}. Yuk, pelajari lagi bagian yang masih sulit.`}
             </p>
           </div>
         </div>
 
-        <div className="shrink-0 rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-sm min-w-[140px] text-center">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-sky-100/80 mb-2">Nilai kamu</p>
-          <p className="text-5xl font-semibold tracking-tight">{finalScore}</p>
-          <p className="mt-1 text-xs text-sky-100/70">min. {threshold} untuk lulus</p>
-          <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold ${
-            isPassed ? "bg-emerald-400/25 text-emerald-50" : "bg-rose-400/25 text-rose-50"
-          }`}>
-            {isPassed ? "Lulus" : "Belum lulus"}
-          </span>
+        <div className="shrink-0 flex flex-col md:flex-row items-center gap-6">
+          <div className="group relative">
+            <div className="absolute inset-0 bg-sky-200/30 blur-2xl rounded-full scale-110 group-hover:scale-125 transition-transform duration-500" />
+            <div className="relative rounded-[3rem] border border-sky-100 bg-white/80 p-7 backdrop-blur-xl min-w-[180px] text-center shadow-2xl">
+              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400 mb-0.5">Skor Akhir</p>
+              <p className="text-5xl font-black tracking-tighter tabular-nums text-slate-900">{finalScore}</p>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <div className={`h-1.5 w-1.5 rounded-full ${isPassed ? "bg-emerald-400" : "bg-rose-400"}`} />
+                <p className="text-[9px] font-bold uppercase tracking-widest text-slate-600">
+                  {isPassed ? "LULUS" : "GAGAL"}
+                </p>
+              </div>
+            </div>
+          </div>
+          {/* Next Action in Hero */}
+          <div className="hidden lg:flex flex-col min-w-[200px] max-w-[250px]">
+             <div className="mb-4 flex items-center gap-3">
+              <div className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-inner ${iconBg}`}>
+                <IconComp className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Rencana Lanjut</p>
+                <p className="text-[12px] font-bold text-slate-900 leading-snug truncate max-w-[200px]">{actionMeta.heading}</p>
+              </div>
+            </div>
+
+            <Button
+              as={Link}
+              href={actionMeta.ctaHref}
+              variant="solid"
+              color={btnColor}
+              size="sm"
+              className="!rounded-lg font-bold uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/20"
+            >
+              {actionMeta.ctaLabel}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -263,146 +306,77 @@ function HeroBanner({ isPassed, finalScore, threshold, materialName, levelText, 
 // ─── Score card ───────────────────────────────────────────────────────────────
 
 function ScoreCard({ finalScore, threshold, isPassed, totalAnswers, subtopicScores = [] }) {
-  const correctCount = Math.round((finalScore / 100) * totalAnswers);
-
   return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">
-            Nilai per sub-topik
-          </p>
-          <span className="text-[11px] text-slate-500">{subtopicScores.length} sub-topik</span>
+    <div className="rounded-[2.5rem] border border-white/60 bg-white/70 p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900 tracking-tight">Analisis Capaian</h3>
+          <p className="text-[10px] font-medium text-slate-500 mt-0.5">Detail nilai per sub-topik materi</p>
         </div>
-
-        {subtopicScores.length > 0 ? (
-          <div className="space-y-3">
-            {subtopicScores.map((item) => {
-              const barColor = item.percentage >= 70 ? "bg-emerald-400" : "bg-rose-400";
-
-              return (
-                <div key={item.key} className="rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <p className="text-[12px] font-medium text-slate-800">{item.name}</p>
-                    <span className="text-[11px] font-semibold text-slate-700">
-                      {item.percentage}%
-                    </span>
+        <div className="h-7 w-7 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100">
+          <Icons.Progress className="h-3.5 w-3.5 text-indigo-600" />
+        </div>
+      </div>
+      {subtopicScores.length > 0 ? (
+        <div className="space-y-3">
+          {subtopicScores.map((item) => {
+            const isHigh = item.percentage >= 70;
+            return (
+              <div key={item.key} className="group rounded-2xl border border-slate-100 bg-slate-50/50 p-2.5 transition-all duration-300 hover:bg-white hover:shadow-md hover:border-slate-200">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${isHigh ? "bg-emerald-100 text-emerald-600" : "bg-rose-100 text-rose-600"}`}>
+                      {isHigh ? <Icons.Check className="h-2.5 w-2.5" /> : <Icons.Error className="h-2.5 w-2.5" />}
+                    </div>
+                    <p className="text-[11px] font-medium text-slate-800 truncate">{item.name}</p>
                   </div>
-
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full ${barColor}`}
-                      style={{ width: `${Math.min(item.percentage, 100)}%` }}
-                    />
-                  </div>
-
-                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500">
-                    <span>{item.correctCount}/{item.totalQuestions} benar</span>
-                    <span>{item.earnedScore}/{item.maxScore} poin</span>
-                  </div>
+                  <span className={`text-[12px] font-bold ${isHigh ? "text-emerald-600" : "text-rose-600"}`}>
+                    {item.percentage}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-sm text-slate-500">
-            Data sub-topik belum tersedia.
-          </div>
-        )}
 
-      <div className="mt-5">
-        <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
-          <span>0</span>
-          <span className="text-slate-500">Batas: {threshold}</span>
-          <span>100</span>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/50">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${isHigh ? "bg-emerald-500" : "bg-rose-500"}`}
+                    style={{ width: `${Math.min(item.percentage, 100)}%` }}
+                  />
+                </div>
+
+                <div className="mt-2.5 flex items-center gap-4 text-[9px] font-medium uppercase tracking-widest text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Icons.Star className="h-2.5 w-2.5" /> {item.earnedScore}/{item.maxScore} Poin
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${isPassed ? "bg-emerald-400" : "bg-rose-400"}`}
-            style={{ width: `${Math.min(finalScore, 100)}%` }}
-          />
-        </div>
-        <div className="relative" style={{ marginTop: -10 }}>
-          <div
-            className="absolute h-4 w-0.5 bg-slate-400"
-            style={{ left: `${threshold}%`, transform: "translateX(-50%)" }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, highlight = false, suffix = null }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <p className="text-[11px] font-medium text-slate-500">{label}</p>
-      <p className={`mt-1 text-xl font-semibold tracking-tight ${highlight ? "text-emerald-600" : "text-slate-900"}`}>
-        {value}
-        {suffix ? <span className="text-sm font-normal text-slate-400 ml-1">{suffix}</span> : null}
-      </p>
-    </div>
-  );
-}
-
-// ─── Next action card ─────────────────────────────────────────────────────────
-
-function NextActionCard({ actionMeta, nextMessage, weakSubTopic }) {
-  const IconComp = Icons[actionMeta.icon] ?? Icons.ChevronRight;
-  const btnColor = TONE_BTN[actionMeta.tone] ?? "indigo";
-  const iconBg = TONE_ICON_BG[actionMeta.tone] ?? TONE_ICON_BG.slate;
-
-  return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm flex flex-col">
-      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Arahan berikutnya</p>
-      <h3 className="mt-1 text-base font-semibold text-slate-900">{actionMeta.heading}</h3>
-
-      {nextMessage && (
-        <p className="mt-2 text-sm text-slate-500 leading-relaxed">{nextMessage}</p>
-      )}
-
-      {weakSubTopic && (
-        <div className="mt-3 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
-          <p className="text-[11px] font-medium text-amber-700 uppercase tracking-wide">Sub-topik lemah</p>
-          <p className="text-sm font-medium text-amber-900 mt-0.5">{weakSubTopic}</p>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 py-10 text-center">
+          <Icons.Info className="h-7 w-7 text-slate-300 mb-2" />
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Analisis tidak tersedia</p>
         </div>
       )}
-
-      <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 flex-1 flex flex-col justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 ${iconBg}`}>
-            <IconComp className="h-4 w-4" />
-          </div>
-          <p className="text-sm font-medium text-slate-800">{actionMeta.ctaLabel}</p>
-        </div>
-
-        <Button
-          as={Link}
-          href={actionMeta.ctaHref}
-          variant="solid"
-          color={btnColor}
-          size="md"
-          className="w-full rounded-full"
-        >
-          {actionMeta.ctaLabel}
-        </Button>
-      </div>
     </div>
   );
 }
+
 
 // ─── Answer review ────────────────────────────────────────────────────────────
 
 function AnswerReview({ reviewedAnswers, showCorrectAnswers, threshold }) {
   return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div className="rounded-[2.5rem] border border-white/60 bg-white/70 p-5 shadow-xl shadow-slate-200/40 backdrop-blur-xl">
+      <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-400">Review jawaban</p>
-          <h3 className="mt-1 text-base font-semibold text-slate-900">Soal dan jawaban yang kamu isi</h3>
+          <h3 className="text-[14px] font-bold text-slate-900 tracking-tight">Review Jawaban</h3>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-slate-100 border border-slate-200">
+          <span className="text-[10px] font-bold text-slate-600 tabular-nums">{reviewedAnswers.length} Pertanyaan</span>
         </div>
       </div>
 
-      <div className="mt-5 space-y-4">
+      <div className="grid gap-4">
         {reviewedAnswers.length > 0 ? (
           reviewedAnswers.map((item, index) => (
             <QuestionReviewCard
@@ -413,8 +387,9 @@ function AnswerReview({ reviewedAnswers, showCorrectAnswers, threshold }) {
             />
           ))
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-            Belum ada jawaban yang bisa ditampilkan.
+          <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-slate-200 py-8 text-center">
+            <Icons.Practice className="h-12 w-12 text-slate-300 mb-4" />
+            <p className="text-sm font-medium text-slate-400 uppercase tracking-widest">Belum ada jawaban untuk direview</p>
           </div>
         )}
       </div>
@@ -423,80 +398,110 @@ function AnswerReview({ reviewedAnswers, showCorrectAnswers, threshold }) {
 }
 
 function QuestionReviewCard({ item, index, showCorrectAnswers }) {
+  const isHigh = item.isCorrect;
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">Soal {index + 1}</p>
-          <p className="mt-1 text-sm font-medium leading-relaxed text-slate-900">{item.questionText}</p>
+    <div className="group rounded-3xl border border-slate-100 bg-white p-4 transition-all duration-300 hover:shadow-xl hover:border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-lg bg-slate-900 text-[8px] font-bold text-white">
+              {index + 1}
+            </span>
+            <h4 className="text-[12px] font-semibold text-slate-800 leading-relaxed max-w-2xl">{item.questionText}</h4>
+          </div>
         </div>
-        <span className={`inline-flex w-fit rounded-full px-3 py-1 text-[10px] font-semibold flex-shrink-0 ${
-          item.isCorrect ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-600"
+        
+        <div className={`flex items-center gap-1.5 px-2.5 h-6 rounded-xl border font-semibold text-[9px] uppercase tracking-widest ${
+          isHigh ? "bg-emerald-50 border-emerald-100 text-emerald-600" : "bg-rose-50 border-rose-100 text-rose-600"
         }`}>
-          {item.isCorrect ? "Benar" : "Salah"}
-        </span>
+          {isHigh ? <Icons.CheckCircle className="h-2.5 w-2.5" /> : <Icons.Failed className="h-2.5 w-2.5" />}
+          {isHigh ? "Benar" : "Salah"}
+        </div>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-2 space-y-2.5">
+        {/* Code Snippet for drag-drop questions */}
+        {item.questionType === "drag_drop" && item.codeSnippet && (
+          <div className="rounded-xl border border-slate-700/30 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border-b border-slate-700/50">
+              <div className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-rose-400/80" />
+                <span className="h-2 w-2 rounded-full bg-amber-400/80" />
+                <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+              </div>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 ml-1">Code Snippet</span>
+            </div>
+            <div className="p-3 overflow-x-auto">
+              <pre className="text-[11px] leading-relaxed font-mono text-emerald-300 whitespace-pre-wrap">
+                <code>{item.codeSnippet}</code>
+              </pre>
+            </div>
+          </div>
+        )}
+
         {item.questionType === "multiple_choice"
           ? <MultipleChoiceOptions item={item} showCorrectAnswers={showCorrectAnswers} />
           : <DragDropAnswer item={item} showCorrectAnswers={showCorrectAnswers} />}
       </div>
 
       {showCorrectAnswers && (
-        <p className={`mt-3 text-[12px] leading-relaxed ${item.isCorrect ? "text-emerald-600" : "text-rose-600"}`}>
-          {item.isCorrect ? item.feedbackCorrect : item.feedbackIncorrect}
-        </p>
+        <div className={`mt-4 p-3.5 rounded-xl border leading-relaxed text-[11px] font-normal ${
+          isHigh ? "bg-emerald-50/50 border-emerald-100 text-emerald-800" : "bg-rose-50/50 border-rose-100 text-rose-800"
+        }`}>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Icons.Lightbulb className={`h-3 w-3 ${isHigh ? "text-emerald-500" : "text-rose-500"}`} />
+            <span className="text-[8px] font-bold uppercase tracking-widest">Penjelasan</span>
+          </div>
+          {isHigh ? item.feedbackCorrect : item.feedbackIncorrect}
+        </div>
       )}
     </div>
   );
 }
 
 function MultipleChoiceOptions({ item, showCorrectAnswers }) {
-  if (!item.options.length) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-200 bg-white p-3 text-sm text-slate-500">
-        Opsi jawaban tidak tersedia.
-      </div>
-    );
-  }
+  if (!item.options.length) return null;
 
-  return item.options.map((option) => {
-    const optId = Number(option?.id ?? 0);
-    const isSelected = optId === item.selectedOptionId;
-    const isCorrectOpt = Number(option?.is_correct) === 1;
-    const showAsCorrect = showCorrectAnswers && isCorrectOpt;
+  return (
+    <div className="grid gap-3">
+      {item.options.map((option) => {
+        const optId = Number(option?.id ?? 0);
+        const isSelected = optId === item.selectedOptionId;
+        const isCorrectOpt = Number(option?.is_correct) === 1;
+        const showAsCorrect = showCorrectAnswers && isCorrectOpt;
 
-    const cls = isSelected
-      ? (item.isCorrect
-          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-          : "border-rose-300 bg-rose-50 text-rose-700")
-      : showAsCorrect
-        ? "border-emerald-200 bg-emerald-50/60 text-emerald-700"
-        : "border-slate-200 bg-white text-slate-700";
+        let styleClass = "border-slate-100 bg-slate-50/50 text-slate-600";
+        if (isSelected) {
+          styleClass = item.isCorrect 
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900 shadow-sm" 
+            : "border-rose-200 bg-rose-50 text-rose-900 shadow-sm";
+        } else if (showAsCorrect) {
+          styleClass = "border-emerald-200 bg-emerald-50/30 text-emerald-700";
+        }
 
-    return (
-      <div key={optId} className={`rounded-xl border p-3 ${cls}`}>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm leading-relaxed">{option?.option_text ?? "-"}</p>
-          <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isSelected && (
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                item.isCorrect ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"
-              }`}>
-                Pilihanmu
-              </span>
-            )}
-            {showAsCorrect && (
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                Jawaban benar
-              </span>
-            )}
+        return (
+          <div key={optId} className={`relative overflow-hidden rounded-xl border p-2.5 transition-all ${styleClass}`}>
+            <div className="flex items-center justify-between gap-3 relative z-10">
+              <p className="text-[12px] font-medium">{option?.option_text ?? "-"}</p>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isSelected && (
+                  <span className={`px-1.5 py-0.5 rounded-lg text-[8px] font-bold uppercase tracking-widest ${
+                    item.isCorrect ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"
+                  }`}>
+                    Pilihanmu
+                  </span>
+                )}
+                {showAsCorrect && (
+                  <Icons.CheckCircle className="h-4 w-4 text-emerald-500" />
+                )}
+              </div>
+            </div>
+            {isSelected && <div className={`absolute inset-0 opacity-10 ${item.isCorrect ? "bg-emerald-400" : "bg-rose-400"}`} />}
           </div>
-        </div>
-      </div>
-    );
-  });
+        );
+      })}
+    </div>
+  );
 }
 
 function DragDropAnswer({ item, showCorrectAnswers }) {
@@ -504,92 +509,37 @@ function DragDropAnswer({ item, showCorrectAnswers }) {
   const correctSteps = Array.isArray(item.correctAnswerItems) ? item.correctAnswerItems : [];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-            Jawaban kamu
-          </p>
-          <span
-            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-              item.isCorrect
-                ? "bg-emerald-100 text-emerald-700"
-                : "bg-rose-100 text-rose-700"
-            }`}
-          >
-            {item.isCorrect ? "Sudah benar" : "Perlu diperbaiki"}
-          </span>
-        </div>
-
-        {userSteps.length > 0 ? (
-          <div className="space-y-2">
-            {userSteps.map((step, index) => (
-              <div
-                key={`user-step-${index}`}
-                className={`flex items-start gap-3 rounded-xl border px-3 py-3 ${
-                  item.isCorrect
-                    ? "border-emerald-200 bg-emerald-50/60"
-                    : "border-rose-200 bg-rose-50/60"
-                }`}
-              >
-                <div
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                    item.isCorrect
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-rose-100 text-rose-700"
-                  }`}
-                >
-                  {index + 1}
-                </div>
-                <p className="text-sm leading-relaxed text-slate-800">{step}</p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
-            Belum ada susunan jawaban.
-          </div>
-        )}
-      </div>
-
-      {showCorrectAnswers ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
-              Urutan yang benar
-            </p>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
-              Acuan
-            </span>
-          </div>
-
-          {correctSteps.length > 0 ? (
-            <div className="space-y-2">
-              {correctSteps.map((step, index) => (
-                <div
-                  key={`correct-step-${index}`}
-                  className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
-                >
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-700">
-                    {index + 1}
-                  </div>
-                  <p className="text-sm leading-relaxed text-slate-800">{step}</p>
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="space-y-2.5">
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-1">Jawaban Kamu</p>
+        <div className={`rounded-2xl border p-3.5 ${item.isCorrect ? "bg-emerald-50/30 border-emerald-100" : "bg-rose-50/30 border-rose-100"}`}>
+          {userSteps.length > 0 ? (
+            <div className="space-y-1.5">
+              {userSteps.map((step, index) => (
+                <div key={index} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-medium text-slate-500">{index + 1}</span>
+                  <p className="text-[12px] font-medium text-slate-800 leading-tight">{step}</p>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
-              Urutan jawaban benar tidak tersedia.
-            </div>
+            <p className="py-3 text-center text-[11px] font-normal text-slate-400">Kosong</p>
           )}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-4">
-          <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400 mb-3">
-            Urutan yang benar
-          </p>
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-400">
-            Tersembunyi — lulus dulu untuk melihat urutan yang benar.
+      </div>
+
+      {showCorrectAnswers && (
+        <div className="space-y-2.5">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-1">Solusi Benar</p>
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-3.5">
+            <div className="space-y-1.5">
+              {correctSteps.map((step, index) => (
+                <div key={index} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white border border-emerald-100 shadow-sm">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-[10px] font-medium text-white">{index + 1}</span>
+                  <p className="text-[12px] font-medium text-slate-800 leading-tight">{step}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -653,6 +603,7 @@ function buildReviewedAnswer(answer) {
     correctAnswerText,
     userAnswerItems: selectedItems,
     correctAnswerItems: correctItems,
+    codeSnippet: question?.code_snippet ?? null,
     feedbackCorrect: question?.feedback_correct ?? "Jawaban kamu sudah benar.",
     feedbackIncorrect: question?.feedback_incorrect ?? "Jawaban kamu belum tepat.",
   };
@@ -660,13 +611,13 @@ function buildReviewedAnswer(answer) {
 
 function getSubtopicName(question) {
   return (
-    question?.subtopic?.name ??
-    question?.subTopicRef?.name ??
     question?.sub_topic_ref?.name ??
+    question?.subTopicRef?.name ??
     question?.sub_topic_name ??
-    question?.sub_topic ??
     question?.subtopic_name ??
     question?.subtopicName ??
+    question?.subtopic?.name ??
+    question?.sub_topic ??
     null
   );
 }
@@ -676,17 +627,41 @@ function buildSubtopicScores(latestAnswers = []) {
 
   latestAnswers.forEach((answer) => {
     const question = answer?.question ?? {};
-    const subtopicId = question?.subtopic_id ?? question?.sub_topic_id ?? null;
+
+    const subtopicId =
+      question?.subtopic_id ??
+      question?.sub_topic_id ??
+      question?.subTopicId ??
+      question?.sub_topic_ref?.id ??
+      question?.subTopicRef?.id ??
+      question?.sub_topic?.id ??
+      question?.subTopic?.id ??
+      question?.subtopic?.id ??
+      null;
+
     const subtopicName = getSubtopicName(question);
-    const key = subtopicId != null ? `subtopic-${subtopicId}` : `subtopic-${subtopicName ?? "unknown"}`;
-    const name = subtopicName ?? (subtopicId != null ? `Sub-topik ${subtopicId}` : "Sub-topik lain");
+
+    const key =
+      subtopicId != null
+        ? `subtopic-${subtopicId}`
+        : `subtopic-${subtopicName ?? "unknown"}`;
+
+    const name =
+      subtopicName ??
+      (subtopicId != null
+        ? `Sub-topik ${subtopicId}`
+        : "Sub-topik belum terhubung");
 
     const questionPoints = Number(question?.points ?? 10);
-    const earnedFromAnswer = Number(answer?.score ?? 0);
     const isCorrect = parseIsCorrect(answer?.is_correct);
-    const earnedScore = Number.isFinite(earnedFromAnswer)
-      ? earnedFromAnswer
-      : (isCorrect ? questionPoints : 0);
+
+    const rawScore = answer?.score;
+    const earnedScore =
+      rawScore !== undefined && rawScore !== null && rawScore !== ""
+        ? Number(rawScore)
+        : isCorrect
+          ? questionPoints
+          : 0;
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -700,7 +675,8 @@ function buildSubtopicScores(latestAnswers = []) {
     }
 
     const row = grouped.get(key);
-    row.earnedScore += earnedScore;
+
+    row.earnedScore += Number.isFinite(earnedScore) ? earnedScore : 0;
     row.maxScore += questionPoints;
     row.correctCount += isCorrect ? 1 : 0;
     row.totalQuestions += 1;
@@ -709,7 +685,10 @@ function buildSubtopicScores(latestAnswers = []) {
   return Array.from(grouped.values())
     .map((item) => ({
       ...item,
-      percentage: item.maxScore > 0 ? Math.round((item.earnedScore / item.maxScore) * 100) : 0,
+      percentage:
+        item.maxScore > 0
+          ? Math.round((item.earnedScore / item.maxScore) * 100)
+          : 0,
     }))
     .sort((a, b) => a.percentage - b.percentage);
 }

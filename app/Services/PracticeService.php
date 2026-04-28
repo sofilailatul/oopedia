@@ -44,6 +44,7 @@ class PracticeService
                 'up.last_score',
                 'up.next_action',
                 'up.focused_subtopic_id',
+                'up.focused_subtopic_ids',
                 'st.name as focused_subtopic_name',
                 'up.completed_pretest_at'
             )
@@ -203,12 +204,28 @@ class PracticeService
     {
         $grouped = $practiceRows->groupBy('material_id');
 
-        return $grouped->map(function ($items) use ($scores, $scoresByMode, $questionCounts, $activeAttempts, $readProgress, $progressRows) {
+        // Pre-fetch subtopic names for focused subtopics
+        $allFocusedIds = [];
+        foreach ($progressRows as $p) {
+            $ids = json_decode($p->focused_subtopic_ids ?? '[]', true);
+            if (!$ids && $p->focused_subtopic_id) $ids = [$p->focused_subtopic_id];
+            if ($ids) $allFocusedIds = array_merge($allFocusedIds, $ids);
+        }
+        
+        $subtopicMap = [];
+        if (!empty($allFocusedIds)) {
+            $subtopicMap = DB::table('subtopics')
+                ->whereIn('id', array_unique($allFocusedIds))
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+
+        return $grouped->map(function ($items) use ($scores, $scoresByMode, $questionCounts, $activeAttempts, $readProgress, $progressRows, $subtopicMap) {
             $material = $items->first()->material;
 
-            $easy = $items->firstWhere('level', 'easy');
-            $medium = $items->firstWhere('level', 'medium');
-            $hard = $items->firstWhere('level', 'hard');
+            $easy = $items->where('type', 'practice')->firstWhere('level', 'easy');
+            $medium = $items->where('type', 'practice')->firstWhere('level', 'medium');
+            $hard = $items->where('type', 'practice')->firstWhere('level', 'hard');
 
             $easyId = $easy?->id;
             $mediumId = $medium?->id;
@@ -242,7 +259,16 @@ class PracticeService
                     'last_score' => $progress->last_score,
                     'next_action' => $progress->next_action,
                     'focused_subtopic_id' => $progress->focused_subtopic_id,
-                    'focused_subtopic_name' => $progress->focused_subtopic_name,
+                    'focused_subtopic_ids' => json_decode($progress->focused_subtopic_ids ?? '[]', true),
+                    'focused_subtopic_names' => (function() use ($progress, $subtopicMap) {
+                        $ids = json_decode($progress->focused_subtopic_ids ?? '[]', true);
+                        if (empty($ids) && $progress->focused_subtopic_id) $ids = [(int)$progress->focused_subtopic_id];
+                        $names = [];
+                        foreach (($ids ?: []) as $id) {
+                            if (isset($subtopicMap[$id])) $names[] = $subtopicMap[$id];
+                        }
+                        return $names;
+                    })(),
                     'completed_pretest_at' => $progress->completed_pretest_at,
                 ] : null,
                 'levels' => [
@@ -341,6 +367,7 @@ class PracticeService
             'correct_answer' => 0,
             'score' => 0,
             'focused_subtopic_id' => $data['focused_subtopic_id'] ?? null,
+            'focused_subtopic_ids' => $data['focused_subtopic_ids'] ?? null,
             'remediation_round' => (int) ($data['remediation_round'] ?? 0),
             'started_at' => now(),
             'finished_at' => null,
@@ -380,6 +407,7 @@ class PracticeService
             'duration_seconds' => (int) ($attempt->duration_seconds ?? 18 * 60),
             'mode' => $attempt->mode ?? 'normal',
             'focused_subtopic_id' => $attempt->focused_subtopic_id ?? null,
+            'focused_subtopic_ids' => $attempt->focused_subtopic_ids ?? null,
             'remediation_round' => (int) ($attempt->remediation_round ?? 0),
         ];
 
@@ -399,7 +427,15 @@ class PracticeService
         $query = PracticeQuestionModel::query()
             ->where('practices_id', $practiceId);
 
-        if (!empty($cfg['focused_subtopic_id'])) {
+        if (!empty($cfg['focused_subtopic_ids'])) {
+            $subtopicIds = is_string($cfg['focused_subtopic_ids']) 
+                ? json_decode($cfg['focused_subtopic_ids'], true) 
+                : $cfg['focused_subtopic_ids'];
+                
+            if (!empty($subtopicIds)) {
+                $query->whereIn('subtopic_id', $subtopicIds);
+            }
+        } elseif (!empty($cfg['focused_subtopic_id'])) {
             $query->where('subtopic_id', $cfg['focused_subtopic_id']);
         }
 

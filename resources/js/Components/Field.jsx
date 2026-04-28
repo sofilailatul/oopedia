@@ -1,66 +1,95 @@
-import React from "react";
-
-/**
- * Generic field row used to display a label + value pair.
- *
- * Variants handled via props:
- * - disabled: true/false → menentukan gaya enable/disable
- * - icon: React node opsional di dalam value (bisa emoji atau ikon lain)
- */
 export default function Field({
-  label,
-  value,
-  disabled = false,
-  icon = null,
-  className = "",
-  as = null,
-  rows = 3,
-  helper = "",
-  inputClassName = "",
-  ...props
+    label,
+    name,
+    type = "text",
+    value,
+    onChange,
+    error,
+    placeholder,
+    required = false,
+    disabled = false,
+    as = "input",
+    rows = 4,
+    className = "",
+    inputClassName = "",
+    labelClassName = "",
+    children,
+    ...props
 }) {
-  if (as) {
-    const InputComponent = as;
+    const isDark = inputClassName.includes("bg-white/5") || inputClassName.includes("text-white");
+
+    const baseClass = `
+        w-full rounded-xl border px-4 py-3 text-[12px] transition-all outline-none
+        ${
+            error
+                ? "border-red-500 focus:ring-2 focus:ring-red-300"
+                : isDark 
+                    ? "border-white/15 bg-white/5 text-white placeholder:text-white/40 focus:border-yellow-300 focus:ring-4 focus:ring-yellow-300/10"
+                    : "border-gray-300 bg-white focus:ring-2 focus:ring-blue-300"
+        }
+        ${disabled ? "bg-gray-100 cursor-not-allowed opacity-50" : ""}
+        ${inputClassName}
+    `;
 
     return (
-      <div className={`space-y-1 ${className}`}>
-        <label className="text-[11px] font-medium text-slate-500">{label}</label>
-        <div
-          className={`rounded-2xl border px-3 py-2 text-[12px] transition-colors ${
-            disabled
-              ? "border-slate-200 bg-slate-100 text-slate-500"
-              : "border-slate-200 bg-white text-slate-800"
-          }`}
-        >
-          {icon ? <span className="mb-1 inline-block shrink-0">{icon}</span> : null}
-          <InputComponent
-            value={value}
-            disabled={disabled}
-            rows={as === "textarea" ? rows : undefined}
-            className={`w-full border-none bg-transparent text-[12px] text-inherit focus:outline-none focus:ring-0 ${
-              as === "textarea" ? "resize-y min-h-[84px]" : ""
-            } ${inputClassName}`}
-            {...props}
-          />
-        </div>
-        {helper ? <p className="text-[11px] text-slate-400">{helper}</p> : null}
-      </div>
-    );
-  }
+        <div className={`space-y-2 ${className}`}>
+            {label && (
+                <label
+                    htmlFor={name}
+                    className={`block font-medium ${isDark ? "text-white/85" : "text-gray-700"} ${labelClassName}`}
+                >
+                    {label}
+                    {required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+            )}
 
-  return (
-    <div className={`grid grid-cols-[70px_1fr] items-center gap-2 ${className}`}>
-      <div className="text-slate-700 text-[12px] font-medium">{label}</div>
-      <div
-        className={`border rounded-lg px-3 py-2 text-[11px] flex items-center gap-2 transition-colors ${
-          disabled
-            ? "bg-slate-100 text-slate-500 border-slate-200"
-            : "bg-white text-slate-800 border-slate-200"
-        }`}
-      >
-        {icon && <span className="shrink-0">{icon}</span>}
-        <span className="truncate">{value}</span>
-      </div>
-    </div>
-  );
+            <div className="relative">
+                {as === "textarea" ? (
+                    <textarea
+                        id={name}
+                        name={name}
+                        value={value}
+                        onChange={onChange}
+                        placeholder={placeholder}
+                        required={required}
+                        disabled={disabled}
+                        rows={rows}
+                        className={baseClass}
+                        {...props}
+                    />
+                ) : as === "select" ? (
+                    <select
+                        id={name}
+                        name={name}
+                        value={value}
+                        onChange={onChange}
+                        required={required}
+                        disabled={disabled}
+                        className={baseClass}
+                        {...props}
+                    />
+                ) : (
+                    <input
+                        id={name}
+                        name={name}
+                        type={type}
+                        value={value}
+                        onChange={onChange}
+                        placeholder={placeholder}
+                        required={required}
+                        disabled={disabled}
+                        className={baseClass}
+                        {...props}
+                    />
+                )}
+                {children}
+            </div>
+
+            {error && (
+                <p className="mt-1 text-xs text-red-600">
+                    {error}
+                </p>
+            )}
+        </div>
+    );
 }

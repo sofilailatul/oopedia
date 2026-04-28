@@ -15,39 +15,71 @@ export default function DragDropQuestionForm({
   onImageChange,
 }) {
   const q = question;
-  const selectedSubtopicId = q.subtopic_id ?? q.sub_topic_id ?? "";
-  const subtopicNameFromOptions = subtopicOptions.find((item) =>
-    String(item.id) === String(selectedSubtopicId),
-  )?.name;
+
+  const selectedSubtopicId =
+    q.subtopic_id ??
+    q.sub_topic_id ??
+    q.subtopicId ??
+    q.subTopicId ??
+    "";
+
+  const subtopicNameFromOptions =
+    subtopicOptions.find(
+      (item) => String(item.id) === String(selectedSubtopicId),
+    )?.name ??
+    subtopicOptions.find(
+      (item) => String(item.id) === String(selectedSubtopicId),
+    )?.subtopic_name ??
+    subtopicOptions.find(
+      (item) => String(item.id) === String(selectedSubtopicId),
+    )?.sub_topic_name;
+
   const subTopicValue =
     q.sub_topic_name ??
     q.subTopicName ??
     subtopicNameFromOptions ??
     q.sub_topic ??
+    q.subtopic ??
     "";
-  const selectedSubtopicLabel = subtopicNameFromOptions || subTopicValue || "Pilih sub-topik";
+
+  const selectedSubtopicLabel =
+    subtopicNameFromOptions || subTopicValue || "Pilih sub-topik";
 
   return (
     <div className="space-y-5 px-5 py-4">
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)]">
         <div className="space-y-2">
-          <p className="text-[11px] font-medium text-slate-500">Question Text</p>
+          <p className="text-[11px] font-medium text-slate-500">
+            Question Text
+          </p>
+
           {readOnly ? (
             <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
-              <p className="whitespace-pre-wrap text-[12px] text-slate-800">{q.question_text || "-"}</p>
+              <p className="whitespace-pre-wrap text-[12px] text-slate-800">
+                {q.question_text || "-"}
+              </p>
             </div>
           ) : (
             <textarea
               rows={3}
-              value={q.question_text}
-              onChange={(e) => onQuestionFieldChange?.(questionIndex, "question_text", e.target.value)}
+              value={q.question_text || ""}
+              onChange={(e) =>
+                onQuestionFieldChange?.(
+                  questionIndex,
+                  "question_text",
+                  e.target.value,
+                )
+              }
               className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               placeholder="Enter your question here..."
             />
           )}
 
           <div className="space-y-2 pt-1">
-            <p className="text-[11px] font-medium text-slate-500">Sub-topik</p>
+            <p className="text-[11px] font-medium text-slate-500">
+              Sub-topik
+            </p>
+
             {readOnly ? (
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
                 {subTopicValue || "-"}
@@ -55,27 +87,68 @@ export default function DragDropQuestionForm({
             ) : (
               <Dropdown className="w-full">
                 <Dropdown.Trigger>
-                  <div className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800">
-                    {selectedSubtopicLabel}
-                  </div>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-800"
+                  >
+                    <span className="truncate pr-2">
+                      {selectedSubtopicLabel}
+                    </span>
+
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4 shrink-0 text-slate-400"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
                 </Dropdown.Trigger>
-                <Dropdown.Content align="left" width="64">
+
+                <Dropdown.Content align="left" width="full">
                   <Dropdown.Item
-                    onClick={() => onQuestionFieldChange?.(questionIndex, "subtopic_id", null)}
+                    onClick={() =>
+                      onQuestionFieldChange?.(
+                        questionIndex,
+                        "subtopic_id",
+                        null,
+                      )
+                    }
                     className={!selectedSubtopicId ? "bg-slate-100" : ""}
                   >
                     Pilih sub-topik
                   </Dropdown.Item>
+
                   {subtopicOptions.length === 0 ? (
-                    <div className="px-3 py-2 text-[12px] text-slate-400">Sub-topik belum tersedia di materi ini.</div>
+                    <div className="px-3 py-2 text-[12px] text-slate-400">
+                      Sub-topik belum tersedia di materi ini.
+                    </div>
                   ) : (
                     subtopicOptions.map((item) => (
                       <Dropdown.Item
                         key={item.id}
-                        onClick={() => onQuestionFieldChange?.(questionIndex, "subtopic_id", Number(item.id))}
-                        className={String(item.id) === String(selectedSubtopicId) ? "bg-slate-100" : ""}
+                        onClick={() =>
+                          onQuestionFieldChange?.(
+                            questionIndex,
+                            "subtopic_id",
+                            Number(item.id),
+                          )
+                        }
+                        className={
+                          String(item.id) === String(selectedSubtopicId)
+                            ? "bg-slate-100"
+                            : ""
+                        }
                       >
-                        {item.name}
+                        {item.name ??
+                          item.subtopic_name ??
+                          item.sub_topic_name}
                       </Dropdown.Item>
                     ))
                   )}
@@ -85,7 +158,10 @@ export default function DragDropQuestionForm({
           </div>
 
           <div className="space-y-2 pt-1">
-            <p className="text-[11px] font-medium text-slate-500">Output Code</p>
+            <p className="text-[11px] font-medium text-slate-500">
+              Code Snippet
+            </p>
+
             {readOnly ? (
               <div className="w-full rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2 text-[12px] text-slate-800">
                 {q.code_snippet || q.outputCode || "-"}
@@ -94,7 +170,13 @@ export default function DragDropQuestionForm({
               <input
                 type="text"
                 value={q.outputCode || ""}
-                onChange={(e) => onQuestionFieldChange?.(questionIndex, "outputCode", e.target.value)}
+                onChange={(e) =>
+                  onQuestionFieldChange?.(
+                    questionIndex,
+                    "outputCode",
+                    e.target.value,
+                  )
+                }
                 className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 placeholder="Define expected output if applicable..."
               />
@@ -103,7 +185,11 @@ export default function DragDropQuestionForm({
         </div>
 
         <div className="space-y-2">
-          <p className="text-[11px] font-medium text-slate-500">Gambar Pendukung (opsional)</p>
+          <p className="text-[11px] font-medium text-slate-500">
+            Gambar Pendukung{" "}
+            <span className="font-normal text-slate-400">(opsional)</span>
+          </p>
+
           {readOnly ? (
             q.image_url || q.imageUrl ? (
               <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50/60 px-3 py-3">
@@ -114,36 +200,33 @@ export default function DragDropQuestionForm({
                 />
               </div>
             ) : (
-              <p className="text-[11px] text-slate-400">Tidak ada gambar untuk soal ini.</p>
+              <p className="text-[11px] text-slate-400">
+                Tidak ada gambar untuk soal ini.
+              </p>
             )
           ) : (
-            <>
-              <UploadImage
-                label="Upload Image"
-                helper="Drag and drop files here or click to upload"
-                subHelper="Supported formats: .png, .jpeg"
-                file={q.imageFile}
-                url={q.imageUrl}
-                onFileChange={(file) => onImageChange?.(questionIndex, file)}
-              />
-              {q.imageUrl && (
-                <div className="mt-3">
-                  <img
-                    src={q.imageUrl}
-                    alt="Gambar soal"
-                    className="max-h-40 rounded-lg border object-contain"
-                  />
-                </div>
-              )}
-            </>
+            <UploadImage
+              label="Upload Image"
+              helper="Drag and drop files here or click to upload"
+              subHelper="Supported formats: .png, .jpeg"
+              file={q.imageFile}
+              url={q.imageUrl || q.image_url}
+              onFileChange={(payload) =>
+                onImageChange?.(questionIndex, payload)
+              }
+            />
           )}
         </div>
       </div>
 
       <div className="space-y-3">
         <div>
-          <p className="text-[11px] font-semibold text-slate-700">Code Block</p>
-          <p className="text-[11px] text-rose-500">*Letakkan jawaban dengan urutan yang benar</p>
+          <p className="text-[11px] font-semibold text-slate-700">
+            Code Block
+          </p>
+          <p className="text-[11px] text-rose-500">
+            *Letakkan jawaban dengan urutan yang benar
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -157,12 +240,21 @@ export default function DragDropQuestionForm({
               </span>
 
               {readOnly ? (
-                <span className="flex-1 text-sm text-slate-800">{opt.text}</span>
+                <span className="flex-1 text-sm text-slate-800">
+                  {opt.text}
+                </span>
               ) : (
                 <input
                   type="text"
-                  value={opt.text}
-                  onChange={(e) => onOptionFieldChange?.(questionIndex, optIdx, "text", e.target.value)}
+                  value={opt.text || ""}
+                  onChange={(e) =>
+                    onOptionFieldChange?.(
+                      questionIndex,
+                      optIdx,
+                      "text",
+                      e.target.value,
+                    )
+                  }
                   placeholder="Masukkan potongan kode"
                   className="flex-1 border-none bg-transparent text-sm text-slate-800 focus:outline-none"
                 />
@@ -199,16 +291,27 @@ export default function DragDropQuestionForm({
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
-          <p className="text-[11px] font-medium text-slate-500">Feedback jawaban BENAR</p>
+          <p className="text-[11px] font-medium text-slate-500">
+            Feedback jawaban BENAR
+          </p>
+
           {readOnly ? (
             <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[9px] text-slate-800">
-              <p className="text-[12px] text-slate-800">{q.feedback_correct || q.feedbackCorrect || "-"}</p>
+              <p className="text-[12px] text-slate-800">
+                {q.feedback_correct || q.feedbackCorrect || "-"}
+              </p>
             </div>
           ) : (
             <textarea
               rows={2}
               value={q.feedbackCorrect || ""}
-              onChange={(e) => onQuestionFieldChange?.(questionIndex, "feedbackCorrect", e.target.value)}
+              onChange={(e) =>
+                onQuestionFieldChange?.(
+                  questionIndex,
+                  "feedbackCorrect",
+                  e.target.value,
+                )
+              }
               className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               placeholder="Contoh: Urutan kode kamu sudah tepat."
             />
@@ -216,16 +319,27 @@ export default function DragDropQuestionForm({
         </div>
 
         <div className="space-y-1">
-          <p className="text-[11px] font-medium text-slate-500">Feedback jawaban SALAH</p>
+          <p className="text-[11px] font-medium text-slate-500">
+            Feedback jawaban SALAH
+          </p>
+
           {readOnly ? (
             <div className="flex min-h-[48px] items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-[9px] text-slate-800">
-              <p className="text-[12px] text-slate-800">{q.feedback_incorrect || q.feedbackIncorrect || "-"}</p>
+              <p className="text-[12px] text-slate-800">
+                {q.feedback_incorrect || q.feedbackIncorrect || "-"}
+              </p>
             </div>
           ) : (
             <textarea
               rows={2}
               value={q.feedbackIncorrect || ""}
-              onChange={(e) => onQuestionFieldChange?.(questionIndex, "feedbackIncorrect", e.target.value)}
+              onChange={(e) =>
+                onQuestionFieldChange?.(
+                  questionIndex,
+                  "feedbackIncorrect",
+                  e.target.value,
+                )
+              }
               className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               placeholder="Contoh: Coba susun ulang berdasarkan alur eksekusi kode."
             />

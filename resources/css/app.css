@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
                 @keyframes bounce-slow {
                     0%, 100% { transform: translateY(0); }
                     50% { transform: translateY(-10px); }
@@ -22,4 +29,169 @@
                 }
                 .animate-fade-in {
                     animation: fade-in 0.3s ease-out;
+                }
+
+                /* Custom Scrollbar for premium minimalist UI */
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 5px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #e2e8f0; /* slate-200 */
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #cbd5e1; /* slate-300 */
+                }
+                .custom-scrollbar {
+                    scrollbar-width: thin;
+                    scrollbar-color: #e2e8f0 transparent;
+                }
+
+                .custom-scrollbar-soft::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar-soft::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar-soft::-webkit-scrollbar-thumb {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar-soft::-webkit-scrollbar-thumb:hover {
+                    background: rgba(255, 255, 255, 0.2);
+                }
+                .custom-scrollbar-soft {
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+                }
+
+                /* Shepherd.js Custom Styling - Gen-Z Modern */
+                .shepherd-element {
+                    background: rgba(255, 255, 255, 0.7) !important;
+                    backdrop-filter: blur(10px) saturate(150%) !important;
+                    -webkit-backdrop-filter: blur(10px) saturate(150%) !important;
+                    border-radius: 2.5rem !important;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15) !important;
+                    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+                    max-width: 360px !important;
+                    padding: 1.2rem !important;
+                    outline: none !important;
+                }
+
+                .shepherd-header {
+                    background: transparent !important;
+                    padding: 0 0 0 0 !important;
+                }
+
+                .shepherd-title {
+                    color: #0f172a !important; /* slate-900 */
+                    font-size: 1rem !important;
+                    font-weight: 900 !important;
+                }
+
+                .shepherd-text {
+                    color: #475569 !important; /* slate-600 */
+                    font-size: 0.75rem !important;
+                    line-height: 1.8 !important;
+                    font-weight: 500 !important;
+                    text-align: justify !important;
+                }
+
+                .shepherd-footer {
+                    padding: 1rem 0 0 0 !important;
+                    display: flex !important;
+                    gap: 0.5rem !important;
+                    justify-content: space-between !important;
+                }
+
+                .shepherd-button {
+                    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%) !important;
+                    color: white !important;
+                    border-radius: 1.25rem !important;
+                    padding: 0.6rem 1.2rem !important;
+                    font-size: 0.6rem !important;
+                    font-weight: 800 !important;
+                    text-transform: uppercase !important;
+                    letter-spacing: 0.1em !important;
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                    border: none !important;
+                    box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3) !important;
+                }
+
+                .shepherd-button:hover {
+                    transform: translateY(-2px) !important;
+                    box-shadow: 0 15px 20px -3px rgba(99, 102, 241, 0.4) !important;
+                    filter: brightness(1.1) !important;
+                }
+
+                .shepherd-button:active {
+                    transform: translateY(0px) !important;
+                }
+
+                .shepherd-button-secondary {
+                    background: white !important;
+                    color: #64748b !important; /* slate-500 */
+                    border: 1px solid #f1f5f9 !important;
+                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+                }
+
+                .shepherd-button-secondary:hover {
+                    background: #f8fafc !important;
+                    color: #0f172a !important;
+                    border-color: #e2e8f0 !important;
+                }
+
+                .shepherd-cancel-icon {
+                    color: #94a3b8 !important;
+                    padding: 0.5rem !important;
+                    transition: all 0.2s !important;
+                }
+
+                .shepherd-cancel-icon:hover {
+                    color: #ef4444 !important;
+                    transform: rotate(90deg) !important;
+                }
+
+                .shepherd-arrow:before {
+                    background: rgba(255, 255, 255, 0.7) !important;
+                    backdrop-filter: blur(20px) !important;
+                    border-radius: 4px !important;
+                }
+
+                .shepherd-has-title .shepherd-content .shepherd-header {
+                    display: flex !important;
+                }
+
+                /* Popup melayang di tengah layar (tidak nempel ke elemen) */
+                .shepherd-element {
+                    position: fixed !important;
+                    top: 50% !important;
+                    left: 50% !important;
+                    transform: translate(-50%, -50%) !important;
+                    animation: shepherd-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+                }
+
+                /* Overlay gelap di belakang popup tour */
+                .shepherd-modal-overlay-container {
+                    fill: rgba(15, 23, 42, 0.6) !important;
+                    opacity: 1 !important;
+                }
+
+                /* Sembunyikan panah */
+                .shepherd-arrow {
+                    display: none !important;
+                }
+
+                @keyframes shepherd-pop-in {
+                    0% {
+                        opacity: 0;
+                        transform: translate(-50%, -50%) scale(0.85);
+                    }
+                    100% {
+                        opacity: 1;
+                        transform: translate(-50%, -50%) scale(1);
+                    }
                 }

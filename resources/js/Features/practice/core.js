@@ -164,7 +164,8 @@ export function getLevelScoreDisplay(level, score, progress) {
 export function getFlowUI(progress) {
   const mode = progress?.current_mode ?? PRACTICE_MODE.PRETEST;
   const level = progress?.current_level ?? null;
-  const focusedSubtopic = progress?.focused_subtopic_name ?? null;
+  const focusedSubtopics = progress?.focused_subtopic_names ?? (progress?.focused_subtopic_name ? [progress.focused_subtopic_name] : []);
+  const hasFocused = focusedSubtopics.length > 0;
   const pretestScore = progress?.pretest_score ?? null;
   const remCount = progress?.easy_remedial_count ?? null;
 
@@ -183,7 +184,13 @@ export function getFlowUI(progress) {
       };
 
     case PRACTICE_MODE.NORMAL: {
-      const reason = pretestScore != null ? buildPlacementReason(pretestScore, level) : null;
+      const initialLevel = pretestScore !== null 
+        ? (pretestScore < 60 ? "easy" : pretestScore <= 80 ? "medium" : "hard")
+        : null;
+      
+      const isInitialLevel = level === initialLevel;
+      const reason = (pretestScore != null && isInitialLevel) ? buildPlacementReason(pretestScore, level) : null;
+      
       const target = level === "hard" ? `> ${HARD_PASSING_SCORE}` : `> ${PASSING_SCORE}`;
       return {
         tone: "slate",
@@ -191,7 +198,7 @@ export function getFlowUI(progress) {
         hint: `Selesaikan dengan skor ${target} untuk lanjut ke tahap berikutnya.`,
         button: `Mulai latihan ${lvlText ?? ""}`.trim(),
         stageLabel: lvlText ? `Level ${lvlText}` : "Latihan",
-        showSubtopic: false,
+        showSubtopic: hasFocused,
         showPlacementReason: Boolean(reason),
         placementReason: reason,
       };
@@ -204,13 +211,10 @@ export function getFlowUI(progress) {
       const remedialLevelText = lvlText ? `Level ${lvlText}` : "Level aktif";
       return {
         tone: "amber",
-        title: focusedSubtopic
-          ? `Remedial ${remedialLevelText} `
+        title: hasFocused
+          ? `Remedial ${remedialLevelText}`
           : `Remedial ${remedialLevelText}`,
         hint: [
-          focusedSubtopic
-            ? `Fokus pada sub-topik "${focusedSubtopic}".`
-            : null,
           level === "easy" && remCount != null
             ? `Nilai > ${PASSING_SCORE} untuk naik ke Medium.`
             : level === "medium"
@@ -222,8 +226,7 @@ export function getFlowUI(progress) {
           .join(" "),
         button: `Kerjakan remedial ${lvlText ?? ""}`.trim(),
         stageLabel: lvlText ? `Remedial Level ${lvlText}` : "Remedial",
-        showSubtopic: Boolean(focusedSubtopic),
-        showPlacementReason: remCount != null,
+        showSubtopic: hasFocused,
         placementReason: remText,
       };
     }
@@ -235,7 +238,7 @@ export function getFlowUI(progress) {
         hint: "Sudah 3x remedial di Easy tapi belum mencapai 60. Baca ulang materi, lalu kembali ke sini untuk mencoba lagi.",
         button: "Ke halaman materi",
         stageLabel: "Baca ulang",
-        showSubtopic: Boolean(focusedSubtopic),
+        showSubtopic: hasFocused,
         showPlacementReason: false,
       };
 
@@ -264,8 +267,8 @@ export function getFlowUI(progress) {
 }
 
 function buildPlacementReason(pretestScore, level) {
-  if (level === "easy")   return `Pre-test ${pretestScore} (< 60) → ditempatkan di Easy`;
-  if (level === "medium") return `Pre-test ${pretestScore} (61–80) → ditempatkan di Medium`;
-  if (level === "hard")   return `Pre-test ${pretestScore} (> 80) → langsung ke Hard`;
+  if (level === "easy")   return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Easy`;
+  if (level === "medium") return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Medium`;
+  if (level === "hard")   return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Hard`;
   return null;
 }

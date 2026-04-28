@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\PracticeAttemptModel;
 use App\Models\QuizAttemptModel;
 use App\Models\UserModel;
@@ -90,8 +89,8 @@ class LeaderboardController extends Controller
         // Ambil semua materi
         $materials = MaterialModel::orderBy('order_number')->get(['id', 'material_name']);
 
-        // --- PRACTICE SCORES per user per material per difficulty ---
-        $practiceScores = DB::table('practice_attempts')
+        // --- PRACTICE SCORES per user per material per type/level ---
+        $practiceAttempts = DB::table('practice_attempts')
             ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
             ->whereIn('practice_attempts.user_id', $classmateIds)
             ->whereNotNull('practice_attempts.finished_at')
@@ -99,15 +98,45 @@ class LeaderboardController extends Controller
                 'practice_attempts.user_id',
                 'practices.material_id',
                 'practices.level',
+                'practice_attempts.attempt_type',
+                'practice_attempts.mode',
                 DB::raw('MAX(practice_attempts.final_score) as best_score')
             )
-            ->groupBy('practice_attempts.user_id', 'practices.material_id', 'practices.level')
+            ->groupBy('practice_attempts.user_id', 'practices.material_id', 'practices.level', 'practice_attempts.attempt_type', 'practice_attempts.mode')
             ->get();
 
-        // Struktur: practiceMap[user_id][material_id][difficulty] = best_score
+        // Struktur: practiceMap[user_id][material_id][key] = best_score
+        // key bisa: pretest, easy, normal, hard, remed_easy, remed_normal, remed_hard
         $practiceMap = [];
-        foreach ($practiceScores as $row) {
-            $practiceMap[$row->user_id][$row->material_id][$row->level] = (int) $row->best_score;
+        foreach ($practiceAttempts as $row) {
+            $key = $row->level;
+            if ($row->attempt_type === 'pretest') {
+                $key = 'pretest';
+            } elseif ($row->mode === 'focused_remedial') {
+                $key = 'remed_' . $row->level;
+            }
+            
+            $practiceMap[$row->user_id][$row->material_id][$key] = (int) $row->best_score;
+        }
+
+        // --- WEAK SUBTOPICS per user per material ---
+        $weakSubtopics = DB::table('practice_attempts')
+            ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
+            ->join('subtopics', 'subtopics.id', '=', 'practice_attempts.focused_subtopic_id')
+            ->whereIn('practice_attempts.user_id', $classmateIds)
+            ->whereNotNull('practice_attempts.finished_at')
+            ->where('practice_attempts.mode', 'focused_remedial')
+            ->select(
+                'practice_attempts.user_id',
+                'practices.material_id',
+                'subtopics.name as subtopic_name'
+            )
+            ->distinct()
+            ->get();
+
+        $weakMap = [];
+        foreach ($weakSubtopics as $ws) {
+            $weakMap[$ws->user_id][$ws->material_id][] = $ws->subtopic_name;
         }
 
         // --- QUIZ SCORES per user per material ---
@@ -136,21 +165,40 @@ class LeaderboardController extends Controller
             $materialBreakdown = [];
 
             foreach ($materials as $mat) {
-                $easy   = $practiceMap[$u->id][$mat->id]['easy'] ?? 0;
-                $normal = $practiceMap[$u->id][$mat->id]['normal'] ?? 0;
-                $hard   = $practiceMap[$u->id][$mat->id]['hard'] ?? 0;
+                $pretest = $practiceMap[$u->id][$mat->id]['pretest'] ?? 0;
+                
+                $easyNormal = $practiceMap[$u->id][$mat->id]['easy'] ?? 0;
+                $easyRemed  = $practiceMap[$u->id][$mat->id]['remed_easy'] ?? 0;
+                
+                $mediumNormal = $practiceMap[$u->id][$mat->id]['medium'] ?? ($practiceMap[$u->id][$mat->id]['normal'] ?? 0);
+                $mediumRemed  = $practiceMap[$u->id][$mat->id]['remed_medium'] ?? ($practiceMap[$u->id][$mat->id]['remed_normal'] ?? 0);
+                
+                $hardNormal = $practiceMap[$u->id][$mat->id]['hard'] ?? 0;
+                $hardRemed  = $practiceMap[$u->id][$mat->id]['remed_hard'] ?? 0;
+                
                 $quizScore = $quizMap[$u->id][$mat->id] ?? 0;
 
-                $materialTotal = $easy + $normal + $hard + $quizScore;
+                // Total per material: pretest + best easy + best medium + best hard + quiz
+                $materialTotal = $pretest 
+                                + max($easyNormal, $easyRemed) 
+                                + max($mediumNormal, $mediumRemed) 
+                                + max($hardNormal, $hardRemed) 
+                                + $quizScore;
+                
                 $totalScore += $materialTotal;
 
                 $materialBreakdown[] = [
                     'material_id' => $mat->id,
-                    'easy' => $easy,
-                    'normal' => $normal,
-                    'hard' => $hard,
+                    'pretest' => $pretest,
+                    'easy' => $easyNormal,
+                    'remed_easy' => $easyRemed,
+                    'normal' => $mediumNormal,
+                    'remed_normal' => $mediumRemed,
+                    'hard' => $hardNormal,
+                    'remed_hard' => $hardRemed,
                     'quiz' => $quizScore,
                     'total' => $materialTotal,
+                    'weak_subtopics' => $weakMap[$u->id][$mat->id] ?? [],
                 ];
             }
 
@@ -179,4 +227,280 @@ class LeaderboardController extends Controller
             'className' => $className,
         ]);
     }
+
+    private function resolvePracticeStatus($lastAttempt): string
+    {
+        if (!$lastAttempt) {
+            return 'Belum mulai';
+        }
+
+        if (!empty($lastAttempt->next_action)) {
+            return match ($lastAttempt->next_action) {
+                'go_easy' => 'Sedang Easy',
+                'go_medium' => 'Sedang Medium',
+                'go_normal' => 'Sedang Medium',
+                'go_hard' => 'Sedang Hard',
+                'remedial_easy' => 'Remedial Easy',
+                'remedial_medium' => 'Remedial Medium',
+                'remedial_normal' => 'Remedial Medium',
+                'remedial_hard' => 'Remedial Hard',
+                'review_material' => 'Perlu baca ulang',
+                'completed' => 'Lulus',
+                default => $lastAttempt->next_action,
+            };
+        }
+
+        if ((bool) $lastAttempt->is_passed) {
+            if ($lastAttempt->level === 'hard') {
+                return 'Lulus';
+            }
+
+            if ($lastAttempt->level === 'easy') {
+                return 'Sedang Medium';
+            }
+
+            if ($lastAttempt->level === 'medium' || $lastAttempt->level === 'normal') {
+                return 'Sedang Hard';
+            }
+        }
+
+        if ($lastAttempt->mode === 'focused_remedial') {
+            return 'Remedial ' . ucfirst($lastAttempt->level ?? '');
+        }
+
+        if ($lastAttempt->level) {
+            return 'Sedang ' . ucfirst($lastAttempt->level);
+        }
+
+        return 'Sedang latihan';
+    }
+
+    private function buildStudentMaterialStats(int $studentId, $materials)
+        {
+            $attemptRows = DB::table('practice_attempts')
+                ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
+                ->leftJoin('subtopics', 'subtopics.id', '=', 'practice_attempts.focused_subtopic_id')
+                ->where('practice_attempts.user_id', $studentId)
+            ->whereNotNull('practice_attempts.finished_at')
+            ->select(
+                'practices.material_id',
+                'practice_attempts.attempt_type',
+                'practice_attempts.level',
+                'practice_attempts.mode',
+                'practice_attempts.focused_subtopic_id',
+                'practice_attempts.final_score',
+                'practice_attempts.is_passed',
+                'practice_attempts.next_action',
+                'practice_attempts.finished_at',
+                'subtopics.name as subtopic_name'
+            )
+            ->orderBy('practice_attempts.finished_at')
+            ->get();
+
+        $stats = [];
+
+        foreach ($materials as $material) {
+            $stats[$material->id] = [
+                'material_id' => $material->id,
+                'material_name' => $material->material_name,
+
+                'pretest' => 0,
+
+                'easy' => 0,
+                'remed_easy' => 0,
+
+                'medium' => 0,
+                'remed_medium' => 0,
+
+                'hard' => 0,
+                'remed_hard' => 0,
+
+                'weak_easy_subtopics' => [],
+                'weak_medium_subtopics' => [],
+                'weak_hard_subtopics' => [],
+
+                'quiz' => 0,
+                'total' => 0,
+
+                'status' => 'Belum mulai',
+                '_last_attempt' => null,
+            ];
+        }
+
+        foreach ($attemptRows as $row) {
+            if (!isset($stats[$row->material_id])) {
+                continue;
+            }
+
+            $score = (int) ($row->final_score ?? 0);
+            $level = $row->level;
+            $mode = $row->mode;
+            $attemptType = $row->attempt_type;
+
+            if ($attemptType === 'pretest') {
+                $stats[$row->material_id]['pretest'] = max(
+                    $stats[$row->material_id]['pretest'],
+                    $score
+                );
+            }
+
+            if ($attemptType === 'practice' && $mode === 'normal') {
+                if ($level === 'easy') {
+                    $stats[$row->material_id]['easy'] = max($stats[$row->material_id]['easy'], $score);
+                }
+
+                if ($level === 'medium' || $level === 'normal') {
+                    $stats[$row->material_id]['medium'] = max($stats[$row->material_id]['medium'], $score);
+                }
+
+                if ($level === 'hard') {
+                    $stats[$row->material_id]['hard'] = max($stats[$row->material_id]['hard'], $score);
+                }
+            }
+
+            if ($attemptType === 'practice' && $mode === 'focused_remedial') {
+                $remedKey = 'remed_' . ($level === 'normal' ? 'medium' : $level);
+                $weakKey = 'weak_' . ($level === 'normal' ? 'medium' : $level) . '_subtopics';
+                
+                $stats[$row->material_id][$remedKey] = max($stats[$row->material_id][$remedKey], $score);
+
+                if ($row->subtopic_name) {
+                    $stats[$row->material_id][$weakKey][$row->focused_subtopic_id] = $row->subtopic_name;
+                }
+            }
+
+            $stats[$row->material_id]['_last_attempt'] = $row;
+        }
+
+        // --- QUIZ SCORES per material for this student ---
+        $quizScores = DB::table('quiz_attempt_material_scores')
+            ->join('quiz_attempts', 'quiz_attempts.id', '=', 'quiz_attempt_material_scores.quiz_attempts_id')
+            ->where('quiz_attempts.user_id', $studentId)
+            ->whereNotNull('quiz_attempts.finished_at')
+            ->select(
+                'quiz_attempt_material_scores.material_id',
+                DB::raw('SUM(quiz_attempt_material_scores.earned_score) as total_quiz_score')
+            )
+            ->groupBy('quiz_attempt_material_scores.material_id')
+            ->get();
+
+        foreach ($quizScores as $qs) {
+            if (isset($stats[$qs->material_id])) {
+                $stats[$qs->material_id]['quiz'] = (int) $qs->total_quiz_score;
+            }
+        }
+
+        foreach ($stats as $materialId => $row) {
+            $lastAttempt = $row['_last_attempt'];
+
+            // Convert weak subtopic associative arrays to flat arrays
+            foreach (['easy', 'medium', 'hard'] as $lvl) {
+                $wkKey = "weak_{$lvl}_subtopics";
+                if (isset($row[$wkKey]) && is_array($row[$wkKey])) {
+                    $stats[$materialId][$wkKey] = array_values($row[$wkKey]);
+                } else {
+                    $stats[$materialId][$wkKey] = [];
+                }
+            }
+
+            // Calculate Total
+            $stats[$materialId]['total'] = $row['pretest'] 
+                + max($row['easy'], $row['remed_easy']) 
+                + max($row['medium'], $row['remed_medium']) 
+                + max($row['hard'], $row['remed_hard']) 
+                + ($stats[$materialId]['quiz'] ?? 0);
+
+            $stats[$materialId]['status'] = $this->resolvePracticeStatus($lastAttempt);
+
+            unset($stats[$materialId]['_last_attempt']);
+        }
+
+        return array_values($stats);
+    }
+
+    private function buildStudentQuizStats(int $studentId, int $classId)
+    {
+        $attempts = QuizAttemptModel::query()
+            ->with([
+                'quiz:id,title,class_id',
+                'materialScores.material:id,material_name',
+            ])
+            ->where('user_id', $studentId)
+            ->whereNotNull('finished_at')
+            ->whereHas('quiz', function ($query) use ($classId) {
+                $query->where('class_id', $classId);
+            })
+            ->orderBy('finished_at')
+            ->get();
+
+        return $attempts->map(function ($attempt) {
+            $materials = $attempt->materialScores->map(function ($score) {
+                return [
+                    'material_id' => $score->material_id,
+                    'material_name' => $score->material?->material_name ?? 'Materi tidak ditemukan',
+                    'score' => (int) ($score->earned_score ?? 0),
+                    'max_score' => (int) ($score->max_score ?? 0),
+                    'percentage' => (float) ($score->percentage ?? 0),
+                ];
+            })->values();
+
+            return [
+                'quiz_id' => $attempt->quizzes_id,
+                'quiz_title' => $attempt->quiz?->title ?? 'Quiz',
+                'attempt_id' => $attempt->id,
+                'materials' => $materials,
+                'total_score' => (int) ($attempt->total_score ?? $materials->sum('score')),
+                'finished_at' => $attempt->finished_at,
+            ];
+        })->values();
+    }
+
+    public function studentDetail(Request $request, int $classId, int $studentId)
+    {
+        $classInfo = DB::table('classes')
+            ->where('id', $classId)
+            ->first();
+
+        $student = UserModel::query()
+            ->where('id', $studentId)
+            ->firstOrFail(['id', 'nama', 'email']);
+
+        $isStudentInClass = DB::table('class_user')
+            ->where('class_id', $classId)
+            ->where('user_id', $studentId)
+            ->exists();
+
+        abort_unless($isStudentInClass, 404);
+
+        $materials = MaterialModel::query()
+            ->orderBy('order_number')
+            ->get(['id', 'material_name']);
+
+        $materialStats = $this->buildStudentMaterialStats(
+            studentId: $studentId,
+            materials: $materials
+        );
+
+        $quizStats = $this->buildStudentQuizStats(
+            studentId: $studentId,
+            classId: $classId
+        );
+
+        return Inertia::render('ManageLeaderboard/Show', [
+            'class' => [
+                'id' => $classInfo->id,
+                'class_name' => $classInfo->class_name,
+                'class_code' => $classInfo->class_code ?? null,
+            ],
+            'student' => [
+                'id' => $student->id,
+                'nama' => $student->nama,
+                'email' => $student->email,
+            ],
+            'materialStats' => $materialStats,
+            'quizStats' => $quizStats,
+        ]);
+    }
 }
+
+

@@ -1,17 +1,49 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import { router } from "@inertiajs/react";
 import Icons from "@/icons";
+import { FaQuestionCircle } from "react-icons/fa";
 
 import PracticeCard from "@/Components/Practice/PracticeCard";
 import PracticeSidebar from "@/Components/Practice/PracticeSidebar";
 
 import { canStartPractice, getPracticeStatus } from "@/Features/practice/core";
+import { useTour } from "@/Hooks/useTour";
 
 export default function Index({ practices = [] }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedPractice, setSelectedPractice] = useState(null);
     const [tab, setTab] = useState("all");
+
+    const { startTour, checkAndStart, addSteps, next, back, cancel, complete } = useTour({
+        storageKey: 'oopedia_tour_practices',
+    });
+
+    useEffect(() => {
+        addSteps([
+            {
+                id: 'practice-intro',
+                title: 'Latihan Soal',
+                text: 'Di halaman ini kamu bisa melihat semua latihan soal yang tersedia. Setiap latihan terkait dengan satu materi yang sudah kamu baca.',
+                buttons: [
+                    { text: 'Lanjut →', action: next },
+                ],
+            },
+            {
+                id: 'practice-cards',
+                title: 'Cara Mulai Latihan',
+                text: 'Klik kartu latihan untuk melihat detailnya, lalu klik tombol Mulai. Kartu yang terkunci (🔒) baru bisa diakses setelah kamu selesai membaca materinya terlebih dahulu.',
+                buttons: [
+                    {
+                        text: 'Lanjut ke Quiz',
+                        action: () => { complete(); router.visit(route('quizzes.index')); }
+                    },
+                ],
+            },
+        ]);
+        // Auto-start pertama kali mahasiswa buka halaman ini
+        checkAndStart();
+    }, []);
 
     const getStatus = (practice) => getPracticeStatus(practice);
 
@@ -70,38 +102,49 @@ export default function Index({ practices = [] }) {
 
     return (
         <AppLayout title="Latihan Soal" label="Latihan Soal">
-            <div className="mx-auto px-4 py-4 space-y-6">
+            <div className="px-4 py-4 space-y-6">
 
                 {/* HEADER */}
-                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                <div id="tour-practice-header" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                     <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
                         Daftar Latihan Soal
                     </h1>
+                    <button
+                        onClick={startTour}
+                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors self-start sm:self-auto"
+                    >
+                        <FaQuestionCircle className="text-indigo-500 h-4 w-4" />
+                        Panduan Latihan
+                    </button>
                 </div>
 
-                {/* TAB */}
-                <div className="flex gap-2 flex-wrap">
+                {/* TABS FILTER */}
+                <div id="tour-practice-tabs" className="flex items-center gap-2 flex-wrap">
                     {tabs.map((t) => (
                         <button
                             key={t.key}
                             onClick={() => setTab(t.key)}
-                            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
                                 tab === t.key
-                                    ? "bg-slate-900 text-white"
-                                    : "bg-white border border-slate-200 text-slate-500 hover:border-slate-400"
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
                             }`}
                         >
                             {t.label}
-                            <span className="text-[10px] font-bold px-1">
-                                {t.count}
-                            </span>
+                            {t.count > 0 && (
+                                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${
+                                    tab === t.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                                }`}>
+                                    {t.count}
+                                </span>
+                            )}
                         </button>
                     ))}
                 </div>
 
                 {/* DESKTOP */}
                 <div className="hidden lg:flex items-start">
-                    <main className="flex-1">
+                    <main id="tour-practice-list" className="flex-1">
                         {filteredPractices.length === 0 ? (
                             <EmptyState />
                         ) : (

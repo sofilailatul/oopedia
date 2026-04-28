@@ -1,64 +1,109 @@
 import { Transition } from "@headlessui/react";
 import { Link } from "@inertiajs/react";
-import { createContext, useContext, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
 const DropDownContext = createContext();
 
 const Dropdown = ({ children, className = "" }) => {
   const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
 
   const toggleOpen = () => {
     setOpen((previousState) => !previousState);
   };
 
   return (
-    <DropDownContext.Provider value={{ open, setOpen, toggleOpen }}>
-      <div className={`relative inline-block text-left ${className}`.trim()}>{children}</div>
+    <DropDownContext.Provider value={{ open, setOpen, toggleOpen, triggerRef }}>
+      <div className={`relative block w-full text-left ${className}`.trim()}>
+        {children}
+      </div>
     </DropDownContext.Provider>
   );
 };
 
 const Trigger = ({ children }) => {
-  const { open, setOpen, toggleOpen } = useContext(DropDownContext);
+  const { open, setOpen, toggleOpen, triggerRef } = useContext(DropDownContext);
 
   return (
     <>
-      <div onClick={toggleOpen} className="cursor-pointer">
+      <div
+        ref={triggerRef}
+        onClick={toggleOpen}
+        className="w-full cursor-pointer"
+      >
         {children}
       </div>
 
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-slate-900/10"
+          className="fixed inset-0 z-[9998] bg-transparent"
           onClick={() => setOpen(false)}
-        ></div>
+        />
       )}
     </>
   );
 };
 
 const Content = ({
-  align = "right",
-  width = "48",
+  align = "left",
+  width = "full",
   contentClasses = "p-1 bg-white/95",
   children,
 }) => {
-  const { open, setOpen } = useContext(DropDownContext);
+  const { open, setOpen, triggerRef } = useContext(DropDownContext);
 
-  let alignmentClasses = "origin-top";
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
-  if (align === "left") {
-    alignmentClasses = "ltr:origin-top-left rtl:origin-top-right start-0";
-  } else if (align === "right") {
-    alignmentClasses = "ltr:origin-top-right rtl:origin-top-left end-0";
-  }
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return;
 
-  let widthClasses = "";
-  if (width === "48") widthClasses = "w-48";
-  if (width === "56") widthClasses = "w-56";
-  if (width === "64") widthClasses = "w-64";
+    const updatePosition = () => {
+      const rect = triggerRef.current.getBoundingClientRect();
 
-  return (
+      let menuWidth = rect.width;
+
+      if (width === "48") menuWidth = 192;
+      if (width === "56") menuWidth = 224;
+      if (width === "64") menuWidth = 256;
+      if (width === "full") menuWidth = rect.width;
+
+      const left =
+        align === "right"
+          ? rect.right - menuWidth
+          : rect.left;
+
+      setPosition({
+        top: rect.bottom + 8,
+        left,
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open, align, width, triggerRef]);
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <Transition
       show={open}
       enter="transform transition ease-out duration-200"
@@ -69,16 +114,22 @@ const Content = ({
       leaveTo="opacity-0 -translate-y-1 scale-95"
     >
       <div
-        className={`absolute z-50 mt-2 ${alignmentClasses} ${widthClasses}`}
+        className="fixed z-[9999]"
+        style={{
+          top: position.top,
+          left: position.left,
+          width: position.width,
+        }}
         onClick={() => setOpen(false)}
       >
         <div
-          className={`rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur ${contentClasses}`}
+          className={`max-h-60 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_18px_40px_rgba(15,23,42,0.16)] backdrop-blur ${contentClasses}`}
         >
           {children}
         </div>
       </div>
-    </Transition>
+    </Transition>,
+    document.body,
   );
 };
 
@@ -96,10 +147,6 @@ const DropdownLink = ({ className = "", children, ...props }) => {
   );
 };
 
-/**
- * ✅ Tambahan: Item (button) untuk aksi non-navigasi (misal pilih difficulty)
- * - Support disabled state
- */
 const DropdownItem = ({
   className = "",
   children,

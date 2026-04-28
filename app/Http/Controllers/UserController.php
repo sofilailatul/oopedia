@@ -13,7 +13,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = UserModel::query();
+        $query = UserModel::query()->with('classes');
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {

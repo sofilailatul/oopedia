@@ -43,19 +43,22 @@ export function useDosenMaterialEdit({ material, authUser }) {
     );
   }
 
-  function updateSectionImage(index, file) {
+  function updateSectionImage(index, payload) {
+    const file = payload?.file !== undefined ? payload.file : payload;
+    const previewUrl = payload?.previewUrl || (file ? URL.createObjectURL(file) : null);
+
     setSections((prev) =>
       prev.map((s, i) => {
         if (i !== index) return s;
 
-        if (s.previewUrl && s.previewUrl.startsWith("blob:")) {
+        if (s.previewUrl && typeof s.previewUrl === "string" && s.previewUrl.startsWith("blob:")) {
           URL.revokeObjectURL(s.previewUrl);
         }
 
         return {
           ...s,
           imageFile: file,
-          previewUrl: file ? URL.createObjectURL(file) : s.previewUrl,
+          previewUrl: previewUrl,
         };
       }),
     );

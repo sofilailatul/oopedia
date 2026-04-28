@@ -1,6 +1,10 @@
 import AppLayout from '@/Layouts/AppLayout';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import Button from '@/Components/Button';
+import React from 'react';
+import { useTour } from '@/Hooks/useTour';
+import { FaQuestionCircle } from 'react-icons/fa';
+
 
 const Ico = {
   Book: (p) => (
@@ -193,7 +197,7 @@ function CtaButton({ action, variant = 'dark', block = false }) {
   return (
     <Button
       as={Link}
-      href={action?.href ?? '/materi'}
+      href="/materi"
       method={method}
       {...commonProps}
     >
@@ -221,7 +225,8 @@ function DashboardHero({ name, learningPath, stats }) {
   const material = learningPath.current_material;
 
   return (
-    <div className="grid grid-cols-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+    <div id="tour-hero" className="grid grid-cols-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+
       {/* LEFT = 2 kolom */}
       <div className="p-6">
         <p className="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-2">
@@ -331,11 +336,12 @@ const EXPLAINER_STEPS = [
 
 function LearningFlowExplainer() {
   return (
-    <section>
+    <section id="tour-explainer">
+
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 overflow-x-auto">
         <h2 className="mb-1.5 text-[16px] font-black text-slate-900 tracking-tight">
-          Gimana cara belajar di Oopedia?
+          Gimana cara belajar di OOpedia?
         </h2>
         <div className="grid grid-cols-6 gap-3">
           {EXPLAINER_STEPS.map((step, i) => {
@@ -393,7 +399,8 @@ function QuizUnlockStatus({ learningPath }) {
   const isLocked = quiz.status === 'locked';
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+    <div id="tour-quiz" className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
@@ -450,55 +457,6 @@ function QuizUnlockStatus({ learningPath }) {
   );
 }
 
-function LockedReasonCard({ learningPath }) {
-  const action = learningPath.next_action ?? {};
-  const quiz = learningPath.quiz;
-  const missing = quiz?.missing_requirements ?? [];
-
-  if (
-    action.key !== 'waiting_practice' &&
-    action.key !== 'quiz_locked' &&
-    missing.length === 0
-  ) return null;
-
-  const isWaitingPractice = action.key === 'waiting_practice';
-
-  return (
-    <div className="rounded-3xl border border-amber-100 bg-amber-50 p-5">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-2xl bg-white text-amber-600 flex items-center justify-center flex-shrink-0">
-          <Ico.Info className="w-5 h-5" />
-        </div>
-        <div>
-          <h2 className="text-sm font-black text-amber-900">
-            {isWaitingPractice
-              ? 'Kenapa latihan belum terlihat?'
-              : 'Kenapa quiz masih terkunci?'}
-          </h2>
-          <p className="mt-1 text-[12px] leading-relaxed text-amber-800">
-            {isWaitingPractice
-              ? 'Latihan soal akan terbuka setelah progress baca materi tersimpan dan soal untuk materi ini tersedia.'
-              : 'Quiz akan terbuka setelah semua materi terkait selesai dibaca dan latihan soalnya tuntas.'}
-          </p>
-          {missing.length > 0 && (
-            <div className="mt-3 space-y-2">
-              {missing.slice(0, 3).map((item) => (
-                <div
-                  key={`${item.material_id}-${item.reason}`}
-                  className="rounded-xl border border-amber-100 bg-white px-3 py-2"
-                >
-                  <p className="text-[12px] font-bold text-slate-800">{item.name}</p>
-                  <p className="mt-0.5 text-[11px] text-amber-700">{item.reason}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function NoClassBanner() {
   return (
     <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-5 flex items-start gap-3">
@@ -527,9 +485,60 @@ export default function MahasiswaDashboard({
   const name = user.name ?? user.nama ?? 'Mahasiswa';
   const path = learningPath ?? fallbackLearningPath(stats, hasClass);
 
+  const { startTour, checkAndStart, addSteps, next, back, cancel, complete } = useTour({
+    storageKey: 'oopedia_tour_dashboard',
+  });
+
+  React.useEffect(() => {
+    addSteps([
+      {
+        id: 'welcome',
+        title: 'Halo, Selamat Belajar!',
+        text: 'Ini adalah dashboard belajarmu. Di sini kamu bisa melihat progres, materi aktif, dan langkah belajar selanjutnya.',
+        buttons: [
+          { text: 'Lanjut →', action: next }
+        ]
+      },
+      {
+        id: 'flow',
+        title: 'Alur Belajar OOpedia',
+        text: 'Baca Materi → Pretest → Latihan Soal Adaptif → Materi Berikutnya → Quiz. Selesaikan setiap tahap untuk lanjut ke yang berikutnya.',
+        buttons: [
+          { text: '← Kembali', action: back, classes: 'shepherd-button-secondary' },
+          { text: 'Lanjut →', action: next }
+        ]
+      },
+      {
+        id: 'go-practice',
+        title: ' Yuk Mulai Latihan Soal!',
+        text: 'Setelah baca materi, kamu bisa langsung mengerjakan latihan soal adaptif di sini. Level soal akan disesuaikan otomatis dari hasil pretestmu.',
+        buttons: [
+          { text: '← Kembali', action: back, classes: 'shepherd-button-secondary' },
+          {
+            text: 'Buka Latihan Soal',
+            action: () => { complete(); router.visit(route('practices.index')); }
+          }
+        ]
+      },
+    ]);
+    // Auto-start hanya saat pertama kali masuk dashboard
+    checkAndStart();
+  }, []);
+
+
   return (
     <AppLayout title="Dashboard" label="Dashboard">
       <main className="mx-auto space-y-5">
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={startTour}
+            className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+          >
+            <FaQuestionCircle className="text-indigo-500 h-4 w-4" />
+            Panduan Dashboard
+          </button>
+        </div>
+
 
         {/* no class warning */}
         {!hasClass && <NoClassBanner />}
@@ -539,14 +548,8 @@ export default function MahasiswaDashboard({
 
         {/* alur belajar explainer — always visible */}
         <LearningFlowExplainer />
-
-        {/* bottom grid: progress detail + quiz + locked reason */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-5">
-          <div className="space-y-5">
-            <QuizUnlockStatus learningPath={path} />
-            <LockedReasonCard learningPath={path} />
-          </div>
-        </div>
+        
+        <QuizUnlockStatus learningPath={path} />
       </main>
     </AppLayout>
   );

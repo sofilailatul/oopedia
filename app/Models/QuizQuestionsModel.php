@@ -30,9 +30,9 @@ class QuizQuestionsModel extends Model
             QuizModel::class,
             'quiz_map',
             'quiz_question_id',
-            'quizzes_id'
+            'quiz_id'
         )->withPivot(['points'])
-         ->withTimestamps();
+        ->withTimestamps();
     }
 
     public function options()
@@ -44,5 +44,9 @@ class QuizQuestionsModel extends Model
     public function answers()
     {
         return $this->hasMany(UserQuizAnswerModel::class, 'quiz_questions_id');
+    }
+    public function subtopic()
+    {
+        return $this->belongsTo(SubtopicModel::class, 'subtopic_id');
     }
 }

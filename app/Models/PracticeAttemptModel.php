@@ -16,6 +16,7 @@ class PracticeAttemptModel extends Model
         'practices_id',
         'user_progress_id',
         'focused_subtopic_id',
+        'focused_subtopic_ids',
         'attempt_type',
         'level',
         'mode',
@@ -58,7 +59,7 @@ class PracticeAttemptModel extends Model
 
     public function subTopicRef()
     {
-        return $this->belongsTo(SubTopicModel::class, 'subtopic_id');
+        return $this->belongsTo(SubTopicModel::class, 'focused_subtopic_id');
     }
 
     public function answers()

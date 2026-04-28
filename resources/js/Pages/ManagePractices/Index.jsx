@@ -4,7 +4,8 @@ import { Link, router, usePage } from "@inertiajs/react";
 import Button from "@/Components/Button";
 import Card from "@/Components/Card";
 import Dropdown from "@/Components/Dropdown";
-import { FaEye, FaPen, FaTrash } from "react-icons/fa";
+import { FaEye, FaPen, FaTrash, FaSearch, FaTimes } from "react-icons/fa";
+import TextInput from "@/Components/TextInput";
 import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 function levelLabel(level, type) {
@@ -53,6 +54,13 @@ function PageContent({ practices = [], materials = [], role }) {
 	const isSuperadmin = role === "superadmin";
 	const [deleting, setDeleting] = React.useState(false);
 	const popup = usePopup();
+	const [searchQuery, setSearchQuery] = React.useState("");
+
+	const filteredPractices = React.useMemo(() => {
+		return practices.filter((p) =>
+			(p.material_name || "").toLowerCase().includes(searchQuery.toLowerCase()),
+		);
+	}, [practices, searchQuery]);
 
 	const handleOpenCreate = () => {
 		if (!isDosen && !isSuperadmin) return;
@@ -65,6 +73,7 @@ function PageContent({ practices = [], materials = [], role }) {
 					<CreatePracticeModal
 						materials={materials}
 						practices={practices}
+						storeRouteName={storeRouteName}
 						onClose={() => popup.close()}
 					/>
 				</div>
@@ -81,7 +90,7 @@ function PageContent({ practices = [], materials = [], role }) {
 
 		setDeleting(true);
 
-		router.delete(route("dosen.practices.destroy", practiceToDelete.id), {
+		router.delete(route(destroyRouteName, practiceToDelete.id), {
 			onSuccess: () => {
 				setDeleting(false);
 				popup.alert({
@@ -123,6 +132,8 @@ function PageContent({ practices = [], materials = [], role }) {
 
 	const showRouteName = isSuperadmin ? "superadmin.practices.show" : "dosen.practices.show";
 	const editRouteName = isSuperadmin ? "superadmin.practices.edit" : "dosen.practices.edit";
+	const destroyRouteName = isSuperadmin ? "superadmin.practices.destroy" : "dosen.practices.destroy";
+	const storeRouteName = isSuperadmin ? "superadmin.practices.store" : "dosen.practices.store";
 
 	return (
 		<div className="mx-auto max-w-6xl space-y-6">
@@ -137,20 +148,40 @@ function PageContent({ practices = [], materials = [], role }) {
 						</p>
 					</div>
 
-					{(isDosen || isSuperadmin) && (
-						<Button
-							variant="solid"
-							color="yellow"
-							size="md"
-							className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm"
-							onClick={(e) => {
-								e.preventDefault();
-								handleOpenCreate();
-							}}
-						>
-							+ Buat Latihan Baru
-						</Button>
-					)}
+					<div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+						<div className="relative w-full sm:w-64">
+							<FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+							<TextInput
+								placeholder="Cari material..."
+								value={searchQuery}
+								onChange={(e) => setSearchQuery(e.target.value)}
+								className="!pl-10 !py-2 !rounded-full border-slate-200 !text-xs !h-10 bg-white/50 focus:bg-white transition-all shadow-sm"
+							/>
+							{searchQuery && (
+								<button
+									onClick={() => setSearchQuery("")}
+									className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+								>
+									<FaTimes className="text-xs" />
+								</button>
+							)}
+						</div>
+
+						{(isDosen || isSuperadmin) && (
+							<Button
+								variant="solid"
+								color="yellow"
+								size="md"
+								className="rounded-full bg-white text-slate-900 hover:bg-slate-100 border-none shadow-sm whitespace-nowrap"
+								onClick={(e) => {
+									e.preventDefault();
+									handleOpenCreate();
+								}}
+							>
+								+ Buat Latihan Baru
+							</Button>
+						)}
+					</div>
 				</div>
 			</div>
 
@@ -166,8 +197,8 @@ function PageContent({ practices = [], materials = [], role }) {
 						</tr>
 					</thead>
 					<tbody>
-						{practices.length > 0 ? (
-							practices.map((practice, idx) => (
+						{filteredPractices.length > 0 ? (
+							filteredPractices.map((practice, idx) => (
 								<tr
 									key={practice.id}
 									className="group border-t border-slate-100/80 bg-white hover:bg-slate-50/80 transition-colors"
@@ -271,8 +302,9 @@ function PageContent({ practices = [], materials = [], role }) {
 	);
 }
 
-function CreatePracticeModal({ materials = [], practices = [], onClose }) {
+function CreatePracticeModal({ materials = [], practices = [], storeRouteName, onClose }) {
 	const [selectedMaterialId, setSelectedMaterialId] = React.useState("");
+	const [selectedType, setSelectedType] = React.useState("practice");
 	const [selectedLevel, setSelectedLevel] = React.useState("");
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
@@ -280,10 +312,16 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 	const existingMap = React.useMemo(() => {
 		const map = {};
 		practices.forEach((p) => {
-			if (!map[p.material_id]) {
-				map[p.material_id] = new Set();
+			const mId = Number(p.material_id);
+			if (!map[mId]) {
+				map[mId] = { practice: new Set(), pretest: false };
 			}
-			map[p.material_id].add(p.level);
+			const type = p.type || "practice";
+			if (type === "pretest") {
+				map[mId].pretest = true;
+			} else {
+				map[mId].practice.add(p.level);
+			}
 		});
 		return map;
 	}, [practices]);
@@ -296,8 +334,8 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 
 	const isMaterialFullyConfigured = React.useCallback(
 		(materialId) => {
-			const usedLevels = existingMap[Number(materialId)] ?? new Set();
-			return levels.every((lvl) => usedLevels.has(lvl.value));
+			const config = existingMap[Number(materialId)] || { practice: new Set(), pretest: false };
+			return config.pretest && levels.every((lvl) => config.practice.has(lvl.value));
 		},
 		[existingMap],
 	);
@@ -305,8 +343,13 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 	const handleSubmit = (e) => {
 		e.preventDefault();
 
-		if (!selectedMaterialId || !selectedLevel) {
-			setError("Pilih materi dan level terlebih dahulu.");
+		if (!selectedMaterialId) {
+			setError("Pilih materi terlebih dahulu.");
+			return;
+		}
+
+		if (selectedType === "practice" && !selectedLevel) {
+			setError("Pilih level untuk latihan soal.");
 			return;
 		}
 
@@ -314,10 +357,11 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 		setError("");
 
 		router.post(
-			route("dosen.practices.store"),
+			route(storeRouteName),
 			{
 				material_id: selectedMaterialId,
-				level: selectedLevel,
+				type: selectedType,
+				level: selectedType === "pretest" ? null : selectedLevel,
 			},
 			{
 				onSuccess: () => {
@@ -326,15 +370,18 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 				},
 				onError: (errors) => {
 					setSubmitting(false);
-					setError(errors?.level || "Gagal membuat latihan. Periksa isian Anda.");
+					setError(errors?.type || errors?.level || "Gagal membuat latihan.");
 				},
 			},
 		);
 	};
 
-	const currentLevels = selectedMaterialId
-		? existingMap[Number(selectedMaterialId)] ?? new Set()
-		: new Set();
+	const config = selectedMaterialId
+		? existingMap[Number(selectedMaterialId)] || { practice: new Set(), pretest: false }
+		: { practice: new Set(), pretest: false };
+
+	const isPretestExists = config.pretest;
+	const usedLevels = config.practice;
 
 	const selectedMaterialIsFull = selectedMaterialId
 		? isMaterialFullyConfigured(selectedMaterialId)
@@ -413,17 +460,55 @@ function CreatePracticeModal({ materials = [], practices = [], onClose }) {
 			</div>
 
 			<div className="space-y-1">
-				<p className="text-[11px] font-medium text-slate-500">Pilih Level Soal</p>
+				<p className="text-[11px] font-medium text-slate-500">Pilih Tipe</p>
+				<div className="flex gap-2">
+					<button
+						type="button"
+						disabled={selectedType === "practice" && isPretestExists && isMaterialFullyConfigured(selectedMaterialId)}
+						onClick={() => {
+							setSelectedType("practice");
+							setSelectedLevel("");
+						}}
+						className={`flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+							selectedType === "practice"
+								? "border-slate-900 bg-slate-900 text-white"
+								: "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+						}`}
+					>
+						Practice (Latihan)
+					</button>
+					<button
+						type="button"
+						disabled={isPretestExists}
+						onClick={() => {
+							setSelectedType("pretest");
+							setSelectedLevel("");
+						}}
+						className={`flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+							isPretestExists
+								? "border-slate-200 bg-slate-50 text-slate-300 cursor-not-allowed"
+								: selectedType === "pretest"
+								? "border-slate-900 bg-slate-900 text-white"
+								: "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+						}`}
+					>
+						Pre-test {isPretestExists && "(Sudah ada)"}
+					</button>
+				</div>
+			</div>
+
+			<div className={`space-y-1 transition-opacity ${selectedType === "pretest" ? "opacity-50 pointer-events-none" : ""}`}>
+				<p className="text-[11px] font-medium text-slate-500">Pilih Level Soal {selectedType === "pretest" && "(Tidak berlaku untuk Pre-test)"}</p>
 				<div className="grid grid-cols-3 gap-2">
 					{levels.map((lvl) => {
-						const isUsed = currentLevels.has(lvl.value);
+						const isUsed = usedLevels.has(lvl.value);
 						const isSelected = selectedLevel === lvl.value;
 
 						return (
 							<button
 								key={lvl.value}
 								type="button"
-								disabled={isUsed}
+								disabled={isUsed || selectedType === "pretest"}
 								onClick={() => {
 									if (isUsed) return;
 									setSelectedLevel(lvl.value);

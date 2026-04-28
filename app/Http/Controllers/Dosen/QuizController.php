@@ -7,7 +7,10 @@ use App\Models\ClassModel;
 use App\Models\MaterialModel;
 use App\Models\QuizMapModel;
 use App\Models\QuizModel;
+use App\Models\QuizQuestionsModel;  
 use App\Models\QuizOptionModel;
+use App\Models\QuizAttemptMaterialScoreModel;
+use App\Models\QuizAttemptModel;
 use App\Services\QuizService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -64,8 +67,9 @@ class QuizController extends Controller
         $quiz->load(['questions.options', 'class']);
 
         $materials = $quiz->materials()
+            ->with('subTopics')
             ->orderBy('material_name')
-            ->get(['materials.id', 'materials.material_name']);
+            ->get();
 
         $questions = $quiz->questions->map(function ($q) use ($materials) {
             $matName = 'Tidak ada materi';
@@ -94,17 +98,32 @@ class QuizController extends Controller
             ];
         });
 
+        // Find sibling quizzes (same content, different class)
+        $siblings = QuizModel::query()
+            ->where('title', $quiz->title)
+            ->where('duration', $quiz->duration)
+            ->where('passing_score', $quiz->passing_score)
+            ->where('created_by', $quiz->created_by)
+            ->with('class')
+            ->get();
+
+        $classes = $siblings->map(fn($s) => [
+            'id'         => $s->id,
+            'class_name' => $s->class?->class_name ?? 'Unknown Class',
+        ])->values();
+
         return Inertia::render('ManageQuizzes/Show', [
             'quiz' => [
-                'id' => $quiz->id,
-                'title' => $quiz->title,
-                'description' => $quiz->description ?? null,
-                'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
-                'duration' => $quiz->duration,
+                'id'           => $quiz->id,
+                'title'        => $quiz->title,
+                'description'  => $quiz->description ?? null,
+                'class_name'   => $quiz->class?->class_name ?? 'Unknown Class',
+                'classes'      => $classes,
+                'duration'     => $quiz->duration,
                 'passing_score' => $quiz->passing_score,
-                'start_at' => $quiz->start_at,
-                'end_at' => $quiz->end_at,
-                'materials' => $materials,
+                'start_at'     => $quiz->start_at,
+                'end_at'       => $quiz->end_at,
+                'materials'    => $materials,
             ],
             'questions' => $questions,
             'authUser' => $user,
@@ -121,8 +140,9 @@ class QuizController extends Controller
                 ->get(['id', 'class_name']);
 
             $materials = MaterialModel::query()
+                ->with('subTopics')
                 ->orderBy('material_name')
-                ->get(['id', 'material_name']);
+                ->get();
         } else {
             $classes = ClassModel::query()
                 ->where('created_by', $user->id)
@@ -131,8 +151,9 @@ class QuizController extends Controller
 
             $materials = MaterialModel::query()
                 ->where('created_by', $user->id)
+                ->with('subTopics')
                 ->orderBy('material_name')
-                ->get(['id', 'material_name']);
+                ->get();
         }
 
         return Inertia::render('ManageQuizzes/Create', [
@@ -213,24 +234,65 @@ class QuizController extends Controller
             return [
                 'id' => $q->id,
                 'material_id' => $q->material_id,
+
+                // Aktif kalau kolom subtopic_id sudah ada
+                'subtopic_id' => $q->subtopic_id ?? null,
+
                 'quiz_text' => $q->quiz_text,
+                'question_text' => $q->quiz_text,
+
                 'image_path' => $q->image_path,
+                'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
+
                 'feedback_correct' => $q->feedback_correct,
+                'feedbackCorrect' => $q->feedback_correct,
+
                 'feedback_incorrect' => $q->feedback_incorrect,
+                'feedbackIncorrect' => $q->feedback_incorrect,
+
                 'points' => (int) ($q->pivot->points ?? 1),
+
                 'options' => $q->options->map(function ($opt) {
                     return [
                         'id' => $opt->id,
+                        'text' => $opt->option_text,
                         'option_text' => $opt->option_text,
                         'is_correct' => (bool) $opt->is_correct,
                     ];
-                }),
+                })->values(),
             ];
-        });
+        })->values();
 
         $materials = $quiz->materials()
+            ->with('subTopics')
             ->orderBy('material_name')
-            ->get(['materials.id', 'materials.material_name']);
+            ->get()
+            ->map(function ($material) {
+                return [
+                    'id' => $material->id,
+                    'material_name' => $material->material_name,
+
+                    'subtopics' => $material->subTopics->map(function ($subtopic) {
+                        return [
+                            'id' => $subtopic->id,
+                            'name' => $subtopic->subtopic_name
+                                ?? $subtopic->sub_topic_name
+                                ?? $subtopic->name,
+                        ];
+                    })->values(),
+                ];
+            })
+            ->values();
+
+        $existingClassIds = QuizModel::query()
+            ->where('title', $quiz->title)
+            ->where('duration', $quiz->duration)
+            ->where('passing_score', $quiz->passing_score)
+            ->where('created_by', $quiz->created_by)
+            ->pluck('class_id')
+            ->filter()
+            ->values()
+            ->all();
 
         return Inertia::render('ManageQuizzes/Edit', [
             'materials' => $materials,
@@ -243,8 +305,13 @@ class QuizController extends Controller
                 'class_name' => $quiz->class?->class_name ?? 'Unknown Class',
                 'duration' => $quiz->duration,
                 'passing_score' => $quiz->passing_score,
-                'start_at' => $quiz->start_at ? \Carbon\Carbon::parse($quiz->start_at)->format('Y-m-d\TH:i') : '',
-                'end_at' => $quiz->end_at ? \Carbon\Carbon::parse($quiz->end_at)->format('Y-m-d\TH:i') : '',
+                'start_at' => $quiz->start_at
+                    ? \Carbon\Carbon::parse($quiz->start_at)->format('Y-m-d\TH:i')
+                    : '',
+                'end_at' => $quiz->end_at
+                    ? \Carbon\Carbon::parse($quiz->end_at)->format('Y-m-d\TH:i')
+                    : '',
+                'existing_class_ids' => $existingClassIds,
             ],
             'questions' => $questions,
             'authUser' => $user,
@@ -254,118 +321,228 @@ class QuizController extends Controller
     public function saveQuestions(Request $request, QuizModel $quiz)
     {
         $user = Auth::user();
+
         $canManage = (int) $quiz->created_by === (int) $user->id
             || $user->role === 'superadmin';
 
         abort_unless($canManage, 403);
 
         $validated = $request->validate([
-            'class_id' => ['required', 'integer', 'exists:classes,id'],
+            'class_ids' => ['required', 'array', 'min:1'],
+            'class_ids.*' => ['integer', 'exists:classes,id'],
+
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+
             'duration' => ['required', 'integer', 'min:1'],
             'passing_score' => ['required', 'integer', 'min:0', 'max:100'],
             'start_at' => ['nullable', 'date'],
             'end_at' => ['nullable', 'date'],
+
+            'material_ids' => ['nullable', 'array'],
+            'material_ids.*' => ['integer', 'exists:materials,id'],
+
             'questions' => ['nullable', 'array'],
-            'questions.*.id' => ['nullable', 'integer'],
-            'questions.*.material_id' => ['nullable', 'integer'],
+            'questions.*.id' => ['nullable', 'integer', 'exists:quiz_questions,id'],
+            'questions.*.material_id' => ['nullable', 'integer', 'exists:materials,id'],
+            'questions.*.subtopic_id' => ['nullable', 'integer', 'exists:subtopics,id'],
             'questions.*.quiz_text' => ['required', 'string'],
             'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
             'questions.*.feedback_correct' => ['nullable', 'string'],
             'questions.*.feedback_incorrect' => ['nullable', 'string'],
             'questions.*.image' => ['nullable', 'image', 'max:2048'],
+
             'questions.*.options' => ['required', 'array', 'min:2'],
             'questions.*.options.*.text' => ['required', 'string'],
             'questions.*.options.*.is_correct' => ['required', 'boolean'],
         ]);
 
-        DB::transaction(function () use ($quiz, $validated, $request) {
-            $quiz->update([
-                'class_id' => $validated['class_id'],
-                'title' => $validated['title'],
-                'description' => $validated['description'] ?? null,
-                'duration' => $validated['duration'],
-                'passing_score' => $validated['passing_score'],
-                'start_at' => $validated['start_at'] ?? null,
-                'end_at' => $validated['end_at'] ?? null,
-            ]);
+        $classIds = collect($validated['class_ids'])
+            ->unique()
+            ->values();
 
-            $questionsInput = $validated['questions'] ?? [];
+        DB::transaction(function () use ($quiz, $validated, $request, $user, $classIds) {
+            /*
+            |--------------------------------------------------------------------------
+            | 1. Ambil semua quiz sibling
+            |--------------------------------------------------------------------------
+            | Karena satu quiz dibuat per class_id, kita anggap quiz yang sama adalah:
+            | title + duration + passing_score + created_by.
+            */
+            $siblings = QuizModel::query()
+                ->where('title', $quiz->title)
+                ->where('duration', $quiz->duration)
+                ->where('passing_score', $quiz->passing_score)
+                ->where('created_by', $quiz->created_by)
+                ->get();
 
-            $existingMap = QuizMapModel::where('quiz_id', $quiz->id)->get()->keyBy('quiz_question_id');
-            $keptQuestionIds = [];
+            $existingClassMap = $siblings->keyBy('class_id');
 
-            foreach ($questionsInput as $index => $qData) {
-                $qid = isset($qData['id']) ? (int) $qData['id'] : null;
+            $activeQuizIds = [];
 
-                if ($qid && $existingMap->has($qid)) {
-                    $question = \App\Models\QuizQuestionsModel::find($qid);
-                    $question->material_id = $qData['material_id'] ?? $question->material_id;
+            /*
+            |--------------------------------------------------------------------------
+            | 2. Update quiz yang sudah ada / buat quiz baru untuk class baru
+            |--------------------------------------------------------------------------
+            */
+            foreach ($classIds as $classId) {
+                if ($existingClassMap->has($classId)) {
+                    $classQuiz = $existingClassMap->get($classId);
+
+                    $classQuiz->update([
+                        'title' => $validated['title'],
+                        'duration' => $validated['duration'],
+                        'passing_score' => $validated['passing_score'],
+                        'start_at' => $validated['start_at'] ?? null,
+                        'end_at' => $validated['end_at'] ?? null,
+                    ]);
                 } else {
-                    $question = new \App\Models\QuizQuestionsModel();
-                    $question->material_id = $qData['material_id'] ?? null;
+                    $classQuiz = QuizModel::create([
+                        'title' => $validated['title'],
+                        'class_id' => $classId,
+                        'created_by' => $user->id,
+                        'duration' => $validated['duration'],
+                        'passing_score' => $validated['passing_score'],
+                        'start_at' => $validated['start_at'] ?? null,
+                        'end_at' => $validated['end_at'] ?? null,
+                    ]);
                 }
 
-                $question->quiz_text = $qData['quiz_text'];
+                if (!empty($validated['material_ids'])) {
+                    $classQuiz->materials()->sync($validated['material_ids']);
+                }
 
-                $feedbackCorrect = $qData['feedback_correct'] ?? 'Jawaban kamu benar.';
-                $feedbackIncorrect = $qData['feedback_incorrect'] ?? 'Jawaban kamu salah.';
+                $activeQuizIds[] = $classQuiz->id;
+            }
 
-                $question->feedback_correct = $feedbackCorrect;
-                $question->feedback_incorrect = $feedbackIncorrect;
+            /*
+            |--------------------------------------------------------------------------
+            | 3. Hapus quiz sibling yang class-nya sudah tidak dipilih
+            |--------------------------------------------------------------------------
+            */
+            $toDelete = $siblings->whereNotIn('class_id', $classIds);
+
+            foreach ($toDelete as $deletedQuiz) {
+                QuizMapModel::where('quiz_id', $deletedQuiz->id)->delete();
+                $deletedQuiz->materials()->detach();
+                $deletedQuiz->delete();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 4. Simpan pertanyaan sekali, lalu hubungkan ke semua quiz aktif
+            |--------------------------------------------------------------------------
+            */
+            $questionsInput = $validated['questions'] ?? [];
+            $keptQuestionIds = [];
+
+            foreach ($questionsInput as $index => $questionData) {
+                $questionId = $questionData['id'] ?? null;
+
+                $question = $questionId
+                    ? QuizQuestionsModel::find($questionId)
+                    : new QuizQuestionsModel();
+
+                if (!$question) {
+                    $question = new QuizQuestionsModel();
+                }
+
+                $question->material_id = $questionData['material_id'] ?? null;
+
+                // Aktifkan kalau kolom subtopic_id sudah ditambahkan ke tabel quiz_questions
+                $question->subtopic_id = $questionData['subtopic_id'] ?? null;
+
+                $question->quiz_text = $questionData['quiz_text'];
+                $question->feedback_correct = $questionData['feedback_correct'] ?? 'Jawaban kamu benar.';
+                $question->feedback_incorrect = $questionData['feedback_incorrect'] ?? 'Jawaban kamu salah.';
 
                 $imageKey = "questions.$index.image";
+
                 if ($request->hasFile($imageKey)) {
                     if ($question->image_path) {
                         Storage::disk('public')->delete($question->image_path);
                     }
-                    $path = $request->file($imageKey)->store('quizzes', 'public');
-                    $question->image_path = $path;
+
+                    $question->image_path = $request
+                        ->file($imageKey)
+                        ->store('quizzes', 'public');
                 }
 
                 $question->save();
 
                 $keptQuestionIds[] = $question->id;
 
-                QuizMapModel::updateOrCreate(
-                    [
-                        'quiz_id' => $quiz->id,
-                        'quiz_question_id' => $question->id,
-                    ],
-                    [
-                        'points' => $qData['points'] ?? 10,
-                    ]
-                );
+                /*
+                |--------------------------------------------------------------------------
+                | 5. Hubungkan question yang sama ke semua quiz beda kelas
+                |--------------------------------------------------------------------------
+                */
+                foreach ($activeQuizIds as $activeQuizId) {
+                    QuizMapModel::updateOrCreate(
+                        [
+                            'quiz_id' => $activeQuizId,
+                            'quiz_question_id' => $question->id,
+                        ],
+                        [
+                            'points' => $questionData['points'] ?? 10,
+                        ],
+                    );
+                }
 
+                /*
+                |--------------------------------------------------------------------------
+                | 6. Karena options nempel ke question, cukup simpan sekali
+                |--------------------------------------------------------------------------
+                */
                 $question->options()->delete();
-                foreach ($qData['options'] as $optData) {
+
+                foreach ($questionData['options'] as $optionData) {
                     QuizOptionModel::create([
                         'quiz_questions_id' => $question->id,
-                        'option_text' => $optData['text'],
-                        'is_correct' => $optData['is_correct'] ? 1 : 0,
+                        'option_text' => $optionData['text'],
+                        'is_correct' => $optionData['is_correct'] ? 1 : 0,
                     ]);
                 }
             }
 
-            if (!empty($keptQuestionIds)) {
-                $unkept = QuizMapModel::where('quiz_id', $quiz->id)
-                    ->whereNotIn('quiz_question_id', $keptQuestionIds)->get();
-                foreach ($unkept as $u) {
-                    $u->delete();
+            /*
+            |--------------------------------------------------------------------------
+            | 7. Bersihkan mapping pertanyaan yang sudah dihapus dari form
+            |--------------------------------------------------------------------------
+            */
+            foreach ($activeQuizIds as $activeQuizId) {
+                QuizMapModel::where('quiz_id', $activeQuizId)
+                    ->whereNotIn('quiz_question_id', $keptQuestionIds)
+                    ->delete();
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | 8. Hapus question yang sudah tidak dipakai quiz mana pun
+            |--------------------------------------------------------------------------
+            */
+            $orphanQuestions = QuizQuestionsModel::query()
+                ->whereDoesntHave('quizzes')
+                ->get();
+
+            foreach ($orphanQuestions as $orphanQuestion) {
+                if ($orphanQuestion->image_path) {
+                    Storage::disk('public')->delete($orphanQuestion->image_path);
                 }
-            } else {
-                QuizMapModel::where('quiz_id', $quiz->id)->delete();
+
+                $orphanQuestion->options()->delete();
+                $orphanQuestion->delete();
             }
         });
 
         $routeName = $user->role === 'superadmin'
-            ? 'superadmin.quizzes.edit'
-            : 'dosen.quizzes.edit';
+            ? 'superadmin.quizzes.index'
+            : 'dosen.quizzes.index';
 
-        return redirect()->route($routeName, $quiz->id)
-            ->with('success', 'Kuis dan soal berhasil disimpan.');
-    }
+        return redirect()
+            ->route($routeName)
+            ->with('success', 'Kuis berhasil diperbarui dan pertanyaan disinkronkan ke semua kelas.');
+        }
 
     public function update(Request $request, QuizModel $quiz)
     {
@@ -392,83 +569,101 @@ class QuizController extends Controller
         return redirect()->route($routeName, $quiz->id)->with('success', 'Quiz updated successfully');
     }
 
-    public function duplicateToClasses(Request $request, QuizModel $quiz)
+    public function destroy(QuizModel $quiz)
     {
-        $user = $request->user();
+        $user = Auth::user();
 
         $canManage = (int) $quiz->created_by === (int) $user->id
             || $user->role === 'superadmin';
 
         abort_unless($canManage, 403);
 
-        $data = $request->validate([
-            'class_ids' => ['required', 'array', 'min:1'],
-            'class_ids.*' => ['integer', 'exists:classes,id'],
-        ]);
+        DB::transaction(function () use ($quiz) {
+            // 1. Cari semua quiz yang dianggap "sama" (sibling) di kelas-kelas lain
+            // Kriterianya: judul, durasi, passing_score, dan pembuat yang sama
+            $siblings = QuizModel::query()
+                ->where('title', $quiz->title)
+                ->where('duration', $quiz->duration)
+                ->where('passing_score', $quiz->passing_score)
+                ->where('created_by', $quiz->created_by)
+                ->get();
 
-        $classIds = collect($data['class_ids'])
-            ->map(fn($id) => (int) $id)
-            ->unique()
-            ->reject(fn($id) => $id === (int) $quiz->class_id)
-            ->values();
+            $siblingIds = $siblings->pluck('id');
 
-        if ($classIds->isEmpty()) {
-            return back()->with('success', 'Tidak ada kelas baru yang dipilih untuk duplikasi.');
-        }
+            // 2. Ambil semua ID pertanyaan yang terhubung ke quiz-quiz ini
+            $questionIds = QuizMapModel::whereIn('quiz_id', $siblingIds)
+                ->pluck('quiz_question_id')
+                ->unique();
 
-        $quiz->load(['materials', 'questions.options']);
+            // 3. Hapus mapping (pivot) untuk semua quiz sibling ini
+            QuizMapModel::whereIn('quiz_id', $siblingIds)->delete();
 
-        DB::transaction(function () use ($quiz, $classIds, $user) {
-            $materialIds = $quiz->materials->pluck('id')->all();
-            $questions = $quiz->questions;
+            // 4. Untuk setiap pertanyaan, cek apakah masih dipakai oleh quiz lain (di luar grup sibling ini)
+            // Jika tidak, hapus pertanyaan tersebut beserta opsi dan gambarnya.
+            foreach ($questionIds as $qid) {
+                $stillLinked = QuizMapModel::where('quiz_question_id', $qid)->exists();
+                
+                if (!$stillLinked) {
+                    $q = QuizQuestionsModel::find($qid);
+                    if ($q) {
+                        // Hapus opsi
+                        $q->options()->delete();
 
-            foreach ($classIds as $classId) {
-                if ($user->role !== 'superadmin') {
-                    $ownsClass = ClassModel::where('id', $classId)
-                        ->where('created_by', $user->id)
-                        ->exists();
+                        // Hapus gambar
+                        if ($q->image_path) {
+                            Storage::disk('public')->delete($q->image_path);
+                        }
 
-                    if (!$ownsClass) {
-                        continue;
-                    }
-                }
-
-                $newQuiz = QuizModel::create([
-                    'class_id' => $classId,
-                    'title' => $quiz->title,
-                    'description' => $quiz->description,
-                    'duration' => $quiz->duration,
-                    'passing_score' => $quiz->passing_score,
-                    'start_at' => $quiz->start_at,
-                    'end_at' => $quiz->end_at,
-                    'created_by' => $user->id,
-                ]);
-
-                if (!empty($materialIds)) {
-                    $newQuiz->materials()->sync($materialIds);
-                }
-
-                foreach ($questions as $question) {
-                    $newQuestion = $question->replicate();
-                    $newQuestion->push();
-
-                    QuizMapModel::create([
-                        'quiz_id' => $newQuiz->id,
-                        'quiz_question_id' => $newQuestion->id,
-                        'points' => (int) ($question->pivot->points ?? 10),
-                    ]);
-
-                    foreach ($question->options as $opt) {
-                        QuizOptionModel::create([
-                            'quiz_questions_id' => $newQuestion->id,
-                            'option_text' => $opt->option_text,
-                            'is_correct' => (int) $opt->is_correct,
-                        ]);
+                        // Hapus pertanyaan
+                        $q->delete();
                     }
                 }
             }
+
+            // 5. Lepaskan relasi materi dan hapus semua quiz sibling
+            foreach ($siblings as $s) {
+                $s->materials()->detach();
+                $s->delete();
+            }
         });
 
-        return back()->with('success', 'Kuis berhasil diduplikasi ke kelas yang dipilih.');
+        $routeName = $user->role === 'superadmin'
+            ? 'superadmin.quizzes.index'
+            : 'dosen.quizzes.index';
+
+        return redirect()->route($routeName)->with('success', 'Kuis berhasil dihapus.');
+    }
+
+    public function questionDestroy(QuizQuestionsModel $question)
+    {
+        $user = Auth::user();
+
+        // Ensure the authenticated user owns at least one quiz this question belongs to
+        $ownsQuestion = QuizMapModel::where('quiz_question_id', $question->id)
+            ->whereHas('quiz', function ($q) use ($user) {
+                if ($user->role !== 'superadmin') {
+                    $q->where('created_by', $user->id);
+                }
+            })
+            ->exists();
+
+        abort_unless($ownsQuestion || $user->role === 'superadmin', 403);
+
+        DB::transaction(function () use ($question) {
+            // Remove from pivot table
+            QuizMapModel::where('quiz_question_id', $question->id)->delete();
+
+            // Delete options
+            $question->options()->delete();
+
+            // Delete image if present
+            if ($question->image_path) {
+                Storage::disk('public')->delete($question->image_path);
+            }
+
+            $question->delete();
+        });
+
+        return back()->with('success', 'Soal berhasil dihapus.');
     }
 }

@@ -6,6 +6,8 @@ import StatusModal from '@/Components/StatusModal';
 import { usePopup } from '@/Components/PopUp/PopUpProvider';
 import { usePage, router } from '@inertiajs/react';
 import { FaPlus } from 'react-icons/fa';
+import Field from '@/Components/Field';
+import Dropdown from '@/Components/Dropdown';
 
 function getApiErrorMessage(err, fallbackMessage) {
 	const payloadMessage = err?.response?.data?.message;
@@ -37,7 +39,7 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 
 	const handleOpenCreate = () => {
 		popup.open({
-			title: 'Tambah Kelas',
+			title: 'Buat Kelas Baru',
 			size: 'lg',
 			content: (
 				<CreateClassModal
@@ -65,6 +67,8 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 			content: (
 				<EditClassModal
 					initialClass={cls}
+					lecturers={lecturers}
+					isSuperadmin={isSuperadmin}
 					lecturerName={lecturerLabel || lecturerName}
 					onSuccess={() => router.reload({ only: ['classes'] })}
 				/>
@@ -73,7 +77,7 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 	};
 
 	return (
-		<div className="mx-auto max-w-6xl space-y-6">
+		<div className="mx-auto max-w-6xl rounded-2xl space-y-6">
 			<div className="rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div className="space-y-1">
@@ -192,8 +196,6 @@ function CreateClassModal({ lecturerName, lecturers = [], isSuperadmin = false, 
 	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState('');
-	const [showConfirm, setShowConfirm] = useState(false);
-	const [resultModal, setResultModal] = useState(null);
 
 	const submitCreate = async () => {
 		if (isSubmitting) return;
@@ -202,6 +204,19 @@ function CreateClassModal({ lecturerName, lecturers = [], isSuperadmin = false, 
 
 		if (isSuperadmin && !selectedLecturerId) {
 			setError('Silakan pilih dosen penanggung jawab kelas.');
+			setIsSubmitting(false);
+			return;
+		}
+
+		// Validasi Kode Kelas: max 6 kombinasi huruf dan angka
+		const codeRegex = /^[A-Z0-9]+$/;
+		if (classCode.length > 6) {
+			setError('Kode kelas maksimal 6 karakter.');
+			setIsSubmitting(false);
+			return;
+		}
+		if (!codeRegex.test(classCode)) {
+			setError('Kode kelas hanya boleh berisi kombinasi huruf dan angka.');
 			setIsSubmitting(false);
 			return;
 		}
@@ -215,96 +230,105 @@ function CreateClassModal({ lecturerName, lecturers = [], isSuperadmin = false, 
 					: {}),
 			});
 			onSuccess?.();
-			setResultModal({
+			popup.alert({
 				type: 'success',
 				title: 'Berhasil',
 				message: 'Kelas berhasil ditambahkan.',
-				onConfirm: () => {
-					setResultModal(null);
-					popup.close();
-				},
+				onClose: () => popup.close(),
 			});
 		} catch (err) {
 			const message = getApiErrorMessage(err, 'Gagal menyimpan kelas. Coba lagi.');
 			setError(message);
-			setResultModal({
+			popup.alert({
 				type: 'error',
 				title: 'Gagal',
 				message,
-				onConfirm: () => setResultModal(null),
 			});
 		} finally {
 			setIsSubmitting(false);
 		}
 	};
-
 	const handleSubmit = (e) => {
 		e?.preventDefault();
 		if (isSubmitting) return;
-		setShowConfirm(true);
+
+		popup.confirm({
+			title: 'Konfirmasi',
+			message: 'Yakin ingin menyimpan kelas baru ini?',
+			confirmText: 'Ya, simpan',
+			onConfirm: () => submitCreate(),
+		});
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className="space-y-5">
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-					Dosen Penanggung Jawab
-				</p>
-				{isSuperadmin ? (
-					<select
-						className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-						value={selectedLecturerId || ''}
-						onChange={(e) => setSelectedLecturerId(e.target.value ? Number(e.target.value) : null)}
-						required
-					>
-						<option value="">Pilih dosen...</option>
-						{lecturers.map((lec) => (
-							<option key={lec.id} value={lec.id}>
-								{lec.nama || lec.name || lec.email}
-							</option>
-						))}
-					</select>
-				) : (
+		<form onSubmit={handleSubmit} className="space-y-5 rounded-2xl">
+			{isSuperadmin ? (
+				<div className="mb-4">
+					<label className="block mb-1 text-xs font-medium text-gray-700">
+						DOSEN PENANGGUNG JAWAB
+						<span className="text-red-500 ml-1">*</span>
+					</label>
+					<Dropdown>
+						<Dropdown.Trigger>
+							<div className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-[12px] shadow-sm bg-white cursor-pointer flex justify-between items-center hover:border-blue-300 transition-colors">
+								<span className={selectedLecturerId ? 'text-slate-800' : 'text-slate-400'}>
+									{selectedLecturerId
+										? lecturers.find((l) => l.id === selectedLecturerId)?.nama || lecturers.find((l) => l.id === selectedLecturerId)?.name || 'Pilih dosen...'
+										: 'Pilih dosen...'}
+								</span>
+								<span className="text-slate-400 text-[10px]">▼</span>
+							</div>
+						</Dropdown.Trigger>
+						<Dropdown.Content width="full">
+							{lecturers.map((lec) => (
+								<Dropdown.Item
+									key={lec.id}
+									onClick={() => setSelectedLecturerId(lec.id)}
+									className={selectedLecturerId === lec.id ? 'bg-blue-50 text-blue-700 font-semibold' : ''}
+								>
+									{lec.nama || lec.name || lec.email}
+								</Dropdown.Item>
+							))}
+						</Dropdown.Content>
+					</Dropdown>
+				</div>
+			) : (
+				<div className="mb-4 space-y-1">
+					<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+						Dosen Penanggung Jawab
+					</p>
 					<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
 						<span className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500">👤</span>
 						<span className="truncate">{lecturerName}</span>
 					</div>
-				)}
-			</div>
+				</div>
+			)}
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Masukkan Nama Kelas"
-					value={name}
-					onChange={(e) => setName(e.target.value)}
-					required
-				/>
-			</div>
+			<Field
+				label="NAMA KELAS"
+				placeholder="Masukkan Nama Kelas"
+				value={name}
+				onChange={(e) => setName(e.target.value)}
+				required
+			/>
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Kode Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Masukkan Kode Kelas (contoh: IF101A)"
-					value={classCode}
-					onChange={(e) => setClassCode(e.target.value.toUpperCase())}
-					required
-				/>
-			</div>
+			<Field
+				label="KODE KELAS"
+				placeholder="Masukkan Kode Kelas - Maksimal 6 Kombinasi Huruf dan Angka (contoh: IF101A)"
+				value={classCode}
+				onChange={(e) => setClassCode(e.target.value.toUpperCase())}
+				required
+				maxLength={6}
+			/>
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Deskripsi</p>
-				<textarea
-					className="w-full min-h-[100px] rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					placeholder="Deskripsi Kelas"
-					value={description}
-					onChange={(e) => setDescription(e.target.value)}
-				/>
-			</div>
+			<Field
+				label="DESKRIPSI"
+				as="textarea"
+				placeholder="Deskripsi Kelas"
+				value={description}
+				onChange={(e) => setDescription(e.target.value)}
+				rows={3}
+			/>
 
 			{error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -328,30 +352,6 @@ function CreateClassModal({ lecturerName, lecturers = [], isSuperadmin = false, 
 					{isSubmitting ? 'Menyimpan...' : 'Simpan'}
 				</Button>
 			</div>
-			<StatusModal
-				show={showConfirm}
-				type="confirm"
-				title="Konfirmasi"
-				message="Yakin ingin menyimpan kelas baru ini?"
-				confirmText="Ya, simpan"
-				cancelText="Batal"
-				onConfirm={() => {
-					setShowConfirm(false);
-					submitCreate();
-				}}
-				onCancel={() => setShowConfirm(false)}
-				onClose={() => setShowConfirm(false)}
-			/>
-
-			<StatusModal
-				show={!!resultModal}
-				type={resultModal?.type || 'success'}
-				title={resultModal?.title}
-				message={resultModal?.message}
-				confirmText={resultModal?.type === 'error' ? 'Tutup' : 'OK'}
-				onConfirm={resultModal?.onConfirm}
-				onClose={resultModal?.onConfirm}
-			/>
 		</form>
 	);
 }
@@ -410,8 +410,8 @@ function ShowClassModal({ classId, lecturerName }) {
 	const classCode = data.class_code;
 
 	return (
-		<div className="space-y-5">
-			<div className="grid gap-4 md:grid-cols-2">
+		<div className="space-y-5 rounded-2xl">
+			<div className="rounded-2xl grid gap-4 md:grid-cols-2">
 				<div className="space-y-1">
 					<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Dosen</p>
 					<div className="flex min-h-[44px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-700">
@@ -467,44 +467,53 @@ function ShowClassModal({ classId, lecturerName }) {
 	);
 }
 
-function EditClassModal({ initialClass, lecturerName, onSuccess }) {
+function EditClassModal({ initialClass, lecturerName, lecturers = [], isSuperadmin = false, onSuccess }) {
 	const popup = usePopup();
 	const [name, setName] = useState(initialClass.class_name || '');
 	const [classCode, setClassCode] = useState(initialClass.class_code || '');
 	const [description, setDescription] = useState(initialClass.description || '');
+	const [selectedLecturerId, setSelectedLecturerId] = useState(initialClass.lecturer_id || null);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState('');
-	const [showConfirm, setShowConfirm] = useState(false);
-	const [resultModal, setResultModal] = useState(null);
 
 	const submitEdit = async () => {
 		if (isSubmitting) return;
 		setIsSubmitting(true);
 		setError('');
+
+		// Validasi Kode Kelas: max 6 kombinasi huruf dan angka
+		const codeRegex = /^[A-Z0-9]+$/;
+		if (classCode.length > 6) {
+			setError('Kode kelas maksimal 6 karakter.');
+			setIsSubmitting(false);
+			return;
+		}
+		if (!codeRegex.test(classCode)) {
+			setError('Kode kelas hanya boleh berisi kombinasi huruf dan angka.');
+			setIsSubmitting(false);
+			return;
+		}
 		try {
 			await window.axios.put(`/classes/${initialClass.id}`, {
 				class_name: name,
 				class_code: classCode,
 				description,
+				...(isSuperadmin && selectedLecturerId ? { lecturer_id: selectedLecturerId } : {}),
 			});
 			onSuccess?.();
-			setResultModal({
+			popup.alert({
 				type: 'success',
 				title: 'Berhasil',
 				message: 'Kelas berhasil diperbarui.',
-				onConfirm: () => {
-					setResultModal(null);
-					popup.close();
-				},
+				onClose: () => popup.close(),
 			});
 		} catch (err) {
 			const message = getApiErrorMessage(err, 'Gagal mengubah kelas. Coba lagi.');
 			setError(message);
-			setResultModal({
+			popup.alert({
 				type: 'error',
 				title: 'Gagal',
 				message,
-				onConfirm: () => setResultModal(null),
 			});
 		} finally {
 			setIsSubmitting(false);
@@ -514,49 +523,82 @@ function EditClassModal({ initialClass, lecturerName, onSuccess }) {
 	const handleSubmit = (e) => {
 		e?.preventDefault();
 		if (isSubmitting) return;
-		setShowConfirm(true);
+
+		popup.confirm({
+			title: 'Konfirmasi',
+			message: 'Yakin ingin menyimpan perubahan kelas ini?',
+			confirmText: 'Ya, simpan',
+			onConfirm: () => submitEdit(),
+		});
 	};
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-5">
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Dosen</p>
-				<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
-					<span className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500">👤</span>
-					<span className="truncate">{lecturerName}</span>
+			{isSuperadmin ? (
+				<div className="mb-4">
+					<label className="block mb-1 text-xs font-medium text-gray-700">
+						DOSEN PENANGGUNG JAWAB
+						<span className="text-red-500 ml-1">*</span>
+					</label>
+					<Dropdown>
+						<Dropdown.Trigger>
+							<div className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-[12px] shadow-sm bg-white cursor-pointer flex justify-between items-center hover:border-blue-300 transition-colors">
+								<span className={selectedLecturerId ? 'text-slate-800' : 'text-slate-400'}>
+									{selectedLecturerId
+										? lecturers.find((l) => l.id === selectedLecturerId)?.nama || lecturers.find((l) => l.id === selectedLecturerId)?.name || 'Pilih dosen...'
+										: 'Pilih dosen...'}
+								</span>
+								<span className="text-slate-400 text-[10px]">▼</span>
+							</div>
+						</Dropdown.Trigger>
+						<Dropdown.Content width="full">
+							{lecturers.map((lec) => (
+								<Dropdown.Item
+									key={lec.id}
+									onClick={() => setSelectedLecturerId(lec.id)}
+									className={selectedLecturerId === lec.id ? 'bg-blue-50 text-blue-700 font-semibold' : ''}
+								>
+									{lec.nama || lec.name || lec.email}
+								</Dropdown.Item>
+							))}
+						</Dropdown.Content>
+					</Dropdown>
 				</div>
-			</div>
+			) : (
+				<div className="mb-4 space-y-1">
+					<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Dosen</p>
+					<div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+						<span className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-200 text-slate-500">👤</span>
+						<span className="truncate">{lecturerName}</span>
+					</div>
+				</div>
+			)}
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Nama Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					value={name}
-					onChange={(e) => setName(e.target.value)}
-					required
-				/>
-			</div>
+			<Field
+				label="NAMA KELAS"
+				placeholder="Masukkan Nama Kelas"
+				value={name}
+				onChange={(e) => setName(e.target.value)}
+				required
+			/>
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Kode Kelas</p>
-				<input
-					type="text"
-					className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					value={classCode}
-					onChange={(e) => setClassCode(e.target.value.toUpperCase())}
-					required
-				/>
-			</div>
+			<Field
+				label="KODE KELAS"
+				placeholder="Masukkan Kode Kelas"
+				value={classCode}
+				onChange={(e) => setClassCode(e.target.value.toUpperCase())}
+				required
+				maxLength={6}
+			/>
 
-			<div className="space-y-1">
-				<p className="text-[11px] font-medium uppercase tracking-wide text-slate-400">Deskripsi</p>
-				<textarea
-					className="w-full min-h-[100px] rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-					value={description}
-					onChange={(e) => setDescription(e.target.value)}
-				/>
-			</div>
+			<Field
+				label="DESKRIPSI"
+				as="textarea"
+				placeholder="Deskripsi Kelas"
+				value={description}
+				onChange={(e) => setDescription(e.target.value)}
+				rows={3}
+			/>
 
 			{error && <p className="text-xs text-red-500">{error}</p>}
 
@@ -580,30 +622,6 @@ function EditClassModal({ initialClass, lecturerName, onSuccess }) {
 					{isSubmitting ? 'Menyimpan...' : 'Simpan'}
 				</Button>
 			</div>
-			<StatusModal
-				show={showConfirm}
-				type="confirm"
-				title="Konfirmasi"
-				message="Yakin ingin menyimpan perubahan kelas ini?"
-				confirmText="Ya, simpan"
-				cancelText="Batal"
-				onConfirm={() => {
-					setShowConfirm(false);
-					submitEdit();
-				}}
-				onCancel={() => setShowConfirm(false)}
-				onClose={() => setShowConfirm(false)}
-			/>
-
-			<StatusModal
-				show={!!resultModal}
-				type={resultModal?.type || 'success'}
-				title={resultModal?.title}
-				message={resultModal?.message}
-				confirmText={resultModal?.type === 'error' ? 'Tutup' : 'OK'}
-				onConfirm={resultModal?.onConfirm}
-				onClose={resultModal?.onConfirm}
-			/>
 		</form>
 	);
 }

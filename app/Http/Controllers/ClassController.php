@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassModel;
+use App\Models\MaterialModel;
 use App\Models\UserModel;
 use App\Models\UserProgressModel;
 use Illuminate\Support\Facades\DB;
@@ -124,7 +125,7 @@ class ClassController extends Controller
 
             // Validasi input
             $data = $request->validate([
-                'class_code' => ['required', 'string', 'max:10'],
+                'class_code' => ['required', 'string', 'max:6'],
             ]);
 
             $classCode = strtoupper($data['class_code']);
@@ -164,11 +165,9 @@ class ClassController extends Controller
                     $user->update(['role' => 'mahasiswa']);
                 }
 
-                // 6. Init progress untuk semua materi di kelas ini
+                // 6. Init progress untuk semua materi (materi bersifat global, sama di semua kelas)
                 // Materi pertama unlocked, sisanya locked
-                $materials = $class->materials()
-                    ->orderBy('materials.order_number')
-                    ->get();
+                $materials = MaterialModel::orderBy('order_number')->get();
 
                 foreach ($materials as $idx => $mat) {
                     UserProgressModel::updateOrCreate(

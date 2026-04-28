@@ -324,7 +324,7 @@ class DashboardController extends Controller
     
                         $missingRequirements[] = [
                             'material_id' => $m->id,
-                            'name'        => $m->title,
+                            'name'        => $m->material_name,
                             'reason'      => $reason,
                         ];
                     }

@@ -1,4 +1,6 @@
 import { Head, Link, useForm, router } from "@inertiajs/react";
+import InputError from "@/Components/InputError";
+import Field from "@/Components/Field";
 import Logo from "@/Components/ApplicationLogo";
 import StatusModal from "@/Components/StatusModal";
 import { useEffect, useState } from "react";
@@ -109,7 +111,7 @@ export default function Register({ status }) {
           {/* LEFT */}
           <div className="relative hidden h-full lg:block">
             <div className="absolute bottom-20 left-16 max-w-[580px] text-white">
-              <span className="inline-block rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-sm">
+              <span className="inline-block rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[12px] text-white/80 backdrop-blur-sm">
                 Yuk mulai perjalanan belajarmu dari sini
               </span>
 
@@ -122,7 +124,7 @@ export default function Register({ status }) {
                 <br />
                 bareng
                 <br />
-                <span className="text-yellow-300">Oopedia.</span>
+                <span className="text-yellow-300">OOpedia.</span>
               </h1>
 
               <p className="mt-5 max-w-lg text-base leading-7 text-white/75">
@@ -140,140 +142,107 @@ export default function Register({ status }) {
               transition={{ duration: 0.45, ease: "easeOut" }}
               className="relative z-10 w-full max-w-[560px]"
             >
-              <div className="max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-white/5 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+              <div className="custom-scrollbar-soft max-h-[90vh] overflow-y-auto rounded-3xl border border-white/10 bg-white/5 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
                 <div className="mb-8 flex flex-col items-center text-center">
                   <Logo className="mb-4 h-[72px] w-auto object-contain" />
                   <h1 className="text-3xl font-bold text-white">
                     Buat akun kamu
                   </h1>
-                  <p className="mt-2 text-sm text-white/65">
-                    Daftar sekarang untuk mulai belajar lebih terarah di Oopedia.
+                  <p className="mt-2 text-[12px] text-white/65">
+                    Daftar sekarang untuk mulai belajar lebih terarah di OOpedia.
                   </p>
                 </div>
 
                 <form onSubmit={submit} className="space-y-5">
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-white/85">
-                      Nama lengkap
-                    </label>
-                    <input
-                      type="text"
-                      value={data.nama}
-                      onChange={(e) => setData("nama", e.target.value)}
-                      className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 outline-none transition focus:border-yellow-300 focus:ring-4 focus:ring-yellow-300/10"
-                      placeholder="Masukkan nama lengkap"
-                      autoFocus
-                      required
-                    />
-                    {errors.nama && (
-                      <p className="mt-2 text-sm text-red-400">{errors.nama}</p>
-                    )}
-                  </div>
+                  <Field
+                    label="Nama lengkap"
+                    name="nama"
+                    value={data.nama}
+                    onChange={(e) => setData("nama", e.target.value)}
+                    error={errors.nama}
+                    placeholder="Masukkan nama lengkap"
+                    inputClassName="bg-white/5 text-white"
+                    required
+                  />
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-white/85">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      value={data.email}
-                      onChange={(e) => setData("email", e.target.value)}
-                      className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-white placeholder:text-white/40 outline-none transition focus:border-yellow-300 focus:ring-4 focus:ring-yellow-300/10"
-                      placeholder="nama@email.com"
-                      required
-                    />
-                    {errors.email && (
-                      <p className="mt-2 text-sm text-red-400">{errors.email}</p>
-                    )}
-                  </div>
+                  <Field
+                    label="Email"
+                    name="email"
+                    type="email"
+                    value={data.email}
+                    onChange={(e) => setData("email", e.target.value)}
+                    error={errors.email}
+                    placeholder="nama@email.com"
+                    inputClassName="bg-white/5 text-white"
+                    required
+                  />
 
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-white/85">
-                      Password
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={data.password}
-                        onChange={(e) => setData("password", e.target.value)}
-                        className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 pr-12 text-white placeholder:text-white/40 outline-none transition focus:border-yellow-300 focus:ring-4 focus:ring-yellow-300/10"
-                        placeholder="Masukkan password"
-                        required
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/60 hover:bg-white/10"
+                  <Field
+                    label="Password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={data.password}
+                    onChange={(e) => setData("password", e.target.value)}
+                    error={errors.password}
+                    placeholder="Masukkan password"
+                    inputClassName="bg-white/5 text-white pr-12"
+                    required
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/60 hover:bg-white/10"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      </button>
-                    </div>
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </Field>
 
-                    {errors.password && (
-                      <p className="mt-2 text-sm text-red-400">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-medium text-white/85">
-                      Konfirmasi password
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={data.password_confirmation}
-                        onChange={(e) =>
-                          setData("password_confirmation", e.target.value)
-                        }
-                        className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 pr-12 text-white placeholder:text-white/40 outline-none transition focus:border-yellow-300 focus:ring-4 focus:ring-yellow-300/10"
-                        placeholder="Ulangi password"
-                        required
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/60 hover:bg-white/10"
+                  <Field
+                    label="Konfirmasi password"
+                    name="password_confirmation"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={data.password_confirmation}
+                    onChange={(e) => setData("password_confirmation", e.target.value)}
+                    error={errors.password_confirmation}
+                    placeholder="Ulangi password"
+                    inputClassName="bg-white/5 text-white pr-12"
+                    required
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-white/60 hover:bg-white/10"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      </button>
-                    </div>
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    </button>
+                  </Field>
 
-                    {errors.password_confirmation && (
-                      <p className="mt-2 text-sm text-red-400">
-                        {errors.password_confirmation}
-                      </p>
-                    )}
-                  </div>
 
                   <div className="pt-2">
                     <button
@@ -286,7 +255,7 @@ export default function Register({ status }) {
                   </div>
                 </form>
 
-                <div className="mt-6 text-center text-sm text-white/65">
+                <div className="mt-6 text-center text-[12px] text-white/65">
                   Sudah punya akun?{" "}
                   <Link
                     href="/login"
@@ -299,7 +268,7 @@ export default function Register({ status }) {
                 <div className="mt-4 text-center">
                   <Link
                     href="/"
-                    className="text-sm text-white/45 transition hover:text-white/70"
+                    className="text-[12px] text-white/45 transition hover:text-white/70"
                   >
                     ← Kembali ke beranda
                   </Link>

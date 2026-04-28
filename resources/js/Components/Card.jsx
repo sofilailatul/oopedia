@@ -8,7 +8,7 @@ export default function Card({
 }) {
     return (
         <div
-            className={`bg-white rounded-3xl border border-slate-200/60 p-5 md:p-6 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between ${className}`}
+            className={`bg-white rounded-3xl border border-slate-200/60 p-3 md:p-6 shadow-sm transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between ${className}`}
         >
             {(title || Icon) && (
                 <div className="flex gap-3 mb-4">

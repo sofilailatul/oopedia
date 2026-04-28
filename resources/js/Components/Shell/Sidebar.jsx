@@ -53,7 +53,8 @@ function normalizeRole(role) {
 }
 
 function isActive(currentUrl, targetHref) {
-  return currentUrl === targetHref || currentUrl.startsWith(targetHref + "/");
+  const [path] = currentUrl.split("?");
+  return path === targetHref || path.startsWith(targetHref + "/");
 }
 
 export default function Sidebar() {
@@ -79,7 +80,7 @@ export default function Sidebar() {
   return (
     <aside
       className={[
-        "flex shrink-0 flex-col rounded-3xl border-r border-sky-200 bg-gradient-to-b from-sky-50 to-white py-4 transition-all duration-200",
+        "relative z-20 flex shrink-0 flex-col rounded-3xl border border-sky-200 bg-gradient-to-b from-sky-50 to-white py-4 shadow-sm transition-all duration-200",
         isCollapsed ? "w-[60px] px-2.5" : "w-[220px] px-4",
       ].join(" ")}
     >
@@ -95,7 +96,7 @@ export default function Sidebar() {
         <img
           className="h-10 w-7 object-contain"
           src="/images/logo.png"
-          alt="Oopedia"
+          alt="OOpedia"
         />
 
           {!isCollapsed ? (

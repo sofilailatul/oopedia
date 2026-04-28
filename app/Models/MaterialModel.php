@@ -26,16 +26,6 @@ class MaterialModel extends Model
         return $this->belongsTo(UserModel::class, 'created_by');
     }
 
-    public function classes()
-    {
-        return $this->belongsToMany(
-            ClassModel::class,
-            'material_class',
-            'material_id',
-            'class_id'
-        )->withPivot(['publish_date', 'is_active', 'actived_at', 'deactived_at'])
-         ->withTimestamps();
-    }
 
     public function practices()
     {

@@ -122,21 +122,23 @@ class PracticeController extends Controller
     {
         $user = Auth::user();
 
-        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items', 'questions.subTopicRef']);
         $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
         abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $questions = $practice->questions
             ->sortBy('id')
             ->values()
-            ->map(function (PracticeQuestionModel $q) {
+            ->map(function (PracticeQuestionModel $q) use ($practice) {
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
-                    'sub_topic' => $q->sub_topic,
+                    'subtopic_id' => $q->subtopic_id,
+                    'sub_topic_name' => $q->subTopicRef->name ?? null,
+                    'material_id' => $practice->material_id,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
-                    'output_code' => $q->output_code,
+                    'code_snippet' => $q->code_snippet,
                     'feedback_correct' => $q->feedback_correct,
                     'feedback_incorrect' => $q->feedback_incorrect,
                     'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
@@ -186,21 +188,23 @@ class PracticeController extends Controller
     {
         $user = Auth::user();
 
-        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items', 'questions.subTopicRef']);
         $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
         abort_unless($isOwner || $user->role === 'superadmin', 403);
 
         $questions = $practice->questions
             ->sortBy('id')
             ->values()
-            ->map(function (PracticeQuestionModel $q) {
+            ->map(function (PracticeQuestionModel $q) use ($practice) {
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
-                    'sub_topic' => $q->sub_topic,
+                    'subtopic_id' => $q->subtopic_id,
+                    'sub_topic_name' => $q->subTopicRef->name ?? null,
+                    'material_id' => $practice->material_id,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
-                    'output_code' => $q->output_code,
+                    'code_snippet' => $q->code_snippet,
                     'feedback_correct' => $q->feedback_correct,
                     'feedback_incorrect' => $q->feedback_incorrect,
                     'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
@@ -250,7 +254,7 @@ class PracticeController extends Controller
     {
         $user = Auth::user();
 
-        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items']);
+        $practice->load(['material:id,material_name,created_by', 'questions.options', 'questions.items', 'questions.subTopicRef']);
         $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
         abort_unless($isOwner || $user->role === 'superadmin', 403);
 
@@ -261,10 +265,11 @@ class PracticeController extends Controller
                 return [
                     'id' => $q->id,
                     'question_text' => $q->question_text,
-                    'sub_topic' => $q->sub_topic,
+                    'subtopic_id' => $q->subtopic_id,
+                    'sub_topic_name' => $q->subTopicRef->name ?? null,
                     'type' => $q->type ?? 'multiple_choice',
                     'points' => (int) ($q->points ?? 10),
-                    'output_code' => $q->output_code,
+                    'code_snippet' => $q->code_snippet,
                     'feedback_correct' => $q->feedback_correct,
                     'feedback_incorrect' => $q->feedback_incorrect,
                     'image_url' => $q->image_path ? asset('storage/' . $q->image_path) : null,
@@ -307,27 +312,38 @@ class PracticeController extends Controller
     {
         $data = $request->validate([
             'material_id' => ['required', 'integer', 'exists:materials,id'],
-            'level' => ['required', 'in:easy,medium,hard'],
+            'type' => ['required', 'in:practice,pretest'],
+            'level' => ['required_if:type,practice', 'nullable', 'in:easy,medium,hard'],
         ]);
 
-        $exists = PracticeModel::query()
-            ->where('material_id', $data['material_id'])
-            ->where('level', $data['level'])
-            ->exists();
+        $type = $data['type'];
+        $level = $type === 'pretest' ? 'easy' : $data['level'];
 
-        if ($exists) {
+        $existsQuery = PracticeModel::query()
+            ->where('material_id', $data['material_id'])
+            ->where('type', $type);
+        
+        if ($type === 'practice') {
+            $existsQuery->where('level', $data['level']);
+        }
+
+        if ($existsQuery->exists()) {
             return back()->withErrors([
-                'level' => 'Latihan untuk level ini pada materi tersebut sudah ada.',
+                'type' => $type === 'pretest' 
+                    ? 'Pre-test untuk materi ini sudah ada.' 
+                    : 'Latihan untuk level ini pada materi tersebut sudah ada.',
             ]);
         }
 
         $practice = PracticeModel::create([
             'material_id' => $data['material_id'],
-            'type' => 'practice',
-            'level' => $data['level'],
+            'type' => $type,
+            'level' => $level,
         ]);
 
-        return redirect()->route('dosen.practices.edit', $practice->id)
+        $routeName = Auth::user()->role === 'superadmin' ? 'superadmin.practices.edit' : 'dosen.practices.edit';
+
+        return redirect()->route($routeName, $practice->id)
             ->with('success', 'Latihan soal berhasil dibuat.');
     }
 
@@ -357,7 +373,6 @@ class PracticeController extends Controller
         ]);
 
         DB::transaction(function () use ($data, $practice, $request) {
-
             foreach ($data['questions'] as $index => $q) {
                 $question = PracticeQuestionModel::updateOrCreate(
                     ['id' => $q['id'] ?? null],
@@ -392,13 +407,26 @@ class PracticeController extends Controller
                     $question->save();
                 }
 
-                $question->options()->delete();
-                foreach ($q['options'] as $opt) {
-                    PracticeOptionModel::create([
-                        'practice_questions_id' => $question->id,
-                        'option_text' => $opt['text'],
-                        'is_correct' => $opt['is_correct'] ? 1 : 0,
-                    ]);
+                if (($q['type'] ?? 'multiple_choice') === 'drag_drop') {
+                    $question->options()->delete();
+                    $question->items()->delete();
+                    foreach ($q['options'] as $idx => $opt) {
+                        PracticeItemModel::create([
+                            'practice_questions_id' => $question->id,
+                            'item_text' => $opt['text'],
+                            'order_number' => $idx + 1,
+                        ]);
+                    }
+                } else {
+                    $question->items()->delete();
+                    $question->options()->delete();
+                    foreach ($q['options'] as $opt) {
+                        PracticeOptionModel::create([
+                            'practice_questions_id' => $question->id,
+                            'option_text' => $opt['text'],
+                            'is_correct' => $opt['is_correct'] ? 1 : 0,
+                        ]);
+                    }
                 }
             }
         });

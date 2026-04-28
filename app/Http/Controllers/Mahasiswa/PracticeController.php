@@ -128,6 +128,7 @@ class PracticeController extends Controller
                 'practices_id'        => $practice->id,
                 'user_progress_id'    => $progress->id,
                 'focused_subtopic_id' => $progress->focused_subtopic_id,
+                'focused_subtopic_ids' => $progress->focused_subtopic_ids,
                 'attempt_type'        => 'practice',
                 'level'               => $progress->current_level,
                 'mode'                => $progress->current_mode,
@@ -166,7 +167,7 @@ class PracticeController extends Controller
 
         $cfg = $this->buildAttemptConfig($attempt, $attempt->practice);
 
-        if ($attempt->mode === 'focused_remedial' && empty($cfg['weak_subtopic_id'])) {
+        if ($attempt->mode === 'focused_remedial' && empty($cfg['focused_subtopic_id']) && empty($cfg['focused_subtopic_ids'])) {
             return redirect()->back()->with('error', 'Subtopik lemah belum terdeteksi. Silakan hubungi dosen Anda.');
         }
 
@@ -188,11 +189,20 @@ class PracticeController extends Controller
     {
         $questionCount = (int) ($cfg['question_count'] ?? 10);
 
-        // ── FOCUSED REMEDIAL: tetap fokus ke subtopik lemah ─────────────────────
-        if ($attempt->mode === 'focused_remedial' && !empty($cfg['weak_subtopic_id'])) {
+        // ── FOCUSED REMEDIAL: fokus ke subtopik lemah (bisa lebih dari 1) ──────────
+        $subtopicIds = [];
+        if (!empty($cfg['focused_subtopic_ids'])) {
+            $subtopicIds = is_string($cfg['focused_subtopic_ids']) 
+                ? json_decode($cfg['focused_subtopic_ids'], true) 
+                : $cfg['focused_subtopic_ids'];
+        } elseif (!empty($cfg['focused_subtopic_id'])) {
+            $subtopicIds = [$cfg['focused_subtopic_id']];
+        }
+
+        if ($attempt->mode === 'focused_remedial' && !empty($subtopicIds)) {
             $questionsQuery = PracticeQuestionModel::query()
                 ->where('practices_id', $attempt->practices_id)
-                ->where('subtopic_id', $cfg['weak_subtopic_id'])
+                ->whereIn('subtopic_id', $subtopicIds)
                 ->with(['options', 'items']);
 
             // Exclude soal yang sudah pernah dikerjakan user di practice ini
@@ -221,15 +231,15 @@ class PracticeController extends Controller
                         $q->where('user_id', $attempt->user_id)
                         ->where('practices_id', $attempt->practices_id);
                     })
-                    ->whereHas('question', function ($q) use ($cfg) {
-                        $q->where('subtopic_id', $cfg['weak_subtopic_id']);
+                    ->whereHas('question', function ($q) use ($subtopicIds) {
+                        $q->whereIn('subtopic_id', $subtopicIds);
                     })
                     ->pluck('practice_questions_id')
                     ->toArray();
 
                 $questions = PracticeQuestionModel::query()
                     ->where('practices_id', $attempt->practices_id)
-                    ->where('subtopic_id', $cfg['weak_subtopic_id'])
+                    ->whereIn('subtopic_id', $subtopicIds)
                     ->whereIn('id', $wrongQuestionIds)
                     ->with(['options', 'items'])
                     ->inRandomOrder()
@@ -403,18 +413,21 @@ class PracticeController extends Controller
             }
 
             $score = $this->learningPathService->calculateScore($attempt->id);
-            $weak = $this->learningPathService->detectWeakSubtopic($attempt->id);
             $progress = UserProgressModel::query()->findOrFail($attempt->user_progress_id);
+            
+            // Calculate resolved weak subtopics (merging current list with attempt results)
+            $weakIds = $this->learningPathService->calculateUpdatedWeakSubtopics($progress, $attempt->id);
+            
             $passingThreshold = $attempt->level === 'hard' ? 80 : 60;
             $isPassed = $score >= $passingThreshold;
 
-            $resolvedSubtopicId = $weak->subtopic_id
-                ?? $attempt->focused_subtopic_id
-                ?? $progress->focused_subtopic_id;
+            $resolvedSubtopicId = $weakIds[0] ?? null;
+            $resolvedSubtopicIds = count($weakIds) > 0 ? json_encode($weakIds) : null;
 
             $attempt->update([
                 'final_score'         => $score,
                 'focused_subtopic_id' => $resolvedSubtopicId,
+                'focused_subtopic_ids'=> $resolvedSubtopicIds,
                 'is_passed'           => $isPassed ? 1 : 0,
                 'finished_at'         => now(),
             ]);
@@ -423,7 +436,7 @@ class PracticeController extends Controller
                 $updatedProgress = $this->learningPathService->handlePretest(
                     $progress,
                     $score,
-                    $resolvedSubtopicId
+                    $weakIds
                 );
             } else {
                 $updatedProgress = $this->learningPathService->handlePractice(
@@ -435,6 +448,7 @@ class PracticeController extends Controller
             $attempt->update([
                 'next_action'         => $updatedProgress->next_action,
                 'focused_subtopic_id' => $updatedProgress->focused_subtopic_id ?? $resolvedSubtopicId,
+                'focused_subtopic_ids'=> $updatedProgress->focused_subtopic_ids ?? $resolvedSubtopicIds,
             ]);
         });
 
@@ -447,7 +461,8 @@ class PracticeController extends Controller
         $userId = Auth::id();
         $mode = request()->query('mode');
 
-        $attemptQuery = PracticeAttemptModel::where('user_id', $userId)
+        $attemptQuery = PracticeAttemptModel::query()
+            ->where('user_id', $userId)
             ->where('practices_id', $practice->id)
             ->whereNotNull('finished_at');
 
@@ -456,7 +471,7 @@ class PracticeController extends Controller
         }
 
         $attempt = $attemptQuery
-            ->latest()
+            ->latest('finished_at')
             ->first();
 
         abort_unless($attempt, 404);
@@ -471,51 +486,35 @@ class PracticeController extends Controller
             ])
             ->get();
 
-        $resolvedIds = [];
-        $nameToIdCache = [];
+        $subtopicIds = $answers
+            ->map(fn ($answer) => $answer->question?->subtopic_id)
+            ->filter()
+            ->unique()
+            ->values();
 
-        foreach ($answers as $answer) {
-            $question = $answer->question;
-            if (!$question) {
-                continue;
-            }
-
-            $resolvedId = $question->subtopic_id;
-
-            if (!$resolvedId) {
-                $rawName = trim((string) ($question->sub_topic ?? ''));
-
-                if ($rawName !== '') {
-                    if (!array_key_exists($rawName, $nameToIdCache)) {
-                        $nameToIdCache[$rawName] = $this->resolveSubTopicId($practice->material_id, $rawName);
-                    }
-
-                    $resolvedId = $nameToIdCache[$rawName];
-                }
-            }
-
-            if ($resolvedId) {
-                $question->setAttribute('sub_topic_id', (int) $resolvedId);
-                $resolvedIds[] = (int) $resolvedId;
-            }
-        }
-
-        $subTopicNames = empty($resolvedIds)
+        $subtopicNames = $subtopicIds->isEmpty()
             ? collect()
             : SubTopicModel::query()
-                ->whereIn('id', array_values(array_unique($resolvedIds)))
+                ->whereIn('id', $subtopicIds)
                 ->pluck('name', 'id');
 
         foreach ($answers as $answer) {
             $question = $answer->question;
+
             if (!$question) {
                 continue;
             }
 
-            $subTopicId = (int) ($question->sub_topic_id ?? 0);
-            if ($subTopicId > 0) {
-                $question->setAttribute('sub_topic_name', $subTopicNames->get($subTopicId));
-            }
+            $subtopicId = $question->subtopic_id;
+
+            $subtopicName =
+                $question->subTopicRef?->name
+                ?? ($subtopicId ? $subtopicNames->get($subtopicId) : null);
+
+            $question->setAttribute('subtopic_id', $subtopicId);
+            $question->setAttribute('sub_topic_id', $subtopicId);
+            $question->setAttribute('subtopic_name', $subtopicName);
+            $question->setAttribute('sub_topic_name', $subtopicName);
         }
 
         $cfg = $this->buildAttemptConfig($attempt, $practice);
@@ -528,7 +527,7 @@ class PracticeController extends Controller
         $nextLevel = $this->nextLevelFromProgress($progress, $attempt);
 
         return Inertia::render('Practices/Summary', [
-            'practice'  => $practice,
+            'practice'  => $practice->loadMissing('material'),
             'attempt'   => $attempt,
             'answers'   => $answers,
             'cfg'       => $cfg,
@@ -579,6 +578,7 @@ class PracticeController extends Controller
             'duration_seconds' => (int) ($attempt->duration_seconds ?? 15 * 60),
             'level'            => $resolvedLevel,
             'focused_subtopic_id' => $attempt->focused_subtopic_id,
+            'focused_subtopic_ids' => $attempt->focused_subtopic_ids,
             'remediation_round'=> (int) ($attempt->remediation_round ?? 0),
         ];
     }
@@ -602,8 +602,21 @@ class PracticeController extends Controller
             ];
         }
 
-        $progress->loadMissing('focusedSubtopic');
-        $weakSubtopicName = $progress->focusedSubtopic?->name ?? null;
+        $weakSubtopicIds = [];
+        if (!empty($progress->focused_subtopic_ids)) {
+            $weakSubtopicIds = is_string($progress->focused_subtopic_ids) 
+                ? json_decode($progress->focused_subtopic_ids, true) 
+                : $progress->focused_subtopic_ids;
+        } elseif (!empty($progress->focused_subtopic_id)) {
+            $weakSubtopicIds = [$progress->focused_subtopic_id];
+        }
+
+        $weakSubtopicNames = [];
+        if (!empty($weakSubtopicIds)) {
+            $weakSubtopicNames = SubTopicModel::whereIn('id', $weakSubtopicIds)->pluck('name')->toArray();
+        }
+        
+        $weakSubtopicNameDisplay = count($weakSubtopicNames) > 0 ? implode(', ', $weakSubtopicNames) : null;
         $weakSubtopicId   = $progress->focused_subtopic_id;
 
         $mode          = $progress->current_mode;
@@ -659,13 +672,21 @@ class PracticeController extends Controller
                 default                  => 'retry',
             };
 
+            $remedialNextLevel = match ($frontendAction) {
+                'fallback_easy'   => 'easy',
+                'fallback_medium' => 'medium',
+                default           => $baseLevel,
+            };
+
             return [
-                'next_level'           => $baseLevel,
-                'message'              => 'Ulangi latihan pada sub-topik yang masih lemah.',
+                'next_level'           => $remedialNextLevel,
+                'message'              => $frontendAction === 'retry' 
+                                            ? 'Ulangi latihan pada sub-topik yang masih lemah.' 
+                                            : 'Kamu diturunkan ke level ' . strtoupper($remedialNextLevel) . ' untuk memperkuat sub-topik yang lemah.',
                 'action'               => $frontendAction,
                 'mode'                 => 'remedial',
                 'focused_subtopic_id'  => $weakSubtopicId,
-                'weak_subtopic_name'   => $weakSubtopicName,
+                'weak_subtopic_name'   => $weakSubtopicNameDisplay,
                 'remediation_round'    => (int) (($progress->easy_remedial_count ?? 0) + ($progress->medium_remedial_count ?? 0)),
                 'recommend_review'     => false,
             ];
@@ -673,23 +694,30 @@ class PracticeController extends Controller
 
         // ── Normal — naik level atau lanjut
         $frontendAction = match ($nextAction) {
+            'start_easy'       => 'next_level',
             'start_medium'     => 'next_level',
             'start_hard'       => 'next_level',
             'go_next_material' => 'go_next_material',
             default            => 'next_level',
         };
 
-        $nextLevelMap = [
-            'easy'   => 'medium',
-            'medium' => 'hard',
-            'hard'   => null,
-        ];
-
-        $nextLevel = $nextLevelMap[$baseLevel] ?? null;
+        if ($attempt && $attempt->attempt_type === 'pretest') {
+            // Jika pretest, level selanjutnya adalah level yang ditetapkan di progress
+            $nextLevel = $progressLevel;
+            $message = 'Hasil pretest menentukan kamu mulai dari level ' . strtoupper($nextLevel ?? 'EASY') . '.';
+        } else {
+            $nextLevelMap = [
+                'easy'   => 'medium',
+                'medium' => 'hard',
+                'hard'   => null,
+            ];
+            $nextLevel = $nextLevelMap[$baseLevel] ?? null;
+            $message = 'Lanjutkan latihan sesuai hasil sesi ini.';
+        }
 
         return [
             'next_level'           => $nextLevel,
-            'message'              => 'Lanjutkan latihan sesuai hasil sesi ini.',
+            'message'              => $message,
             'action'               => $frontendAction,
             'mode'                 => 'regular',
             'focused_subtopic_id'  => null,

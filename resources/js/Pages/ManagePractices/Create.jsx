@@ -8,6 +8,11 @@ import { QUESTION_TYPE, levelLabel as difficultyLabel, questionTypeLabel } from 
 import PracticeMetaPanel from "@/Features/practice/PracticeMetaPanel";
 import MultipleChoiceQuestionForm from "@/Components/QuestionForm/MultipleChoiceQuestionForm";
 import DragDropQuestionForm from "@/Components/QuestionForm/DragDropQuestionForm";
+import {
+  appendQuestionImageToFormData,
+  normalizeQuestionImage,
+  updateQuestionImage,
+} from "@/Features/questionImage";
 
 function logCreateAction(action, detail = {}) {
 	console.log("[Latsol Create]", { action, ...detail });
@@ -36,34 +41,38 @@ function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 }
 
 function normalizeInitialQuestions(initial = []) {
-	if (!Array.isArray(initial) || initial.length === 0) {
-		return [createEmptyQuestion()];
-	}
+  if (!Array.isArray(initial) || initial.length === 0) {
+    return [createEmptyQuestion()];
+  }
 
-	return initial.map((q) => {
-		const base = createEmptyQuestion();
-		return {
-			...base,
-			...q,
-			subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? null,
-			sub_topic_name: q.sub_topic_name ?? q.sub_topic ?? q.subTopic ?? "",
-			type: q.type ?? base.type,
-			feedbackCorrect: q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
-			feedbackIncorrect:
-				q.feedback_incorrect ?? q.feedbackIncorrect ?? base.feedbackIncorrect,
-			outputCode: q.code_snippet ?? q.outputCode ?? base.outputCode,
-			imageUrl: q.image_url ?? q.imageUrl ?? base.imageUrl,
-			options:
-				Array.isArray(q.options) && q.options.length
-					? q.options.map((opt) => ({
-						id: opt.id ?? null,
-						text: opt.text ?? "",
-						is_correct: !!opt.is_correct,
-					}))
-					: base.options,
-			_localId: Math.random().toString(36).slice(2),
-		};
-	});
+  return initial.map((q) => {
+    const base = createEmptyQuestion();
+
+    return {
+      ...base,
+      ...q,
+      material_id: q.material_id ?? base.material_id,
+      subtopic_id: q.subtopic_id ?? q.sub_topic_id ?? base.subtopic_id,
+      outputCode: q.code_snippet ?? q.output_code ?? q.outputCode ?? base.outputCode,
+      question_text: q.question_text ?? q.practice_text ?? base.question_text,
+      feedbackCorrect:
+        q.feedback_correct ?? q.feedbackCorrect ?? base.feedbackCorrect,
+      feedbackIncorrect:
+        q.feedback_incorrect ??
+        q.feedbackIncorrect ??
+        base.feedbackIncorrect,
+      ...normalizeQuestionImage(q, base),
+      options:
+        Array.isArray(q.options) && q.options.length
+          ? q.options.map((opt) => ({
+              id: opt.id ?? null,
+              text: opt.option_text ?? opt.text ?? "",
+              is_correct: !!opt.is_correct,
+            }))
+          : base.options,
+      _localId: Math.random().toString(36).slice(2),
+    };
+  });
 }
 
 export default function ManagePracticesCreate({ practice, teacher, questions: initialQuestions = [], subtopics = [], authUser }) {
@@ -283,6 +292,8 @@ function CreatePracticeContent({
 				q.feedbackIncorrect ?? "",
 			);
 
+			appendQuestionImageToFormData(formData, q, index);	
+
 			q.options.forEach((opt, optIdx) => {
 				formData.append(
 					`questions[${index}][options][${optIdx}][text]`,
@@ -293,14 +304,6 @@ function CreatePracticeContent({
 					opt.is_correct ? "1" : "0",
 				);
 			});
-
-			if (q.imageFile) {
-				formData.append(`questions[${index}][image]`, q.imageFile);
-			}
-
-			if (q.remove_image) {
-				formData.append(`questions[${index}][remove_image]`, "1");
-			}
 		});
 
 		const saveRouteName = (authUser?.role || "").toLowerCase() === "superadmin"
@@ -334,19 +337,10 @@ function CreatePracticeContent({
 		});
 	};
 
-	const handleImageUpload = (qIdx, file) => {
-		setQuestions((prev) =>
-			prev.map((q, i) =>
-				i === qIdx
-					? {
-							...q,
-							imageFile: file || null,
-							imageUrl: file ? URL.createObjectURL(file) : null,
-							remove_image: !file,
-						}
-					: q,
-				),
-		);
+	const handleQuestionImageChange = (questionIndex, payload) => {
+	setQuestions((prev) =>
+		updateQuestionImage(prev, questionIndex, payload),
+	);
 	};
 
 	return (
@@ -423,14 +417,14 @@ function CreatePracticeContent({
 
 						{q.type === QUESTION_TYPE.DRAG ? (
 							<DragDropQuestionForm
-								question={q}
-								questionIndex={idx}
-								subtopicOptions={subtopics}
-								onQuestionFieldChange={updateQuestionField}
-								onOptionFieldChange={updateOptionField}
-								onAddCodeBlock={handleAddCodeBlock}
-								onRemoveCodeBlock={handleRemoveCodeBlock}
-								onImageChange={handleImageUpload}
+							question={q}
+							questionIndex={idx}
+							subtopicOptions={subtopics}
+							onQuestionFieldChange={updateQuestionField}
+							onOptionFieldChange={updateOptionField}
+							onAddCodeBlock={handleAddCodeBlock}
+							onRemoveCodeBlock={handleRemoveCodeBlock}
+							onImageChange={handleQuestionImageChange}
 							/>
 						) : (
 							<MultipleChoiceQuestionForm
@@ -440,7 +434,7 @@ function CreatePracticeContent({
 								onQuestionFieldChange={updateQuestionField}
 								onOptionFieldChange={updateOptionField}
 								onSetCorrectOption={setCorrectOption}
-								onImageChange={handleImageUpload}
+								onImageChange={handleQuestionImageChange}
 							/>
 						)}
 					</Card>
