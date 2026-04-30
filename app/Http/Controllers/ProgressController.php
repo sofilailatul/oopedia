@@ -56,7 +56,6 @@ class ProgressController extends Controller
                     $q->where('role', 'mahasiswa')
                         ->orderBy('nama');
                 },
-                'materials',
             ]);
 
             if (! $isSuperadmin) {
@@ -73,8 +72,8 @@ class ProgressController extends Controller
             $studentIds = $class->users->pluck('id');
             $quizIds = $quizzes->pluck('id');
 
-            // Practice summary per student (best final_score across class materials, all levels)
-            $materialIds = $class->materials->pluck('id');
+            // Practice summary per student (best final_score across all materials, all levels)
+            $materialIds = \App\Models\MaterialModel::pluck('id');
             $hardMap = [];
 
             if ($studentIds->isNotEmpty() && $materialIds->isNotEmpty()) {
@@ -175,7 +174,7 @@ class ProgressController extends Controller
 
         $isSuperadmin = $lecturer->role === 'superadmin';
 
-        $classQuery = ClassModel::with(['materials', 'users' => function ($q) {
+        $classQuery = ClassModel::with(['users' => function ($q) {
             $q->where('role', 'mahasiswa');
         }]);
 

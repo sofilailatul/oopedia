@@ -62,6 +62,21 @@ function PageContent({ practices = [], materials = [], role }) {
 		);
 	}, [practices, searchQuery]);
 
+	const groupedPractices = React.useMemo(() => {
+		const groups = {};
+		filteredPractices.forEach((practice) => {
+			const key = practice.material_id || practice.material_name;
+			if (!groups[key]) {
+				groups[key] = {
+					material_name: practice.material_name,
+					practices: [],
+				};
+			}
+			groups[key].practices.push(practice);
+		});
+		return Object.values(groups);
+	}, [filteredPractices]);
+
 	const handleOpenCreate = () => {
 		if (!isDosen && !isSuperadmin) return;
 
@@ -136,7 +151,7 @@ function PageContent({ practices = [], materials = [], role }) {
 	const storeRouteName = isSuperadmin ? "superadmin.practices.store" : "dosen.practices.store";
 
 	return (
-		<div className="mx-auto max-w-6xl space-y-6">
+		<div className="mx-auto space-y-6">
 			<div className="rounded-3xl border border-slate-200/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5 shadow-sm sm:p-6">
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<div className="space-y-1">
@@ -197,101 +212,112 @@ function PageContent({ practices = [], materials = [], role }) {
 						</tr>
 					</thead>
 					<tbody>
-						{filteredPractices.length > 0 ? (
-							filteredPractices.map((practice, idx) => (
-								<tr
-									key={practice.id}
-									className="group border-t border-slate-100/80 bg-white hover:bg-slate-50/80 transition-colors"
-								>
-									<td className="px-5 py-3 align-middle text-xs text-slate-500">
-										<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
-											{idx + 1}
-										</span>
-									</td>
-
-									<td className="px-5 py-3 align-middle">
-										<span className="text-sm font-semibold text-slate-900 group-hover:text-slate-950">
-											{practice.material_name}
-										</span>
-										<p className="mt-0.5 text-[11px] text-slate-400">
-											Level latihan untuk materi ini
-										</p>
-									</td>
-
-									<td className="px-5 py-3 align-middle text-sm text-slate-700">
-										<span
-											className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium ${
-												practice.level === "easy"
-													? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-													: practice.level === "medium"
-													? "bg-blue-50 text-blue-700 border border-blue-100"
-													: "bg-purple-50 text-purple-700 border border-purple-100"
-											}`}
+						{groupedPractices.length > 0 ? (
+							groupedPractices.map((group, groupIdx) => (
+								<React.Fragment key={groupIdx}>
+									{group.practices.map((practice, idx) => (
+										<tr
+											key={practice.id}
+											className={`group bg-white hover:bg-slate-50/80 transition-colors ${idx === 0 ? "border-t border-slate-200" : ""}`}
 										>
-											<span className="h-1.5 w-1.5 rounded-full bg-current" />
-											{levelLabel(practice.level, practice.type)}
-										</span>
-									</td>
-
-									<td className="px-5 py-3 align-middle text-center text-sm text-slate-700">
-										<span className="inline-flex items-center justify-center rounded-full bg-slate-50 px-3 py-1 text-[12px] font-medium text-slate-700 border border-slate-100">
-											{practice.total_questions} soal
-										</span>
-									</td>
-
-									<td className="px-5 py-3 align-middle">
-										<div className="flex items-center justify-center gap-2">
-											{isDosen || isSuperadmin ? (
-												<>
-													<Button
-														as={Link}
-														href={route(showRouteName, practice.id)}
-														color="blue"
-														variant="ghost"
-														size="sm"
-														leftIcon={<FaEye className="h-3 w-3" />}
-													>
-														Lihat
-													</Button>
-
-													<Button
-														as={Link}
-														href={route(editRouteName, practice.id)}
-														color="blue"
-														variant="outline"
-														size="sm"
-														leftIcon={<FaPen className="h-3 w-3" />}
-													>
-														Edit
-													</Button>
-
-													<Button
-														type="button"
-														color="red"
-														variant="outline"
-														size="sm"
-														leftIcon={<FaTrash className="h-3 w-3" />}
-														onClick={() => handleOpenDelete(practice)}
-													>
-														Hapus
-													</Button>
-												</>
-											) : (
-												<span className="text-xs text-slate-400">
-													Aksi hanya untuk pengguna berwenang
-												</span>
+											{idx === 0 && (
+												<td className="px-5 py-4 align-top text-xs text-slate-500 border-r border-slate-100" rowSpan={group.practices.length}>
+													<span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-600">
+														{groupIdx + 1}
+													</span>
+												</td>
 											)}
-										</div>
-									</td>
-								</tr>
+
+											{idx === 0 && (
+												<td className="px-5 py-4 align-top border-r border-slate-100" rowSpan={group.practices.length}>
+													<span className="text-sm font-bold text-slate-900">
+														{group.material_name}
+													</span>
+												</td>
+											)}
+
+											<td className={`px-5 py-3 align-middle text-sm text-slate-700 ${idx !== 0 ? "border-t border-slate-100/50" : ""}`}>
+												<span
+													className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium shadow-sm ${
+														practice.level === "easy"
+															? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+															: practice.level === "medium"
+															? "bg-blue-50 text-blue-700 border border-blue-100"
+															: "bg-purple-50 text-purple-700 border border-purple-100"
+													}`}
+												>
+													<span className="h-1.5 w-1.5 rounded-full bg-current" />
+													{levelLabel(practice.level, practice.type)}
+												</span>
+											</td>
+
+											<td className={`px-5 py-3 align-middle text-center text-sm text-slate-700 ${idx !== 0 ? "border-t border-slate-100/50" : ""}`}>
+												<span className="inline-flex items-center justify-center rounded-full bg-white px-3 py-1 text-[12px] font-medium text-slate-700 border border-slate-200 shadow-sm">
+													{practice.total_questions} soal
+												</span>
+											</td>
+
+											<td className={`px-5 py-3 align-middle ${idx !== 0 ? "border-t border-slate-100/50" : ""}`}>
+												<div className="flex items-center justify-center gap-2">
+													{isDosen || isSuperadmin ? (
+														<>
+															<Button
+																as={Link}
+																href={route(showRouteName, practice.id)}
+																color="blue"
+																variant="ghost"
+																size="sm"
+																leftIcon={<FaEye className="h-3 w-3" />}
+																className="rounded-lg"
+															>
+																Lihat
+															</Button>
+
+															<Button
+																as={Link}
+																href={route(editRouteName, practice.id)}
+																color="blue"
+																variant="outline"
+																size="sm"
+																leftIcon={<FaPen className="h-3 w-3" />}
+																className="rounded-lg"
+															>
+																Edit
+															</Button>
+
+															<Button
+																type="button"
+																color="red"
+																variant="outline"
+																size="sm"
+																leftIcon={<FaTrash className="h-3 w-3" />}
+																className="rounded-lg"
+																onClick={() => handleOpenDelete(practice)}
+															>
+																Hapus
+															</Button>
+														</>
+													) : (
+														<span className="text-xs text-slate-400">
+															Aksi hanya untuk pengguna berwenang
+														</span>
+													)}
+												</div>
+											</td>
+										</tr>
+									))}
+								</React.Fragment>
 							))
 						) : (
 							<tr>
 								<td
 									colSpan="5"
-									className="px-5 py-10 text-center text-sm text-slate-400"
+									className="px-5 py-12 text-center text-sm text-slate-400"
 								>
-									Belum ada latihan soal untuk materi yang Anda buat.
+									<div className="flex flex-col items-center justify-center gap-2">
+										<span className="text-3xl mb-1">📭</span>
+										<p>Belum ada latihan soal untuk materi yang Anda buat.</p>
+									</div>
 								</td>
 							</tr>
 						)}

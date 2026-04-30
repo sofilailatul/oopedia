@@ -54,7 +54,7 @@ class ClassController extends Controller
 
     public function show($class)
     {
-        $class = ClassModel::with(['users', 'materials'])->findOrFail($class);
+        $class = ClassModel::with(['users', 'lecturer'])->withCount('users')->findOrFail($class);
         return response()->json($class);
     }
 

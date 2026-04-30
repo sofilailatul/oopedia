@@ -518,7 +518,7 @@ class QuizController extends Controller
                     'quizzes_id' => $attempt->quizzes_id,
                 ],
                 [
-                    'reason' => $isCompleted ? 'high_score' : 'low_score',
+                    'reason' => $isCompleted ? 'enrichment' : 'low_score',
                     'is_completed' => $isCompleted,
                 ]
             );

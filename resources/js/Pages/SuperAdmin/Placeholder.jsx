@@ -4,7 +4,7 @@ import AppLayout from "@/Layouts/AppLayout";
 export default function Placeholder({ title, description }) {
   return (
     <AppLayout title={title || "SuperAdmin"}>
-      <div className="mx-auto max-w-3xl rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center shadow-sm">
+      <div className="mx-auto   rounded-2xl border border-dashed border-slate-300 bg-white/80 p-8 text-center shadow-sm">
         <h1 className="text-2xl font-bold text-slate-900">
           {title || "Halaman dalam pengembangan"}
         </h1>

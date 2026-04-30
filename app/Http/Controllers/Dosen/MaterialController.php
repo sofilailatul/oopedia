@@ -5,8 +5,14 @@ namespace App\Http\Controllers\Dosen;
 use App\Http\Controllers\Controller;
 use App\Models\MaterialContentModel;
 use App\Models\MaterialModel;
+use App\Models\PracticeAttemptModel;
+use App\Models\PracticeItemModel;
+use App\Models\PracticeOptionModel;
+use App\Models\PracticeQuestionModel;
 use App\Models\SubTopicModel;
 use App\Models\UserModel;
+use App\Models\UserPracticeAnswerModel;
+use App\Models\UserProgressModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -404,6 +410,72 @@ class MaterialController extends Controller
 		});
 
 		return response()->json(['message' => 'materials reordered successfully']);
+	}
+
+	public function destroy(Request $request, MaterialModel $material)
+	{
+		$user = $request->user();
+
+		// Hanya superadmin atau pembuat materi yang boleh menghapus
+		if (strtolower($user->role ?? '') !== 'superadmin' && $material->created_by !== $user->id) {
+			abort(403, 'Akses ditolak. Anda tidak berhak menghapus materi ini.');
+		}
+
+		DB::transaction(function () use ($material) {
+			// Ambil semua practice yang terkait dengan materi ini
+			$practiceIds = $material->practices()->pluck('id');
+
+			if ($practiceIds->isNotEmpty()) {
+				// Ambil semua question yang terkait dengan practice-practice tersebut
+				$questionIds = PracticeQuestionModel::whereIn('practices_id', $practiceIds)->pluck('id');
+
+				if ($questionIds->isNotEmpty()) {
+					// Ambil semua attempt yang terkait
+					$attemptIds = PracticeAttemptModel::whereIn('practices_id', $practiceIds)->pluck('id');
+
+					if ($attemptIds->isNotEmpty()) {
+						// Hapus semua user_practice_answers berdasarkan attempt
+						UserPracticeAnswerModel::whereIn('practice_attempts_id', $attemptIds)->delete();
+					}
+
+					// Hapus semua practice_attempts
+					PracticeAttemptModel::whereIn('practices_id', $practiceIds)->delete();
+
+					// Hapus semua items (drag-drop)
+					PracticeItemModel::whereIn('practice_questions_id', $questionIds)->delete();
+
+					// Hapus semua options (MC)
+					PracticeOptionModel::whereIn('practice_questions_id', $questionIds)->delete();
+
+					// Hapus semua questions
+					PracticeQuestionModel::whereIn('practices_id', $practiceIds)->delete();
+				}
+
+				// Hapus semua practices
+				$material->practices()->delete();
+			}
+
+			// Hapus material contents (sections)
+			$material->contents()->delete();
+
+			// Hapus subtopics
+			$material->subTopics()->delete();
+
+			// Hapus user progress terkait materi ini
+			UserProgressModel::where('material_id', $material->id)->delete();
+
+			// Hapus materi itu sendiri
+			$material->delete();
+		});
+
+		$role = strtolower($user->role ?? '');
+		if ($role === 'superadmin') {
+			return redirect()->route('superadmin.materials.index')
+				->with('success', 'Materi beserta latihan soal terkait berhasil dihapus.');
+		}
+
+		return redirect()->route('dosen.materials.index')
+			->with('success', 'Materi beserta latihan soal terkait berhasil dihapus.');
 	}
 
 	public function apiStore(Request $request)

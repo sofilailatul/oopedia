@@ -463,9 +463,6 @@ function QuizEditContent({
 							/>
 						))}
 						</div>
-						<p className="mt-1 text-[10px] text-slate-400">
-							Centang kelas mana saja yang akan diberikan kuis ini. Menambah kelas akan menduplikasi kuis, melepas centang akan menghapus kuis dari kelas tersebut.
-						</p>
 					</div>
 					<div className="grid gap-4 sm:grid-cols-2">
 						<Field

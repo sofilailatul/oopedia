@@ -16,7 +16,7 @@ export default function Welcome() {
         </div>
 
         <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-16">
-          <div className="mx-auto flex max-w-6xl flex-col items-center gap-12 lg:flex-row lg:items-center lg:justify-between">
+          <div className="mx-auto flex flex-col items-center gap-12 lg:flex-row lg:items-center lg:justify-between">
             
             {/* LEFT CONTENT */}
             <div className="max-w-2xl text-center lg:text-left text-white">

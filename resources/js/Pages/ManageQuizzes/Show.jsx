@@ -88,46 +88,65 @@ export default function ManageQuizzesShow({ quiz, questions = [], authUser }) {
 				</div>
 
 				{/* Content */}
-				<div className="space-y-3 px-5">
+				<div className="space-y-3">
 					{/* Title + Classes */}
-					<div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-					<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-						<p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-						Judul Kuis
-						</p>
-						<h3 className="mt-2 text-base font-semibold leading-snug text-slate-900">
-						{quiz.title}
-						</h3>
+					<div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.3fr)]">
+						<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col justify-center">
+							<h3 className="mt-2 mb-2 text-base font-semibold leading-snug text-slate-900">
+							{quiz.title}
+							</h3>
+							<div className="flex flex-wrap gap-1.5">
+								{(quiz.classes || [{ id: quiz.id, class_name: quiz.class_name }]).map((cls) => (
+									<span
+									key={cls.id}
+									className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-700"
+									>
+									<span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+									{cls.class_name}
+									</span>
+								))}
+							</div>
 
-						{quiz.description && (
-						<p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
-							{quiz.description}
-						</p>
-						)}
-					</div>
-
-					<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-						<div className="flex items-center justify-between gap-3">
-						<p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-							Kelas
-						</p>
-						<span className="rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-medium text-blue-700">
-							{(quiz.classes || [{ id: quiz.id, class_name: quiz.class_name }]).length} kelas
-						</span>
+							{quiz.description && (
+							<p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500">
+								{quiz.description}
+							</p>
+							)}
 						</div>
 
-						<div className="mt-3 flex flex-wrap gap-2">
-						{(quiz.classes || [{ id: quiz.id, class_name: quiz.class_name }]).map((cls) => (
-							<span
-							key={cls.id}
-							className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-medium text-blue-700"
-							>
-							<span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-							{cls.class_name}
-							</span>
-						))}
+						{/* Schedule */}
+						<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 flex flex-col justify-center">
+							<p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+								Jadwal Pelaksanaan
+							</p>
+							<div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+								<div className="flex items-center gap-3">
+									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
+										<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+											<path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3M5 11h14M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z" />
+										</svg>
+									</span>
+									<div>
+										<p className="text-[10px] text-slate-500 font-medium">Mulai</p>
+										<p className="text-sm font-semibold text-slate-800">{formatDateTime(quiz.start_at)}</p>
+									</div>
+								</div>
+								
+								<div className="hidden sm:flex h-px flex-1 bg-slate-200"></div>
+
+								<div className="flex items-center gap-3">
+									<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-rose-600 shadow-sm">
+										<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+											<path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+										</svg>
+									</span>
+									<div>
+										<p className="text-[10px] text-slate-500 font-medium">Selesai</p>
+										<p className="text-sm font-semibold text-slate-800">{formatDateTime(quiz.end_at)}</p>
+									</div>
+								</div>
+							</div>
 						</div>
-					</div>
 					</div>
 
 					{/* Stats */}
@@ -179,62 +198,6 @@ export default function ManageQuizzesShow({ quiz, questions = [], authUser }) {
 					</div>
 					</div>
 
-					{/* Schedule */}
-					<div className="grid gap-3 sm:grid-cols-2">
-					<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-						<p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-						Mulai
-						</p>
-						<div className="mt-2 flex items-center gap-2">
-						<span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm">
-							<svg
-							xmlns="http://www.w3.org/2000/svg"
-							className="h-4 w-4"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								d="M8 7V3m8 4V3M5 11h14M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"
-							/>
-							</svg>
-						</span>
-						<p className="text-sm font-medium text-slate-800">
-							{formatDateTime(quiz.start_at)}
-						</p>
-						</div>
-					</div>
-
-					<div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-						<p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-						Selesai
-						</p>
-						<div className="mt-2 flex items-center gap-2">
-						<span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-rose-600 shadow-sm">
-							<svg
-							xmlns="http://www.w3.org/2000/svg"
-							className="h-4 w-4"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							strokeWidth="2"
-							>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-							/>
-							</svg>
-						</span>
-						<p className="text-sm font-medium text-slate-800">
-							{formatDateTime(quiz.end_at)}
-						</p>
-						</div>
-					</div>
-					</div>
 
 					{/* Description full */}
 					{quiz.description && (

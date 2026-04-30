@@ -84,10 +84,10 @@ function EditMaterialContent({ material, authUser, indexUrl }) {
 
 	return (
 		<>
-			<div className="max-w-6xl mx-auto flex gap-6">
+			<div className="mx-auto flex gap-6">
 				<div className="flex-1 space-y-4">
 					{/* Main card: title + description */}
-					<div className="bg-white rounded-xl border border-green-400 p-5 shadow-sm">
+					<div className="bg-white rounded-xl border border-sky-200 p-5 shadow-sm">
 						<input
 							type="text"
 							className="w-full text-lg font-semibold text-gray-900 border-none focus:ring-0 focus:outline-none placeholder:text-gray-400"
@@ -157,15 +157,6 @@ function EditMaterialContent({ material, authUser, indexUrl }) {
 									url={section.previewUrl || section.imagePath}
 									onFileChange={(file) => updateSectionImage(index, file)}
 								/>
-								{section.previewUrl && (
-									<div className="mt-3">
-										<img
-											src={section.previewUrl}
-											alt={section.title || `Preview gambar section ${index + 1}`}
-											className="max-h-64 rounded-lg border object-contain"
-										/>
-									</div>
-								)}
 							</div>
 
 							<div className="mt-3 flex items-center justify-end gap-2">

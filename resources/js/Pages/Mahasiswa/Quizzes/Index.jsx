@@ -69,7 +69,7 @@ export default function Index({ quizzes = [] }) {
   };
 
   return (
-    <AppLayout title="Kuis" label="Kuis" fullHeight={false}>
+    <AppLayout title="Kuis" label="Kuis" >
       <div className="space-y-6 min-h-[582px]">
 
         {/* HEADER */}

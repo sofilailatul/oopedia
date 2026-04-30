@@ -165,6 +165,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/{material}/edit', [DosenMaterialController::class, 'edit'])->name('edit');
             Route::post('/', [DosenMaterialController::class, 'store'])->name('store');
             Route::put('/{material}', [DosenMaterialController::class, 'update'])->name('update');
+            Route::delete('/{material}', [DosenMaterialController::class, 'destroy'])->name('destroy');
         });
 
         // ===== KELAS (halaman ManageClasses untuk dosen) =====
@@ -237,6 +238,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/{material}/edit', [DosenMaterialController::class, 'edit'])->name('edit');
             Route::post('/', [DosenMaterialController::class, 'store'])->name('store');
             Route::put('/{material}', [DosenMaterialController::class, 'update'])->name('update');
+            Route::delete('/{material}', [DosenMaterialController::class, 'destroy'])->name('destroy');
         });
 
         // ===== KELAS (halaman ManageClasses untuk superadmin) =====
