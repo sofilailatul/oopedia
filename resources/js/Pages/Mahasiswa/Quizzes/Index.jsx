@@ -73,8 +73,7 @@ export default function Index({ quizzes = [] }) {
       <div className="space-y-6 min-h-[582px]">
 
         {/* HEADER */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Kuis</h1>
+        <div className="flex items-center justify-end">
           <button
             onClick={startTour}
             className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"

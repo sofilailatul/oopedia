@@ -39,10 +39,10 @@ export default function PracticeSidebar({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full overflow-y-auto">
+    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full overflow-hidden">
 
-      {/* Header */}
-      <div className="flex items-start justify-between p-6 pb-4 border-b border-slate-100">
+      {/* Header — fixed, tidak ikut scroll */}
+      <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 leading-snug">
             {selectedPractice?.material_name ?? "Pilih Materi"}
@@ -57,88 +57,87 @@ export default function PracticeSidebar({
         </button>
       </div>
 
-      <div className="flex flex-col gap-3 p-5">
+      {/* Konten scrollable */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-3 p-5">
 
-        {/* Journey stepper */}
-        <JourneyStepper steps={steps} />
+          {/* Journey stepper — dengan skor per level */}
+          <JourneyStepper steps={steps} scores={scores} pretestScore={progress?.pretest_score ?? null} />
 
-        {/* Current action card */}
-        <ActionCard flow={flow} />
+          {/* Current action card */}
+          <ActionCard flow={flow} />
 
-        {/* Placement reason / remedial counter */}
-        {flow.showPlacementReason && flow.placementReason && (
-          <ReasonBox text={flow.placementReason} tone={flow.tone} />
-        )}
+          {/* Focused subtopic — hanya saat mode remedial */}
+          {flow.showSubtopic && focusedSubtopicNames.length > 0 && (
+            <InfoSection label="Fokus pada topik ini">
+              <div className="flex flex-col gap-2">
+                {focusedSubtopicNames.map((name, idx) => (
+                  <div key={idx} className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
+                    <p className="text-[11px] font-medium text-amber-800">{name}</p>
+                  </div>
+                ))}
+              </div>
+            </InfoSection>
+          )}
 
-        {/* Focused subtopic */}
-        {flow.showSubtopic && focusedSubtopicNames.length > 0 && (
-          <InfoSection label="Fokus pada topik ini">
-            <div className="flex flex-col gap-2">
-              {focusedSubtopicNames.map((name, idx) => (
-                <div key={idx} className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2">
-                  <p className="text-[11px] font-medium text-amber-800">{name}</p>
-                </div>
+          {/* Scores per level — termasuk nilai remedial */}
+          <InfoSection label="Nilai per level">
+            <div className="rounded-xl border border-slate-100 overflow-hidden">
+              {["easy", "medium", "hard"].map((level, i) => (
+                <LevelScoreAccordionRow
+                  key={level}
+                  level={level}
+                  practiceId={selectedPractice?.levels?.[level] ?? null}
+                  score={scores[level]}
+                  modeScores={scoresByMode[level]}
+                  isOpen={Boolean(openLevels[level])}
+                  onToggle={() => toggleLevel(level)}
+                  divider={i < 2}
+                />
               ))}
             </div>
           </InfoSection>
-        )}
 
-        {/* Scores per level */}
-        <InfoSection label="Nilai per level">
-          <div className="rounded-xl border border-slate-100 overflow-hidden">
-            {["easy", "medium", "hard"].map((level, i) => (
-              <LevelScoreAccordionRow
-                key={level}
-                level={level}
-                practiceId={selectedPractice?.levels?.[level] ?? null}
-                score={scores[level]}
-                modeScores={scoresByMode[level]}
-                isOpen={Boolean(openLevels[level])}
-                onToggle={() => toggleLevel(level)}
-                divider={i < 2}
-              />
-            ))}
-          </div>
-        </InfoSection>
 
-        {/* Read-material warning */}
-        {progress?.current_mode === "repeat_material" && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-            <FaBookOpen className="mt-0.5 text-amber-500 flex-shrink-0" style={{ fontSize: 14 }} />
-            <div>
-              <p className="text-[13px] font-medium text-amber-800">
-                Baca ulang materi sebelum latihan lagi
-              </p>
-              <p className="mt-0.5 text-[12px] text-amber-700 leading-relaxed">
-                Setelah memahami materi, kembali ke sini untuk melanjutkan.
-              </p>
+          {/* Read-material warning */}
+          {progress?.current_mode === "repeat_material" && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
+              <FaBookOpen className="mt-0.5 text-amber-500 flex-shrink-0" style={{ fontSize: 14 }} />
+              <div>
+                <p className="text-[13px] font-medium text-amber-800">
+                  Baca ulang materi sebelum latihan lagi
+                </p>
+                <p className="mt-0.5 text-[12px] text-amber-700 leading-relaxed">
+                  Setelah memahami materi, kembali ke sini untuk melanjutkan.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Summary history links */}
-        {selectedPractice?.summary_links?.length > 0 && (
-          <InfoSection label="Riwayat ringkasan">
-            <div className="space-y-1.5">
-              {selectedPractice.summary_links.map((item) => (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors"
-                >
-                  <p className="text-[12px] font-medium text-slate-700">{item.label}</p>
-                  <span className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-                    {item.score ?? 0} pts
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </InfoSection>
-        )}
+          {/* Summary history links */}
+          {selectedPractice?.summary_links?.length > 0 && (
+            <InfoSection label="Riwayat ringkasan">
+              <div className="space-y-1.5">
+                {selectedPractice.summary_links.map((item) => (
+                  <Link
+                    key={item.id}
+                    href={item.href}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 text-left hover:border-indigo-200 hover:bg-indigo-50/40 transition-colors"
+                  >
+                    <p className="text-[12px] font-medium text-slate-700">{item.label}</p>
+                    <span className="rounded-lg bg-white border border-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                      {item.score ?? 0} pts
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </InfoSection>
+          )}
+        </div>
       </div>
 
-      {/* CTA */}
-      <div className="p-5 pt-2">
+      {/* CTA — sticky di bawah, tidak ikut scroll */}
+      <div className="p-5 pt-3 border-t border-slate-100 flex-shrink-0">
         <Button
           type="button"
           disabled={!canStart}
@@ -178,30 +177,46 @@ const STEP_ICONS = {
   locked:  "○",
 };
 
-function JourneyStepper({ steps }) {
+// Map step key → skor yang relevan
+function getStepScore(key, scores, pretestScore) {
+  if (key === "pretest") return pretestScore;
+  if (key === "passed")  return null;
+  return scores?.[key] ?? null;
+}
+
+function JourneyStepper({ steps, scores = {}, pretestScore = null }) {
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
         Perjalananmu
       </p>
       <div className="flex items-center">
-        {steps.map((step, i) => (
-          <React.Fragment key={step.key}>
-            <div className="flex flex-col items-center gap-1 flex-shrink-0">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${STEP_STYLES[step.state].dot}`}>
-                {STEP_ICONS[step.state]}
+        {steps.map((step, i) => {
+          const score = getStepScore(step.key, scores, pretestScore);
+          return (
+            <React.Fragment key={step.key}>
+              <div className="flex flex-col items-center gap-1 flex-shrink-0">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${STEP_STYLES[step.state].dot}`}>
+                  {STEP_ICONS[step.state]}
+                </div>
+                <span className={`text-[9px] ${STEP_STYLES[step.state].label}`}>
+                  {step.label}
+                </span>
+                {/* Nilai di bawah label — tampil jika sudah ada skor */}
+                <span className={`text-[9px] font-semibold ${
+                  score != null ? "text-slate-500" : "text-slate-300"
+                }`}>
+                  {score != null ? score : "—"}
+                </span>
               </div>
-              <span className={`text-[9px] ${STEP_STYLES[step.state].label}`}>
-                {step.label}
-              </span>
-            </div>
-            {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-1 mb-4 ${
-                step.state === "done" ? "bg-green-300" : "bg-slate-200"
-              }`} />
-            )}
-          </React.Fragment>
-        ))}
+              {i < steps.length - 1 && (
+                <div className={`flex-1 h-px mx-1 mb-7 ${
+                  step.state === "done" ? "bg-green-300" : "bg-slate-200"
+                }`} />
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

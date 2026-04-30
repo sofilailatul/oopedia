@@ -211,11 +211,11 @@ export default function AttemptShow(props) {
         <div className="absolute -right-40 h-[500px] w-[500px] rounded-full pointer-events-none" />
         <div className="absolute -left-40 h-[400px] w-[400px] rounded-full pointer-events-none" />
 
-        <div className="relative z-10 mx-auto px-4 ">
+        <div className="relative z-10 mx-auto ">
           <div className="flex justify-end mb-2">
             <button
               onClick={startTour}
-              className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
+              className="flex items-center gap-2 mb-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
             >
               <FaQuestionCircle className="text-amber-500 h-4 w-4" />
               Butuh panduan?
@@ -463,7 +463,6 @@ export default function AttemptShow(props) {
                         color="green"
                         size="sm"
                         onClick={() => actions.submit(false)}
-
                         disabled={answeredCount === 0 || isAutoSubmitting}
                         leftIcon={<Icons.Check className="h-5 w-5" />}
                         className="w-full !rounded-3xl !py-3 shadow-lg shadow-emerald-500/30"

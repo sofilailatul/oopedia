@@ -79,6 +79,12 @@ class MaterialController extends Controller
 			$row = $progressMap->get($materialId);
 			$hasRead = !is_null($row?->read_at);
 
+			// Jika backend sudah menandai progress sebagai completed (lulus hard level),
+			// langsung return 'completed' tanpa perlu menghitung ulang skor latihan.
+			if ($row?->status === 'completed') {
+				return 'completed';
+			}
+
 			$levels = collect($practiceByMaterial->get($materialId, collect()))->keyBy('level');
 
 			$easyId = $levels->get('easy')?->id;

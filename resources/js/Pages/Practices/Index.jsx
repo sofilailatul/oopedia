@@ -101,50 +101,26 @@ export default function Index({ practices = [] }) {
     };
 
     return (
-        <AppLayout title="Latihan Soal" label="Latihan Soal">
-            <div className="px-4 py-4 space-y-6">
+        <AppLayout title="Daftar Latihan Soal" label="Latihan Soal">
+            {/* Wrapper h-full agar tidak ada scroll di level AppShell */}
+            <div className="flex flex-col h-full px-4 pb-0 gap-4 overflow-hidden">
 
                 {/* HEADER */}
-                <div id="tour-practice-header" className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-                        Daftar Latihan Soal
-                    </h1>
+                <div id="tour-practice-header" className="flex items-center justify-end flex-shrink-0">
                     <button
                         onClick={startTour}
-                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors self-start sm:self-auto"
+                        className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
                     >
                         <FaQuestionCircle className="text-indigo-500 h-4 w-4" />
                         Panduan Latihan
                     </button>
                 </div>
 
-                {/* TABS FILTER */}
-                <div id="tour-practice-tabs" className="flex items-center gap-2 flex-wrap">
-                    {tabs.map((t) => (
-                        <button
-                            key={t.key}
-                            onClick={() => setTab(t.key)}
-                            className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
-                                tab === t.key
-                                    ? "bg-indigo-600 text-white border-indigo-600"
-                                    : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"
-                            }`}
-                        >
-                            {t.label}
-                            {t.count > 0 && (
-                                <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] ${
-                                    tab === t.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                                }`}>
-                                    {t.count}
-                                </span>
-                            )}
-                        </button>
-                    ))}
-                </div>
 
-                {/* DESKTOP */}
-                <div className="hidden lg:flex items-start">
-                    <main id="tour-practice-list" className="flex-1">
+                {/* DESKTOP — flex-1 mengisi sisa tinggi, tidak ada scroll di luar */}
+                <div className="hidden lg:flex flex-1 min-h-0 gap-6 pb-4">
+                    {/* Kartu practice — scroll internal */}
+                    <main id="tour-practice-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                         {filteredPractices.length === 0 ? (
                             <EmptyState />
                         ) : (
@@ -160,29 +136,28 @@ export default function Index({ practices = [] }) {
                         )}
                     </main>
 
+                    {/* Sidebar — tinggi mengikuti parent, scroll internal di PracticeSidebar */}
                     <aside
-                        className={`transition-all duration-500 overflow-hidden ${
-                            sidebarOpen ? "w-[400px] pl-6 opacity-100" : "w-0 opacity-0"
+                        className={`transition-all duration-500 min-h-0 flex-shrink-0 ${
+                            sidebarOpen ? "w-[376px] opacity-100" : "w-0 opacity-0 overflow-hidden"
                         }`}
                     >
-                        <div className="w-[376px]">
-                            {selectedPractice && (
-                                <div className="h-[calc(100vh-140px)] sticky top-24">
-                                    <PracticeSidebar
-                                        selectedPractice={selectedPractice}
-                                        progress={selectedPractice?.progress ?? null}
-                                        onClose={closeSidebar}
-                                        onStart={handleStartPractice}
-                                        canStart={canStart}
-                                    />
-                                </div>
-                            )}
-                        </div>
+                        {selectedPractice && (
+                            <div className="w-[376px] h-full">
+                                <PracticeSidebar
+                                    selectedPractice={selectedPractice}
+                                    progress={selectedPractice?.progress ?? null}
+                                    onClose={closeSidebar}
+                                    onStart={handleStartPractice}
+                                    canStart={canStart}
+                                />
+                            </div>
+                        )}
                     </aside>
                 </div>
 
-                {/* MOBILE */}
-                <div className="lg:hidden">
+                {/* MOBILE — tetap scroll normal */}
+                <div className="lg:hidden flex-1 overflow-y-auto pb-4">
                     <main>
                         {filteredPractices.length === 0 ? (
                             <EmptyState />

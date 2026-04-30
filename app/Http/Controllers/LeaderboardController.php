@@ -139,10 +139,12 @@ class LeaderboardController extends Controller
             $weakMap[$ws->user_id][$ws->material_id][] = $ws->subtopic_name;
         }
 
-        // --- QUIZ SCORES per user per material ---
+        // --- QUIZ SCORES per user per material (untuk kolom quiz di tabel latihan) ---
         $quizScores = DB::table('quiz_attempt_material_scores')
             ->join('quiz_attempts', 'quiz_attempts.id', '=', 'quiz_attempt_material_scores.quiz_attempts_id')
+            ->join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quizzes_id')
             ->whereIn('quiz_attempts.user_id', $classmateIds)
+            ->where('quizzes.class_id', $classId)
             ->whereNotNull('quiz_attempts.finished_at')
             ->select(
                 'quiz_attempts.user_id',
@@ -156,6 +158,62 @@ class LeaderboardController extends Controller
         $quizMap = [];
         foreach ($quizScores as $row) {
             $quizMap[$row->user_id][$row->material_id] = (int) $row->total_quiz_score;
+        }
+
+        // --- QUIZ ATTEMPTS detail per user (untuk tabel kuis terpisah) ---
+        // Ambil semua attempt kuis yang sudah selesai, dengan nilai tiap materi
+        $quizAttemptRows = DB::table('quiz_attempts')
+            ->join('quizzes', 'quizzes.id', '=', 'quiz_attempts.quizzes_id')
+            ->whereIn('quiz_attempts.user_id', $classmateIds)
+            ->where('quizzes.class_id', $classId)
+            ->whereNotNull('quiz_attempts.finished_at')
+            ->select(
+                'quiz_attempts.id as attempt_id',
+                'quiz_attempts.user_id',
+                'quiz_attempts.quizzes_id',
+                'quiz_attempts.total_score',
+                'quiz_attempts.finished_at',
+                'quizzes.title as quiz_title'
+            )
+            ->orderBy('quiz_attempts.finished_at')
+            ->get();
+
+        $quizAttemptIds = $quizAttemptRows->pluck('attempt_id');
+
+        // Ambil nilai per-materi untuk setiap attempt
+        $materialScoreRows = collect();
+        if ($quizAttemptIds->isNotEmpty()) {
+            $materialScoreRows = DB::table('quiz_attempt_material_scores')
+                ->whereIn('quiz_attempts_id', $quizAttemptIds)
+                ->select('quiz_attempts_id', 'material_id', 'earned_score')
+                ->get();
+        }
+
+        // Group material scores by attempt_id
+        $materialScoreByAttempt = $materialScoreRows->groupBy('quiz_attempts_id');
+
+        // Susun quizAttemptsMap[user_id] = [ {quiz_title, total_score, materials:[{material_id, score}]} ]
+        $quizAttemptsMap = [];
+        // Ambil attempt terakhir per user per kuis
+        $latestAttemptPerUserQuiz = [];
+        foreach ($quizAttemptRows as $row) {
+            $key = $row->user_id . '-' . $row->quizzes_id;
+            // Karena sudah order by finished_at, selalu timpa dengan yang lebih baru
+            $latestAttemptPerUserQuiz[$key] = $row;
+        }
+
+        foreach ($latestAttemptPerUserQuiz as $row) {
+            $matScores = $materialScoreByAttempt->get($row->attempt_id, collect());
+            $materialsArr = $matScores->map(fn($ms) => [
+                'material_id' => $ms->material_id,
+                'score'       => (int) $ms->earned_score,
+            ])->values()->all();
+
+            $quizAttemptsMap[$row->user_id][] = [
+                'quiz_title'  => $row->quiz_title,
+                'total_score' => (int) $row->total_score,
+                'materials'   => $materialsArr,
+            ];
         }
 
         // Build rankings
@@ -178,13 +236,13 @@ class LeaderboardController extends Controller
                 
                 $quizScore = $quizMap[$u->id][$mat->id] ?? 0;
 
-                // Total per material: pretest + best easy + best medium + best hard + quiz
-                $materialTotal = $pretest 
-                                + max($easyNormal, $easyRemed) 
-                                + max($mediumNormal, $mediumRemed) 
-                                + max($hardNormal, $hardRemed) 
-                                + $quizScore;
-                
+                // Total per material: hanya mode normal (pretest + easy + medium + hard).
+                // Kuis dan remedial TIDAK dihitung ke total.
+                $materialTotal = $pretest
+                                + $easyNormal
+                                + $mediumNormal
+                                + $hardNormal;
+
                 $totalScore += $materialTotal;
 
                 $materialBreakdown[] = [
@@ -203,11 +261,12 @@ class LeaderboardController extends Controller
             }
 
             $rankings[] = [
-                'user_id' => $u->id,
-                'nama' => $u->nama,
-                'email' => $u->email,
-                'total_score' => $totalScore,
-                'materials' => $materialBreakdown,
+                'user_id'      => $u->id,
+                'nama'         => $u->nama,
+                'email'        => $u->email,
+                'total_score'  => $totalScore,
+                'materials'    => $materialBreakdown,
+                'quiz_attempts'=> $quizAttemptsMap[$u->id] ?? [],
             ];
         }
 
@@ -403,12 +462,12 @@ class LeaderboardController extends Controller
                 }
             }
 
-            // Calculate Total
-            $stats[$materialId]['total'] = $row['pretest'] 
-                + max($row['easy'], $row['remed_easy']) 
-                + max($row['medium'], $row['remed_medium']) 
-                + max($row['hard'], $row['remed_hard']) 
-                + ($stats[$materialId]['quiz'] ?? 0);
+            // Calculate Total: hanya mode normal (pretest + easy + medium + hard).
+            // Kuis dan remedial TIDAK dihitung ke total.
+            $stats[$materialId]['total'] = $row['pretest']
+                + $row['easy']
+                + $row['medium']
+                + $row['hard'];
 
             $stats[$materialId]['status'] = $this->resolvePracticeStatus($lastAttempt);
 

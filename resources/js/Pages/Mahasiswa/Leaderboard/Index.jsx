@@ -13,95 +13,169 @@ function medalColor(rank) {
 const DETAIL_COLUMNS = [
   { key: "pretest",      label: "Pre-test", dot: "bg-slate-400",    text: "text-slate-600",    activeBg: "bg-slate-50 text-slate-700",   footerText: "text-slate-700" },
   { key: "easy",         label: "Easy",     dot: "bg-emerald-400",  text: "text-emerald-600",  activeBg: "bg-emerald-50 text-emerald-700", footerText: "text-emerald-700" },
-  { key: "remed_easy",   label: "R-Easy",   dot: "bg-emerald-300",  text: "text-emerald-500",  activeBg: "bg-emerald-50 text-emerald-600", footerText: "text-emerald-600" },
+  { key: "remed_easy",   label: "R-Easy",   dot: "bg-emerald-200",  text: "text-emerald-400",  activeBg: "bg-emerald-50/60 text-emerald-500", footerText: "text-emerald-400", isRemed: true },
   { key: "normal",       label: "Medium",   dot: "bg-amber-400",    text: "text-amber-600",    activeBg: "bg-amber-50 text-amber-700",     footerText: "text-amber-700" },
-  { key: "remed_normal", label: "R-Medium", dot: "bg-amber-300",    text: "text-amber-500",    activeBg: "bg-amber-50 text-amber-600",     footerText: "text-amber-600" },
+  { key: "remed_normal", label: "R-Medium", dot: "bg-amber-200",    text: "text-amber-400",    activeBg: "bg-amber-50/60 text-amber-500",  footerText: "text-amber-400",  isRemed: true },
   { key: "hard",         label: "Hard",     dot: "bg-red-400",      text: "text-red-500",      activeBg: "bg-red-50 text-red-700",         footerText: "text-red-600" },
-  { key: "remed_hard",   label: "R-Hard",   dot: "bg-red-300",      text: "text-red-400",      activeBg: "bg-red-50 text-red-600",         footerText: "text-red-500" },
-  { key: "quiz",         label: "Kuis",     dot: "bg-blue-400",     text: "text-blue-600",     activeBg: "bg-blue-50 text-blue-700",       footerText: "text-blue-700" },
+  { key: "remed_hard",   label: "R-Hard",   dot: "bg-red-200",      text: "text-red-300",      activeBg: "bg-red-50/60 text-red-400",      footerText: "text-red-300",    isRemed: true },
 ];
 
-function DetailTable({ materialsData, materialsList }) {
+function DetailTable({ materialsData, materialsList, quizAttempts }) {
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white px-5 py-5 border-b border-slate-100">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 ml-0 sm:ml-10 shadow-sm bg-white">
-        <table className="min-w-[1000px] w-full text-sm">
-          <thead>
-            <tr className="bg-gradient-to-r from-blue-50 to-indigo-50">
-              <th className="text-left py-3 px-4">
-                <Text variant="caption" className="uppercase tracking-wider font-semibold text-slate-700">Materi</Text>
-              </th>
-              {DETAIL_COLUMNS.map((col) => (
-                <th key={col.key} className="text-center py-3 px-2">
-                  <Text variant="caption" className={`inline-flex items-center gap-1 uppercase tracking-wider font-semibold ${col.text} whitespace-nowrap`}>
-                    <span className={`w-2 h-2 rounded-full ${col.dot}`}></span>{col.label}
-                  </Text>
+    <div className="bg-gradient-to-b from-slate-50 to-white px-5 py-5 border-b border-slate-100 space-y-5">
+      {/* ── Tabel Latihan ─────────────────────────────────────────────── */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2 ml-0 sm:ml-10">Latihan Soal</p>
+        <div className="overflow-x-auto rounded-xl border border-slate-200 ml-0 sm:ml-10 shadow-sm bg-white">
+          <table className="min-w-[900px] w-full text-sm">
+            <thead>
+              <tr className="bg-gradient-to-r from-blue-50 to-indigo-50">
+                <th className="text-left py-3 px-4">
+                  <Text variant="caption" className="uppercase tracking-wider font-semibold text-slate-700">Materi</Text>
                 </th>
-              ))}
-              <th className="text-center py-3 px-4">
-                <Text variant="caption" className="uppercase tracking-wider font-semibold text-slate-700">Total</Text>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {materialsData.map((mat) => {
-              const material = materialsList.find((m) => m.id === mat.material_id);
-              return (
-                <React.Fragment key={mat.material_id}>
-                  <tr className="hover:bg-blue-50/40 transition-colors">
+                {DETAIL_COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    className={`text-center py-3 px-2 ${col.isRemed ? "opacity-60" : ""}`}
+                    title={col.isRemed ? "Skor remedial — tidak dihitung ke total poin" : undefined}
+                  >
+                    <Text variant="caption" className={`inline-flex items-center gap-1 uppercase tracking-wider font-semibold ${col.text} whitespace-nowrap ${col.isRemed ? "italic" : ""}`}>
+                      <span className={`w-2 h-2 rounded-full ${col.dot}`}></span>{col.label}
+                    </Text>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {materialsData.map((mat) => {
+                const material = materialsList.find((m) => m.id === mat.material_id);
+                return (
+                  <tr key={mat.material_id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="py-3 px-4 max-w-[200px]">
                       <Text variant="contentSection" className="font-medium text-slate-800 truncate" title={material?.name}>
                         {material?.name ?? `Materi ${mat.material_id}`}
                       </Text>
                     </td>
                     {DETAIL_COLUMNS.map((col) => (
-                      <td key={col.key} className="py-3 px-2 text-center">
-                        <Text variant="caption" className={`inline-block min-w-[32px] rounded-md px-2 py-0.5 font-semibold ${mat[col.key] > 0 ? col.activeBg : "text-slate-400"}`}>
+                      <td
+                        key={col.key}
+                        className={`py-3 px-2 text-center ${col.isRemed ? "opacity-60" : ""}`}
+                        title={col.isRemed ? "Tidak dihitung ke total poin" : undefined}
+                      >
+                        <Text variant="caption" className={`inline-block min-w-[32px] rounded-md px-2 py-0.5 font-semibold ${mat[col.key] > 0 ? col.activeBg : "text-slate-400"} ${col.isRemed ? "italic" : ""}`}>
                           {mat[col.key]}
                         </Text>
                       </td>
                     ))}
-                    <td className="py-3 px-4 text-center">
-                      <Text variant="caption" className="inline-block min-w-[40px] rounded-lg bg-slate-800 px-3 py-1 font-bold text-white shadow-sm">
-                        {mat.total}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Tabel Kuis ────────────────────────────────────────────────── */}
+      <QuizTable quizAttempts={quizAttempts} materialsList={materialsList} />
+    </div>
+  );
+}
+
+function QuizTable({ quizAttempts = [], materialsList = [] }) {
+  if (!quizAttempts || quizAttempts.length === 0) {
+    return (
+      <div className="ml-0 sm:ml-10">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Kuis</p>
+        <div className="flex items-center justify-center py-6 rounded-xl border border-dashed border-slate-200 bg-white text-slate-400 text-xs">
+          Belum ada kuis yang dikerjakan
+        </div>
+      </div>
+    );
+  }
+
+  // Kumpulkan semua material_id yang muncul di kuis manapun
+  const allMatIds = [...new Set(
+    quizAttempts.flatMap((q) => q.materials.map((m) => m.material_id))
+  )];
+
+  // Hitung grand total nilai kuis
+  const grandTotal = quizAttempts.reduce((s, q) => s + (q.total_score || 0), 0);
+
+  return (
+    <div className="ml-0 sm:ml-10">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-2">Kuis</p>
+      <div className="overflow-x-auto rounded-xl border border-blue-100 shadow-sm bg-white">
+        <table className="min-w-[600px] w-full text-sm">
+          <thead>
+            <tr className="bg-gradient-to-r from-blue-50 to-sky-50">
+              <th className="text-left py-3 px-4">
+                <Text variant="caption" className="uppercase tracking-wider font-semibold text-blue-700">Kuis</Text>
+              </th>
+              {allMatIds.map((mid) => {
+                const mat = materialsList.find((m) => m.id === mid);
+                return (
+                  <th key={mid} className="text-center py-3 px-2">
+                    <Text variant="caption" className="uppercase tracking-wider font-semibold text-blue-600 whitespace-nowrap">
+                      {mat?.name ?? `Materi ${mid}`}
+                    </Text>
+                  </th>
+                );
+              })}
+              <th className="text-center py-3 px-4">
+                <Text variant="caption" className="uppercase tracking-wider font-semibold text-blue-700">Total</Text>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-blue-50">
+            {quizAttempts.map((quiz, idx) => {
+              const scoreByMat = Object.fromEntries(
+                quiz.materials.map((m) => [m.material_id, m.score])
+              );
+              return (
+                <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                  <td className="py-3 px-4">
+                    <Text variant="contentSection" className="font-medium text-slate-800">
+                      {quiz.quiz_title}
+                    </Text>
+                  </td>
+                  {allMatIds.map((mid) => (
+                    <td key={mid} className="py-3 px-2 text-center">
+                      <Text variant="caption" className={`inline-block min-w-[32px] rounded-md px-2 py-0.5 font-semibold ${
+                        (scoreByMat[mid] ?? 0) > 0
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-slate-400"
+                      }`}>
+                        {scoreByMat[mid] ?? 0}
                       </Text>
                     </td>
-                  </tr>
-                  {mat.weak_subtopics && mat.weak_subtopics.length > 0 && (
-                    <tr className="bg-rose-50/30">
-                      <td colSpan={DETAIL_COLUMNS.length + 2} className="px-4 py-2">
-                        <div className="flex items-center gap-3">
-                          <span className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Subtopik Lemah:</span>
-                          <div className="flex flex-wrap gap-1.5">
-                            {mat.weak_subtopics.map((sub, i) => (
-                              <span key={i} className="inline-flex rounded-full border border-rose-100 bg-white px-2 py-0.5 text-[10px] font-medium text-rose-700">
-                                {sub}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
+                  ))}
+                  <td className="py-3 px-4 text-center">
+                    <Text variant="caption" className="inline-block min-w-[40px] rounded-lg bg-blue-600 px-3 py-1 font-bold text-white shadow-sm">
+                      {quiz.total_score}
+                    </Text>
+                  </td>
+                </tr>
               );
             })}
           </tbody>
           <tfoot>
-            <tr className="bg-gradient-to-r from-slate-100 to-slate-50 border-t-2 border-slate-200">
+            <tr className="bg-gradient-to-r from-blue-100/60 to-sky-50 border-t-2 border-blue-100">
               <td className="py-3 px-4">
-                <Text variant="titleSection" className="text-slate-900">Grand Total</Text>
+                <Text variant="titleSection" className="text-blue-900">Grand Total Kuis</Text>
               </td>
-              {DETAIL_COLUMNS.map((col) => (
-                <td key={col.key} className="py-3 px-2 text-center">
-                  <Text variant="contentSection" className={`font-bold ${col.footerText}`}>
-                    {materialsData.reduce((s, m) => s + (m[col.key] || 0), 0)}
+              {allMatIds.map((mid) => (
+                <td key={mid} className="py-3 px-2 text-center">
+                  <Text variant="contentSection" className="font-bold text-blue-600">
+                    {quizAttempts.reduce((s, q) => {
+                      const m = q.materials.find((x) => x.material_id === mid);
+                      return s + (m?.score ?? 0);
+                    }, 0)}
                   </Text>
                 </td>
               ))}
               <td className="py-3 px-4 text-center">
-                <Text variant="caption" className="inline-block min-w-[48px] rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-bold text-white shadow-sm">
-                  {materialsData.reduce((s, m) => s + (m.total || 0), 0)}
+                <Text variant="caption" className="inline-block min-w-[48px] rounded-lg bg-blue-700 px-4 py-1.5 text-sm font-bold text-white shadow-sm">
+                  {grandTotal}
                 </Text>
               </td>
             </tr>
@@ -154,37 +228,6 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
   return (
     <AppLayout title="Leaderboard Kelas" label="Leaderboard">
       <div className="mx-auto px-2 space-y-8">
-        {/* ── Page Header ─────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-              {pageTitle}
-            </h1>
-            <p className="mt-1 text-xs text-slate-500">
-              Lihat posisi kamu dibanding teman sekelas dalam latihan dan kuis.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm min-w-[220px]">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-yellow-600">
-              <Icons.Leaderboard className="w-4 h-4" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Posisi Kamu
-              </span>
-              {myEntry ? (
-                <span className="text-sm font-extrabold text-slate-900">
-                  #{myEntry.rank} 
-                </span>
-              ) : (
-                <span className="text-xs font-medium text-slate-500">
-                  Belum masuk leaderboard
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* Podium Top 3 */}
         {top3.length > 0 && (
@@ -279,7 +322,11 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
 
                   {/* Expanded Detail */}
                   {isExpanded && (
-                    <DetailTable materialsData={entry.materials} materialsList={materials} />
+                    <DetailTable
+                      materialsData={entry.materials}
+                      materialsList={materials}
+                      quizAttempts={entry.quiz_attempts}
+                    />
                   )}
                 </div>
               );

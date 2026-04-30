@@ -180,27 +180,25 @@ export function getFlowUI(progress) {
         button: "Mulai pre-test",
         stageLabel: "Pre-test",
         showSubtopic: false,
-        showPlacementReason: false,
       };
 
     case PRACTICE_MODE.NORMAL: {
       const initialLevel = pretestScore !== null 
         ? (pretestScore < 60 ? "easy" : pretestScore <= 80 ? "medium" : "hard")
         : null;
-      
       const isInitialLevel = level === initialLevel;
-      const reason = (pretestScore != null && isInitialLevel) ? buildPlacementReason(pretestScore, level) : null;
-      
       const target = level === "hard" ? `> ${HARD_PASSING_SCORE}` : `> ${PASSING_SCORE}`;
+      // Gabungkan info pretest score ke hint jika ini level penempatan dari pretest
+      const pretestHint = (pretestScore != null && isInitialLevel)
+        ? ` Nilai pre-test kamu ${pretestScore}.`
+        : "";
       return {
         tone: "slate",
-        title: lvlText ? `Kerjakan level ${lvlText}` : "Kerjakan latihan",
-        hint: `Selesaikan dengan skor ${target} untuk lanjut ke tahap berikutnya.`,
+        title: lvlText ? `Lanjutkan level ${lvlText}` : "Kerjakan latihan",
+        hint: `Selesaikan dengan skor ${target} untuk lanjut ke tahap berikutnya.${pretestHint}`,
         button: `Mulai latihan ${lvlText ?? ""}`.trim(),
         stageLabel: lvlText ? `Level ${lvlText}` : "Latihan",
-        showSubtopic: hasFocused,
-        showPlacementReason: Boolean(reason),
-        placementReason: reason,
+        showSubtopic: false,
       };
     }
 
@@ -226,7 +224,7 @@ export function getFlowUI(progress) {
           .join(" "),
         button: `Kerjakan remedial ${lvlText ?? ""}`.trim(),
         stageLabel: lvlText ? `Remedial Level ${lvlText}` : "Remedial",
-        showSubtopic: hasFocused,
+        showSubtopic: hasFocused,  // hanya tampil jika ada subtopik yang difokuskan
         placementReason: remText,
       };
     }
@@ -238,7 +236,7 @@ export function getFlowUI(progress) {
         hint: "Sudah 3x remedial di Easy tapi belum mencapai 60. Baca ulang materi, lalu kembali ke sini untuk mencoba lagi.",
         button: "Ke halaman materi",
         stageLabel: "Baca ulang",
-        showSubtopic: hasFocused,
+        showSubtopic: false,   // baca ulang materi, bukan fokus subtopik
         showPlacementReason: false,
       };
 
@@ -250,7 +248,6 @@ export function getFlowUI(progress) {
         button: "Lanjut ke materi berikutnya",
         stageLabel: "Selesai",
         showSubtopic: false,
-        showPlacementReason: false,
       };
 
     default:
@@ -261,14 +258,6 @@ export function getFlowUI(progress) {
         button: "Mulai",
         stageLabel: "Latihan",
         showSubtopic: false,
-        showPlacementReason: false,
       };
   }
-}
-
-function buildPlacementReason(pretestScore, level) {
-  if (level === "easy")   return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Easy`;
-  if (level === "medium") return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Medium`;
-  if (level === "hard")   return `Nilai Pre-test kamu = ${pretestScore} → kerjakan level Hard`;
-  return null;
 }
