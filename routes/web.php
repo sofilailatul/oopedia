@@ -219,6 +219,7 @@ Route::middleware('auth')->group(function () {
         Route::put('/users/{user}', [UserController::class, 'update'])->name('superadmin.users.update');
         Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('superadmin.users.destroy');
         Route::put('/users/{user}/role', [UserController::class, 'updateRole'])->name('superadmin.users.role');
+        Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('superadmin.users.resetPassword');
 
         // Leaderboard (superadmin)
         Route::prefix('leaderboard')->name('leaderboard.')->group(function () {

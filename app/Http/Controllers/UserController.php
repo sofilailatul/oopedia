@@ -39,6 +39,17 @@ class UserController extends Controller
             'users' => $users,
         ]);
     }
+    public function resetPassword(UserModel $user)
+    {
+        $defaultPassword = 'password123'; // atau bisa pakai random
+
+        $user->update([
+            'password' => Hash::make($defaultPassword),
+            'password_plain' => $defaultPassword,
+        ]);
+
+        return back()->with('success', "Password {$user->nama} berhasil direset ke: {$defaultPassword}");
+    }
 
     public function create()
     {
