@@ -13,6 +13,11 @@ class UserModel extends Authenticatable
 
     protected $table = 'users';
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\UserFactory::new();
+    }
+
     protected $fillable = [
         'nama',
         'email',
@@ -28,7 +33,6 @@ class UserModel extends Authenticatable
 
     protected $casts = [
         'last_login' => 'datetime',
-        'email_verified_at' => 'datetime',
     ];
 
     // Relationships
