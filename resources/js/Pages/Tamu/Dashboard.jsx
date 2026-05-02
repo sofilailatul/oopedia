@@ -216,7 +216,7 @@ export default function TamuDashboard({ auth, stats }) {
         addSteps([
             {
                 id: 'tamu-welcome',
-                title: 'Selamat Datang di OOpedia! 🎉',
+                title: 'Selamat Datang di OOpedia!',
                 text: 'Halo! Kamu terdaftar sebagai tamu. Untuk mulai belajar, kamu perlu bergabung ke kelas terlebih dahulu dengan kode dari dosenmu.',
                 buttons: [
                     { text: 'Lewati', action: cancel, classes: 'shepherd-button-secondary' },
@@ -225,7 +225,7 @@ export default function TamuDashboard({ auth, stats }) {
             },
             {
                 id: 'tamu-alur',
-                title: '📚 Alur Belajar OOpedia',
+                title: 'Alur Belajar OOpedia',
                 text: 'Setelah join kelas, kamu bisa belajar secara bertahap: Baca Materi → Latihan Soal Adaptif → Quiz. Semua disesuaikan dengan kemampuanmu!',
                 buttons: [
                     { text: '← Kembali', action: back, classes: 'shepherd-button-secondary' },
@@ -234,7 +234,7 @@ export default function TamuDashboard({ auth, stats }) {
             },
             {
                 id: 'tamu-join',
-                title: '🚪 Yuk Join Kelas!',
+                title: 'Yuk Join Kelas!',
                 text: 'Klik tombol "Join Kelas" di bawah, lalu masukkan kode kelas yang diberikan oleh dosenmu. Setelah berhasil, dashboard belajarmu akan aktif!',
                 buttons: [
                     { text: '← Kembali', action: back, classes: 'shepherd-button-secondary' },

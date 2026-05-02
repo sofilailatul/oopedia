@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { router } from "@inertiajs/react";
 
-export function useDosenMaterialEdit({ material, authUser }) {
+export function useDosenMaterialEdit({ material, authUser, subTopics = [] }) {
   const [title, setTitle] = useState(material?.material_name || "");
   const [description, setDescription] = useState(material?.description || "");
   const [orderNumber, setOrderNumber] = useState(material?.order_number || 1);
@@ -10,7 +10,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
     (material?.contents || []).map((c) => ({
       id: c.id,
       title: c.title || "",
-      subTopic: c.sub_topic || "",
+      subTopicId: c.subtopic_id ? String(c.subtopic_id) : "",
       content: c.content_text || "",
       imagePath: c.image_path || null,
       previewUrl: c.image_url || null,
@@ -27,7 +27,7 @@ export function useDosenMaterialEdit({ material, authUser }) {
       {
         id: null,
         title: "",
-        subTopic: "",
+        subTopicId: subTopics?.[0]?.id ? String(subTopics[0].id) : "",
         content: "",
         imagePath: null,
         previewUrl: null,
@@ -74,7 +74,8 @@ export function useDosenMaterialEdit({ material, authUser }) {
     const payloadSections = sections.map((s) => ({
       id: s.id,
       title: s.title,
-      sub_topic: s.subTopic,
+      subtopic_id: s.subTopicId ? Number(s.subTopicId) : null,
+      sub_topic: null,
       content_text: s.content,
       image: s.imageFile || null,
     }));

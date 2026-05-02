@@ -13,6 +13,7 @@ import {
   normalizeQuestionImage,
   updateQuestionImage,
 } from "@/Features/questionImage";
+import { parseCsvText, getCsvValue } from "@/Features/questionImport";
 
 function createEmptyQuestion() {
   return {
@@ -204,6 +205,7 @@ function QuizEditContent({
 	authUser,
 	registerBackHandler,
 }) {
+	const importFileRef = React.useRef(null);
 	const [modalState, setModalState] = React.useState({
 		show: false,
 		type: "success",
@@ -236,6 +238,8 @@ function QuizEditContent({
 
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
+	const [importError, setImportError] = React.useState("");
+	const [importSummary, setImportSummary] = React.useState("");
 
 	const isDirty = React.useMemo(
 		() => getQuestionsSnapshot(questions) !== initialSnapshot,
@@ -248,6 +252,37 @@ function QuizEditContent({
 	const saveRouteName = isSuperadmin
 		? "superadmin.quizzes.questions.save"
 		: "dosen.quizzes.questions.save";
+	const templateRouteName = isSuperadmin
+		? "superadmin.quizzes.template"
+		: "dosen.quizzes.template";
+	const materialLookup = React.useMemo(() => {
+		const map = new Map();
+		(materials ?? []).forEach((item) => {
+			const key = String(
+				item?.material_name ?? item?.name ?? item?.title ?? "",
+			)
+				.trim()
+				.toLowerCase();
+			if (key) map.set(key, item);
+		});
+		return map;
+	}, [materials]);
+	const csvAliases = React.useMemo(
+		() => ({
+			material: ["materi", "material"],
+			question: ["pertanyaan", "soal", "question", "quiz_text", "question_text"],
+			optionA: ["opsi a", "option a", "jawaban a", "a"],
+			optionB: ["opsi b", "option b", "jawaban b", "b"],
+			optionC: ["opsi c", "option c", "jawaban c", "c"],
+			optionD: ["opsi d", "option d", "jawaban d", "d"],
+			answer: ["jawaban", "kunci", "answer"],
+			points: ["poin", "points", "nilai"],
+			feedbackCorrect: ["feedback benar", "feedback_correct"],
+			feedbackIncorrect: ["feedback salah", "feedback_incorrect"],
+			subtopic: ["subtopik", "sub-topic", "sub_topic", "subtopic"],
+		}),
+		[],
+	);
 
 	const handleBack = React.useCallback(() => {
 		if (submitting) return;
@@ -438,6 +473,170 @@ function QuizEditContent({
 		}));
 	};
 
+	const resolveAnswerIndex = (answerRaw, options) => {
+		const normalized = String(answerRaw ?? "").trim().toLowerCase();
+		if (!normalized) return null;
+		const letterMap = { a: 0, b: 1, c: 2, d: 3 };
+		if (normalized in letterMap) return letterMap[normalized];
+		if (["1", "2", "3", "4"].includes(normalized)) {
+			return Number(normalized) - 1;
+		}
+		const textIndex = options.findIndex(
+			(opt) => String(opt ?? "").trim().toLowerCase() === normalized,
+		);
+		return textIndex >= 0 ? textIndex : null;
+	};
+
+	const handleImportCsv = async () => {
+		setImportError("");
+		setImportSummary("");
+		const file = importFileRef.current?.files?.[0];
+		if (!file) {
+			setImportError("Pilih file CSV terlebih dahulu.");
+			return;
+		}
+
+		const text = await file.text();
+		const parsed = parseCsvText(text);
+		if (!parsed.normalizedHeaders.length) {
+			setImportError("Template CSV tidak terbaca. Pastikan header kolom sudah benar.");
+			return;
+		}
+
+		let skipped = 0;
+		const imported = [];
+		const importErrors = [];
+
+		parsed.rows.forEach((row, index) => {
+			const rowNumber = index + 2;
+			const questionText = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.question),
+			).trim();
+			if (!questionText) {
+				skipped += 1;
+				return;
+			}
+
+			const optionTexts = [
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionA),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionB),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionC),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionD),
+			]
+				.map((value) => String(value ?? "").trim())
+				.filter((value) => value.length > 0);
+
+			if (optionTexts.length < 2) {
+				importErrors.push(
+					`Baris ${rowNumber}: opsi jawaban minimal 2.`,
+				);
+				skipped += 1;
+				return;
+			}
+
+			const answerRaw = getCsvValue(
+				row,
+				parsed.normalizedHeaders,
+				csvAliases.answer,
+			);
+			const answerIndex = resolveAnswerIndex(answerRaw, optionTexts);
+			if (answerIndex === null || answerIndex >= optionTexts.length) {
+				importErrors.push(
+					`Baris ${rowNumber}: jawaban tidak valid (isi A/B/C/D atau teks opsi).`,
+				);
+				skipped += 1;
+				return;
+			}
+
+			const pointsValue = Number.parseInt(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.points),
+				10,
+			);
+			const materialName = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.material),
+			).trim();
+			let material = materialLookup.get(materialName.toLowerCase()) ?? null;
+			if (!material && !materialName && (materials ?? []).length === 1) {
+				material = materials[0];
+			}
+			if (!material) {
+				importErrors.push(
+					`Baris ${rowNumber}: materi "${materialName || "(kosong)"}" tidak ditemukan di kuis ini.`,
+				);
+				skipped += 1;
+				return;
+			}
+			const subtopicName = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.subtopic),
+			).trim();
+			const subtopicId = material
+				? (material.subtopics ?? [])
+					.find(
+						(item) =>
+							String(item?.name ?? item?.subtopic_name ?? item?.sub_topic_name ?? "")
+								.trim()
+								.toLowerCase() === subtopicName.toLowerCase(),
+					)
+					?.id ?? null
+				: null;
+			if (subtopicName && !subtopicId) {
+				importErrors.push(
+					`Baris ${rowNumber}: subtopik "${subtopicName}" tidak ditemukan di materi "${material.material_name}".`,
+				);
+				skipped += 1;
+				return;
+			}
+			const feedbackCorrect = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackCorrect),
+			).trim();
+			const feedbackIncorrect = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackIncorrect),
+			).trim();
+
+			imported.push({
+				...createEmptyQuestion(),
+				question_text: questionText,
+				material_id: material?.id ?? "",
+				subtopic_id: subtopicId ?? "",
+				points: Number.isNaN(pointsValue) ? 10 : pointsValue,
+				feedbackCorrect: feedbackCorrect || "Jawaban kamu benar.",
+				feedbackIncorrect,
+				options: optionTexts.map((text, optIdx) => ({
+					id: null,
+					text,
+					is_correct: optIdx === answerIndex,
+				})),
+				_localId: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+			});
+		});
+
+		if (imported.length === 0) {
+			if (importErrors.length > 0) {
+				const details = importErrors.slice(0, 5).join("\n");
+				const extra = importErrors.length > 5
+					? `\n+${importErrors.length - 5} baris lainnya`
+					: "";
+				setImportError(`Tidak ada baris soal valid.\n${details}${extra}`);
+				return;
+			}
+			setImportError("Tidak ada baris soal valid yang bisa diimpor.");
+			return;
+		}
+
+		if (importErrors.length > 0) {
+			const details = importErrors.slice(0, 5).join("\n");
+			const extra = importErrors.length > 5
+				? `\n+${importErrors.length - 5} baris lainnya`
+				: "";
+			setImportError(`Beberapa baris gagal diimpor:\n${details}${extra}`);
+		}
+
+		setQuestions((prev) => [...prev, ...imported]);
+		setImportSummary(
+			`Berhasil impor ${imported.length} soal${skipped ? `, ${skipped} baris dilewati.` : "."}`,
+		);
+	};
+
 
 
 	return (
@@ -540,6 +739,53 @@ function QuizEditContent({
 							}
 						/>
 					</div>
+				</div>
+			</Card>
+
+			<Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
+					<div>
+						<p className="text-xs font-semibold text-slate-800">Import Soal (CSV)</p>
+						<p className="text-[11px] text-slate-500">
+							Soal pilihan ganda saja. Simpan perubahan setelah impor.
+						</p>
+					</div>
+					<a
+						href={route(templateRouteName, { quiz: quiz.id })}
+						className="text-[11px] font-medium text-blue-600 hover:underline"
+						target="_blank"
+						rel="noreferrer"
+					>
+						Download template kuis
+					</a>
+				</div>
+				<div className="px-5 py-4 space-y-3">
+					<input
+						ref={importFileRef}
+						type="file"
+						accept=".csv,text/csv"
+						className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+					/>
+					<div className="flex flex-wrap items-center gap-3">
+						<Button
+							type="button"
+							variant="outline"
+							color="blue"
+							size="sm"
+							onClick={handleImportCsv}
+						>
+							Import CSV
+						</Button>
+						<p className="text-[11px] text-slate-400">
+							Kolom wajib: Materi, Pertanyaan, Opsi A-D, Jawaban. Materi & subtopik harus sesuai template.
+						</p>
+					</div>
+					{importError && (
+						<p className="text-[11px] text-red-500 whitespace-pre-line">{importError}</p>
+					)}
+					{importSummary && (
+						<p className="text-[11px] text-emerald-600">{importSummary}</p>
+					)}
 				</div>
 			</Card>
 

@@ -70,11 +70,23 @@ class LeaderboardController extends Controller
                 'materials' => [],
                 'currentUserId' => $user->id,
                 'className' => null,
+                'hasClass' => false,
             ]);
         }
 
         // Ambil nama kelas
         $className = DB::table('classes')->where('id', $classId)->value('class_name');
+        $lecturerId = DB::table('classes')->where('id', $classId)->value('created_by');
+
+        if (!$lecturerId) {
+            return Inertia::render('Mahasiswa/Leaderboard/Index', [
+                'rankings' => [],
+                'materials' => [],
+                'currentUserId' => $user->id,
+                'className' => $className,
+                'hasClass' => true,
+            ]);
+        }
 
         // Ambil semua user di kelas ini
         $classmateIds = DB::table('class_user')
@@ -86,14 +98,20 @@ class LeaderboardController extends Controller
             ->get(['id', 'nama', 'email'])
             ->keyBy('id');
 
-        // Ambil semua materi
-        $materials = MaterialModel::orderBy('order_number')->get(['id', 'material_name']);
+        // Ambil semua materi milik dosen kelas ini
+        $materials = MaterialModel::query()
+            ->where('created_by', $lecturerId)
+            ->orderBy('order_number')
+            ->get(['id', 'material_name']);
+
+        $materialIds = $materials->pluck('id');
 
         // --- PRACTICE SCORES per user per material per type/level ---
         $practiceAttempts = DB::table('practice_attempts')
             ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
             ->whereIn('practice_attempts.user_id', $classmateIds)
             ->whereNotNull('practice_attempts.finished_at')
+            ->whereIn('practices.material_id', $materialIds)
             ->select(
                 'practice_attempts.user_id',
                 'practices.material_id',
@@ -126,6 +144,7 @@ class LeaderboardController extends Controller
             ->whereIn('practice_attempts.user_id', $classmateIds)
             ->whereNotNull('practice_attempts.finished_at')
             ->where('practice_attempts.mode', 'focused_remedial')
+            ->whereIn('practices.material_id', $materialIds)
             ->select(
                 'practice_attempts.user_id',
                 'practices.material_id',
@@ -146,6 +165,7 @@ class LeaderboardController extends Controller
             ->whereIn('quiz_attempts.user_id', $classmateIds)
             ->where('quizzes.class_id', $classId)
             ->whereNotNull('quiz_attempts.finished_at')
+            ->whereIn('quiz_attempt_material_scores.material_id', $materialIds)
             ->select(
                 'quiz_attempts.user_id',
                 'quiz_attempt_material_scores.material_id',
@@ -185,6 +205,7 @@ class LeaderboardController extends Controller
         if ($quizAttemptIds->isNotEmpty()) {
             $materialScoreRows = DB::table('quiz_attempt_material_scores')
                 ->whereIn('quiz_attempts_id', $quizAttemptIds)
+            ->whereIn('material_id', $materialIds)
                 ->select('quiz_attempts_id', 'material_id', 'earned_score')
                 ->get();
         }
@@ -284,6 +305,7 @@ class LeaderboardController extends Controller
             ])->values(),
             'currentUserId' => $user->id,
             'className' => $className,
+            'hasClass' => true,
         ]);
     }
 

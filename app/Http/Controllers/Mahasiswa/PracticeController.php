@@ -32,9 +32,13 @@ class PracticeController extends Controller
     {
         $userId = Auth::id();
         $practices = $this->practiceService->getPracticesForUser($userId);
+        $hasClass = DB::table('class_user')
+            ->where('user_id', $userId)
+            ->exists();
 
         return Inertia::render('Practices/Index', [
             'practices' => $practices,
+            'hasClass' => $hasClass,
         ]);
     }
 

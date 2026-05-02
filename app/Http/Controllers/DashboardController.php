@@ -560,7 +560,7 @@ class DashboardController extends Controller
                 'label'       => 'Kerjakan Pretest',
                 'title'       => 'Saatnya kerjakan Pretest!',
                 'description' => 'Materi sudah dibaca. Kerjakan pretest untuk menentukan level latihan yang sesuai.',
-                'href'        => route('pretest.start', $currentMaterial?->id),
+                'href'        => route('practices.attempts.entry', $currentMaterial?->id),
                 'disabled'    => false,
             ];
         }

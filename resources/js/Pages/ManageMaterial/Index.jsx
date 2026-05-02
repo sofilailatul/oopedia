@@ -205,13 +205,11 @@ export default function ManageMaterialsIndex({ authUser, materials = [] }) {
 														</span>
 													)}
 												</span>
-												{typeof material.order_number === "number" && (
-													<span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
-														<span className="inline-flex h-4 rounded-full bg-slate-100 px-2 text-[10px] uppercase tracking-wide text-slate-600">
-															Materi ke-{material.order_number}
-														</span>
+												<span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+													<span className="inline-flex h-4 rounded-full bg-slate-100 px-2 text-[10px] uppercase tracking-wide text-slate-600">
+														Materi ke-{(currentPage - 1) * perPage + idx + 1}
 													</span>
-												)}
+												</span>
 											</div>
 										</td>
 										<td className="px-5 py-3 align-middle text-right">

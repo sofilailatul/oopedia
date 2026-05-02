@@ -5,14 +5,14 @@ import Button from "@/Components/Button";
 export default function Welcome() {
   return (
     <PublicLayout>
-      <Head title="Welcome" />
+      <Head title="Learn By OOPedia" />
 
       <div className="relative min-h-screen overflow-hidden">
         {/* BACKGROUND DECORATION */}
         <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 h-40 w-40 rounded-full bg-yellow-300/10 blur-3xl" />
+          <div className="absolute top-20 left-10 h-40 w-40 rounded-full bg-blue-400/10 blur-3xl" />
           <div className="absolute bottom-20 right-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-yellow-200/10 blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-400/10 blur-3xl" />
         </div>
 
         <div className="relative z-10 flex min-h-screen items-center justify-center px-6 py-16">
@@ -22,9 +22,9 @@ export default function Welcome() {
             <div className="max-w-2xl text-center lg:text-left text-white">
 
               <h1 className="mt-6 text-4xl font-bold leading-tight md:text-6xl">
-                Belajar <span className="text-yellow-300">lebih santai</span>,
+                Belajar <span className="text-blue-400">lebih santai</span>,
                 <br />
-                paham materi <span className="text-yellow-300">lebih cepat</span>.
+                paham materi <span className="text-blue-400">lebih cepat</span>.
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-7 text-white/75 md:text-lg">
@@ -35,13 +35,13 @@ export default function Welcome() {
 
               <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:justify-center lg:justify-start">
                 <Link href={route("register")}>
-                  <Button color="yellow" variant="solid" size="lg">
+                  <Button color="blue" variant="solid" size="lg">
                     Mulai Belajar Sekarang
                   </Button>
                 </Link>
 
                 <Link href={route("login")}>
-                  <Button color="yellow" variant="outline" size="lg">
+                  <Button color="blue" variant="outline" size="lg">
                     Sudah Punya Akun
                   </Button>
                 </Link>
@@ -75,7 +75,7 @@ export default function Welcome() {
 
                 <div className="mt-6 space-y-4">
                   <div className="rounded-2xl bg-white/10 p-4">
-                    <h3 className="font-semibold text-yellow-300">
+                    <h3 className="font-semibold text-blue-400">
                       Belajar sesuai level kamu
                     </h3>
                     <p className="mt-1 text-sm text-white/75">
@@ -85,7 +85,7 @@ export default function Welcome() {
                   </div>
 
                   <div className="rounded-2xl bg-white/10 p-4">
-                    <h3 className="font-semibold text-yellow-300">
+                    <h3 className="font-semibold text-blue-400">
                       Langsung tahu salahnya di mana
                     </h3>
                     <p className="mt-1 text-sm text-white/75">
@@ -95,7 +95,7 @@ export default function Welcome() {
                   </div>
 
                   <div className="rounded-2xl bg-white/10 p-4">
-                    <h3 className="font-semibold text-yellow-300">
+                    <h3 className="font-semibold text-blue-400">
                       Progress kamu lebih terarah
                     </h3>
                     <p className="mt-1 text-sm text-white/75">

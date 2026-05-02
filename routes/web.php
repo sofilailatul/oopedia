@@ -139,6 +139,8 @@ Route::middleware('auth')->group(function () {
             ->name('dosen.practices.create');
         Route::get('/dosen/latihan-soal/{practice}', [DosenPracticeController::class, 'edit'])
             ->name('dosen.practices.edit');
+        Route::get('/dosen/latihan-soal/{practice}/template', [DosenPracticeController::class, 'downloadTemplate'])
+            ->name('dosen.practices.template');
         Route::post('/dosen/latihan-soal/{practice}/questions', [DosenPracticeController::class, 'saveQuestions'])
             ->name('dosen.practices.questions.save');
 
@@ -151,6 +153,8 @@ Route::middleware('auth')->group(function () {
             ->name('dosen.quizzes.show');
         Route::get('/dosen/kuis/{quiz}/edit', [DosenQuizController::class, 'dosenEditPage'])
             ->name('dosen.quizzes.edit');
+        Route::get('/dosen/kuis/{quiz}/template', [DosenQuizController::class, 'downloadTemplate'])
+            ->name('dosen.quizzes.template');
         Route::post('/dosen/kuis/{quiz}/questions', [DosenQuizController::class, 'saveQuestions'])
             ->name('dosen.quizzes.questions.save');
         Route::post('/dosen/kuis/{quiz}/duplicate', [DosenQuizController::class, 'duplicateToClasses'])
@@ -254,10 +258,15 @@ Route::middleware('auth')->group(function () {
             ->name('superadmin.practices.create');
         Route::get('/superadmin/latihan-soal/{practice}', [DosenPracticeController::class, 'edit'])
             ->name('superadmin.practices.edit');
+        Route::get('/superadmin/latihan-soal/{practice}/template', [DosenPracticeController::class, 'downloadTemplate'])
+            ->name('superadmin.practices.template');
 
         // Simpan soal latihan (superadmin) menggunakan method yang sama dengan dosen
         Route::post('/superadmin/latihan-soal/{practice}/questions', [DosenPracticeController::class, 'saveQuestions'])
             ->name('superadmin.practices.questions.save');
+
+        Route::get('/superadmin/kuis/{quiz}/template', [DosenQuizController::class, 'downloadTemplate'])
+            ->name('superadmin.quizzes.template');
 
         Route::post('/superadmin/practices', [DosenPracticeController::class, 'store'])->name('superadmin.practices.store');
         Route::delete('/superadmin/practices/{practice}', [DosenPracticeController::class, 'destroy'])->name('superadmin.practices.destroy');

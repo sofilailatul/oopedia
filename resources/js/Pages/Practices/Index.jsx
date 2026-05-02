@@ -10,7 +10,7 @@ import PracticeSidebar from "@/Components/Practice/PracticeSidebar";
 import { canStartPractice, getPracticeStatus } from "@/Features/practice/core";
 import { useTour } from "@/Hooks/useTour";
 
-export default function Index({ practices = [] }) {
+export default function Index({ practices = [], hasClass = true }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedPractice, setSelectedPractice] = useState(null);
     const [tab, setTab] = useState("all");
@@ -122,7 +122,7 @@ export default function Index({ practices = [] }) {
                     {/* Kartu practice — scroll internal */}
                     <main id="tour-practice-list" className="flex-1 min-h-0 overflow-y-auto pr-1">
                         {filteredPractices.length === 0 ? (
-                            <EmptyState />
+                            <EmptyState hasClass={hasClass} />
                         ) : (
                             <div className={`grid gap-4 ${sidebarOpen ? "grid-cols-2" : "grid-cols-3"}`}>
                                 {filteredPractices.map((practice) => (
@@ -160,7 +160,7 @@ export default function Index({ practices = [] }) {
                 <div className="lg:hidden flex-1 overflow-y-auto pb-4">
                     <main>
                         {filteredPractices.length === 0 ? (
-                            <EmptyState />
+                            <EmptyState hasClass={hasClass} />
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {filteredPractices.map((practice) => (
@@ -201,7 +201,23 @@ export default function Index({ practices = [] }) {
 }
 
 /* COMPONENT TAMBAHAN */
-function EmptyState() {
+function EmptyState({ hasClass }) {
+    if (!hasClass) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                    <Icons.Practice className="w-7 h-7 text-slate-300" />
+                </div>
+                <p className="text-sm font-bold text-slate-500">
+                    Belum bergabung ke kelas
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                    Hubungi dosen atau gunakan kode kelas agar latihan soal muncul.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">

@@ -13,6 +13,7 @@ import {
   normalizeQuestionImage,
   updateQuestionImage,
 } from "@/Features/questionImage";
+import { parseCsvText, getCsvValue } from "@/Features/questionImport";
 
 function createEmptyQuestion(type = QUESTION_TYPE.MC) {
 	return {
@@ -247,6 +248,8 @@ function PracticeEditContent({
 	backRoute,
 	authUser,
 }) {
+	const importMcFileRef = React.useRef(null);
+	const importDragFileRef = React.useRef(null);
 	const STORAGE_VERSION = "v3";
 	const STORAGE_KEY = `practice_draft_${practice?.id}_${STORAGE_VERSION}`;
 	const normalizedServerQuestions = React.useMemo(
@@ -276,7 +279,39 @@ function PracticeEditContent({
 	const [selectedType, setSelectedType] = React.useState(QUESTION_TYPE.MC);
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
+	const [importError, setImportError] = React.useState("");
+	const [importSummary, setImportSummary] = React.useState("");
 	const popup = usePopup();
+	const role = (authUser?.role || "").toLowerCase();
+	const isSuperadmin = role === "superadmin";
+	const templateRouteName = isSuperadmin
+		? "superadmin.practices.template"
+		: "dosen.practices.template";
+	const subtopicLookup = React.useMemo(() => {
+		const map = new Map();
+		(subtopics ?? []).forEach((item) => {
+			const key = String(item?.name ?? "").trim().toLowerCase();
+			if (key) map.set(key, item.id);
+		});
+		return map;
+	}, [subtopics]);
+	const csvAliases = React.useMemo(
+		() => ({
+			question: ["pertanyaan", "soal", "question", "question_text"],
+			optionA: ["opsi a", "option a", "jawaban a", "a"],
+			optionB: ["opsi b", "option b", "jawaban b", "b"],
+			optionC: ["opsi c", "option c", "jawaban c", "c"],
+			optionD: ["opsi d", "option d", "jawaban d", "d"],
+			answer: ["jawaban", "kunci", "answer"],
+			codeSnippet: ["code snippet", "code_snippet", "kode", "kode program"],
+			points: ["poin", "points", "nilai"],
+			feedbackCorrect: ["feedback benar", "feedback_correct"],
+			feedbackIncorrect: ["feedback salah", "feedback_incorrect"],
+			subtopic: ["subtopik", "sub-topic", "sub_topic", "subtopic"],
+			dragItem1: ["item 1", "item1"],
+		}),
+		[],
+	);
 	const isDirty = React.useMemo(
 		() => getQuestionsSnapshot(questions) !== initialSnapshot,
 		[questions, initialSnapshot],
@@ -402,6 +437,179 @@ function PracticeEditContent({
 		);
 	};
 
+	const resolveAnswerIndex = (answerRaw, options) => {
+		const normalized = String(answerRaw ?? "").trim().toLowerCase();
+		if (!normalized) return null;
+		const letterMap = { a: 0, b: 1, c: 2, d: 3 };
+		if (normalized in letterMap) return letterMap[normalized];
+		if (["1", "2", "3", "4"].includes(normalized)) {
+			return Number(normalized) - 1;
+		}
+		const textIndex = options.findIndex(
+			(opt) => String(opt ?? "").trim().toLowerCase() === normalized,
+		);
+		return textIndex >= 0 ? textIndex : null;
+	};
+
+	const handleImportCsv = async (mode) => {
+		setImportError("");
+		setImportSummary("");
+		const file =
+			mode === "drag"
+				? importDragFileRef.current?.files?.[0]
+				: importMcFileRef.current?.files?.[0];
+		if (!file) {
+			setImportError("Pilih file CSV terlebih dahulu.");
+			return;
+		}
+
+		const text = await file.text();
+		const parsed = parseCsvText(text);
+		if (!parsed.normalizedHeaders.length) {
+			setImportError("Template CSV tidak terbaca. Pastikan header kolom sudah benar.");
+			return;
+		}
+
+		const isDragTemplate =
+			mode === "drag" ||
+			parsed.normalizedHeaders.includes("item 1") ||
+			parsed.normalizedHeaders.includes("item1");
+
+		let skipped = 0;
+		const imported = [];
+
+		parsed.rows.forEach((row, index) => {
+			const questionText = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.question),
+			).trim();
+			if (!questionText) {
+				skipped += 1;
+				return;
+			}
+
+			if (isDragTemplate) {
+				const items = [];
+				for (let i = 1; i <= 14; i += 1) {
+					const itemValue = String(
+						getCsvValue(row, parsed.normalizedHeaders, [`item ${i}`, `item${i}`]),
+					).trim();
+					if (itemValue) items.push(itemValue);
+				}
+
+				if (items.length < 2) {
+					skipped += 1;
+					return;
+				}
+
+				const pointsValue = Number.parseInt(
+					getCsvValue(row, parsed.normalizedHeaders, csvAliases.points),
+					10,
+				);
+				const codeSnippet = String(
+					getCsvValue(row, parsed.normalizedHeaders, csvAliases.codeSnippet),
+				).trim();
+				const subtopicName = String(
+					getCsvValue(row, parsed.normalizedHeaders, csvAliases.subtopic),
+				).trim();
+				const subtopicId = subtopicLookup.get(subtopicName.toLowerCase()) ?? null;
+				const feedbackCorrect = String(
+					getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackCorrect),
+				).trim();
+				const feedbackIncorrect = String(
+					getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackIncorrect),
+				).trim();
+
+				imported.push({
+					...createEmptyQuestion(QUESTION_TYPE.DRAG),
+					question_text: questionText,
+					subtopic_id: subtopicId,
+					sub_topic_name: subtopicName,
+					points: Number.isNaN(pointsValue) ? 10 : pointsValue,
+					outputCode: codeSnippet,
+					feedbackCorrect: feedbackCorrect || "Jawaban kamu benar.",
+					feedbackIncorrect,
+					options: items.map((text) => ({
+						id: null,
+						text,
+						is_correct: false,
+					})),
+					_localId: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+				});
+				return;
+			}
+
+			const optionTexts = [
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionA),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionB),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionC),
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.optionD),
+			]
+				.map((value) => String(value ?? "").trim())
+				.filter((value) => value.length > 0);
+
+			if (optionTexts.length < 2) {
+				skipped += 1;
+				return;
+			}
+
+			const answerRaw = getCsvValue(
+				row,
+				parsed.normalizedHeaders,
+				csvAliases.answer,
+			);
+			const answerIndex = resolveAnswerIndex(answerRaw, optionTexts);
+			if (answerIndex === null || answerIndex >= optionTexts.length) {
+				skipped += 1;
+				return;
+			}
+
+			const pointsValue = Number.parseInt(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.points),
+				10,
+			);
+			const codeSnippet = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.codeSnippet),
+			).trim();
+			const subtopicName = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.subtopic),
+			).trim();
+			const subtopicId = subtopicLookup.get(subtopicName.toLowerCase()) ?? null;
+			const feedbackCorrect = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackCorrect),
+			).trim();
+			const feedbackIncorrect = String(
+				getCsvValue(row, parsed.normalizedHeaders, csvAliases.feedbackIncorrect),
+			).trim();
+
+			imported.push({
+				...createEmptyQuestion(QUESTION_TYPE.MC),
+				question_text: questionText,
+				subtopic_id: subtopicId,
+				sub_topic_name: subtopicName,
+				points: Number.isNaN(pointsValue) ? 10 : pointsValue,
+				outputCode: codeSnippet,
+				feedbackCorrect: feedbackCorrect || "Jawaban kamu benar.",
+				feedbackIncorrect,
+				options: optionTexts.map((text, optIdx) => ({
+					id: null,
+					text,
+					is_correct: optIdx === answerIndex,
+				})),
+				_localId: `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
+			});
+		});
+
+		if (imported.length === 0) {
+			setImportError("Tidak ada baris soal valid yang bisa diimpor.");
+			return;
+		}
+
+		setQuestions((prev) => [...prev, ...imported]);
+		setImportSummary(
+			`Berhasil impor ${imported.length} soal${skipped ? `, ${skipped} baris dilewati.` : "."}`,
+		);
+	};
+
 	const handleSubmit = (e) => {
 		e?.preventDefault();
 
@@ -503,6 +711,91 @@ function PracticeEditContent({
 					]}
 				/>
 			</header>
+
+			<Card className="rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
+				<div className="border-b border-slate-100 px-5 py-3">
+					<p className="text-xs font-semibold text-slate-800">Import Soal (CSV)</p>
+					<p className="text-[11px] text-slate-500">
+						Gunakan template yang sesuai untuk Pilihan Ganda atau Drag & Drop.
+					</p>
+				</div>
+				<div className="px-5 py-4 space-y-4">
+					<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+						<div>
+							<p className="text-xs font-semibold text-slate-700">Pilihan Ganda</p>
+							<p className="text-[11px] text-slate-500">
+								Kolom wajib: Pertanyaan, Opsi A-D, Jawaban, Subtopik.
+							</p>
+						</div>
+						<input
+							ref={importMcFileRef}
+							type="file"
+							accept=".csv,text/csv"
+							className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+						/>
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								color="blue"
+								size="sm"
+								onClick={() => handleImportCsv("mc")}
+							>
+								Import
+							</Button>
+							<a
+								href={route(templateRouteName, { practice: practice?.id, type: "mc" })}
+								className="text-[11px] font-medium text-blue-600 hover:underline"
+								target="_blank"
+								rel="noreferrer"
+							>
+								Download Template
+							</a>
+						</div>
+					</div>
+
+					<div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+						<div>
+							<p className="text-xs font-semibold text-slate-700">Drag & Drop</p>
+							<p className="text-[11px] text-slate-500">
+								Kolom wajib: Pertanyaan, Item 1-2, Subtopik.
+							</p>
+						</div>
+						<input
+							ref={importDragFileRef}
+							type="file"
+							accept=".csv,text/csv"
+							className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+						/>
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								color="blue"
+								size="sm"
+								onClick={() => handleImportCsv("drag")}
+							>
+								Import
+							</Button>
+							<a
+								href={route(templateRouteName, { practice: practice?.id, type: "drag" })}
+								className="text-[11px] font-medium text-blue-600 hover:underline"
+								target="_blank"
+								rel="noreferrer"
+							>
+								Download Template
+							</a>
+						</div>
+					</div>
+
+					{importError && (
+						<p className="text-[11px] text-red-500">{importError}</p>
+					)}
+					{importSummary && (
+						<p className="text-[11px] text-emerald-600">{importSummary}</p>
+					)}
+				</div>
+			</Card>
 
 			{filteredQuestions.length === 0 && (
 				<div className=" p-8 text-center text-sm text-slate-500">
