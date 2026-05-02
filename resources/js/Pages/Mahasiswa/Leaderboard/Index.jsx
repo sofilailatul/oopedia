@@ -212,7 +212,7 @@ function PodiumCard({ entry, rank, isCurrentUser }) {
   );
 }
 
-export default function Index({ rankings = [], materials = [], currentUserId, className }) {
+export default function Index({ rankings = [], materials = [], currentUserId, className, hasClass = true }) {
   const pageTitle = className ? `Leaderboard Kelas ${className}` : "Leaderboard Kelas";
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -229,8 +229,22 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
     <AppLayout title="Leaderboard Kelas" label="Leaderboard">
       <div className="mx-auto px-2 space-y-8">
 
+        {!hasClass && (
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+              <Icons.User className="w-6 h-6 text-slate-300" />
+            </div>
+            <Text variant="body" className="font-semibold text-slate-600">
+              Belum bergabung ke kelas
+            </Text>
+            <Text variant="caption" className="text-slate-400 mt-1">
+              Hubungi dosen atau gunakan kode kelas agar leaderboard kelas muncul.
+            </Text>
+          </div>
+        )}
+
         {/* Podium Top 3 */}
-        {top3.length > 0 && (
+        {hasClass && top3.length > 0 && (
           <div className="rounded-3xl border border-slate-100 bg-gradient-to-r from-blue-50 via-slate-50 to-indigo-50 px-5 py-6 shadow-sm">
             <Text as="h2" variant="title" className="text-center text-base mb-6">
               Top 3 Skor
@@ -251,6 +265,7 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
         )}
 
         {/* Full Rankings Table */}
+        {hasClass && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           {/* Header */}
           <div className="hidden md:grid md:grid-cols-[60px_1fr_120px_120px_60px] px-5 py-3 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-slate-100">
@@ -333,6 +348,7 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
             })
           )}
         </div>
+          )}
       </div>
     </AppLayout>
   );

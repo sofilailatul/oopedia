@@ -147,7 +147,7 @@ class MaterialController extends Controller
 
 		$material->load(['creator', 'contents' => function ($q) {
 			$q->orderBy('sort_order');
-		}, 'contents.subTopic']);
+		}, 'contents.subTopic', 'subTopics']);
 
 		$author = $material->creator?->name
 			?? $material->creator?->nama
@@ -155,6 +155,10 @@ class MaterialController extends Controller
 
 		return Inertia::render('ManageMaterial/Edit', [
 			'authUser' => $request->user(),
+			'subTopics' => $material->subTopics->map(fn($s) => [
+				'id' => $s->id,
+				'name' => $s->name,
+			]),
 			'material' => [
 				'id' => $material->id,
 				'material_name' => $material->material_name,
@@ -167,6 +171,7 @@ class MaterialController extends Controller
 						'title' => $c->title,
 						'content_text' => $c->content_text,
 						'sub_topic' => $c->subTopic?->name,
+						'subtopic_id' => $c->subtopic_id,
 						'image_path' => $c->image_path,
 						'image_url' => $c->image_url,
 					];

@@ -19,9 +19,28 @@ class PracticeService
     
     public function getPracticesForUser($userId)
     {
-        // Semua latihan soal yang tersedia
+        $classId = DB::table('class_user')
+            ->where('user_id', $userId)
+            ->value('class_id');
+
+        if (!$classId) {
+            return collect();
+        }
+
+        $lecturerId = DB::table('classes')
+            ->where('id', $classId)
+            ->value('created_by');
+
+        if (!$lecturerId) {
+            return collect();
+        }
+
+        // Semua latihan soal yang tersedia untuk kelas ini
         $practiceRows = PracticeModel::query()
-            ->with('material:id,material_name')
+            ->with('material:id,material_name,created_by')
+            ->whereHas('material', function ($q) use ($lecturerId) {
+                $q->where('created_by', $lecturerId);
+            })
             ->orderBy('material_id')
             ->get();
 

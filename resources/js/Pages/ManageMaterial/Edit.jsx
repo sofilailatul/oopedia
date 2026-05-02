@@ -5,9 +5,11 @@ import Button from '@/Components/Button';
 import StatusModal from '@/Components/StatusModal';
 import { useDosenMaterialEdit } from '@/Features/materials/useDosenMaterialEdit';
 import UploadImage from '@/Components/UploadImage';
+import Dropdown from '@/Components/Dropdown';
+import { FaChevronDown, FaCheck } from 'react-icons/fa';
 
 export default function ManageMaterialEdit(props) {
-	const { material, authUser } = props;
+	const { material, authUser, subTopics = [] } = props;
 	const materialTitle = material?.material_name ?? '';
 	const role = (authUser?.role || '').toLowerCase();
 	const baseRole = role === 'superadmin' ? 'superadmin' : 'dosen';
@@ -21,13 +23,13 @@ export default function ManageMaterialEdit(props) {
 			backHref={indexUrl}
 			backLabel="Kembali ke daftar materi"
 		>
-			<EditMaterialContent material={material} authUser={authUser} indexUrl={indexUrl} />
+			<EditMaterialContent material={material} authUser={authUser} indexUrl={indexUrl} subTopics={subTopics} />
 		</AppLayout>
 	);
 }
 
-function EditMaterialContent({ material, authUser, indexUrl }) {
-	const { state, actions } = useDosenMaterialEdit({ material, authUser });
+function EditMaterialContent({ material, authUser, indexUrl, subTopics = [] }) {
+	const { state, actions } = useDosenMaterialEdit({ material, authUser, subTopics });
 	const { title, description, orderNumber, sections, creatorName } = state;
 	const {
 		setTitle,
@@ -82,6 +84,11 @@ function EditMaterialContent({ material, authUser, indexUrl }) {
 		});
 	};
 
+	const getSubTopicName = (subTopicId) => {
+		const selected = subTopics.find((item) => String(item.id) === String(subTopicId));
+		return selected?.name || 'Pilih subtopic';
+	};
+
 	return (
 		<>
 			<div className="mx-auto flex gap-6">
@@ -124,19 +131,54 @@ function EditMaterialContent({ material, authUser, indexUrl }) {
 									/>
 								</div>
 							</div>
-							<div className="w-full">
+							<div className="w-full mb-4">
 								<label className="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">
 									Subtopic
 								</label>
-								<input
-									type="text"
-									className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-									placeholder="Masukkan subtopic section"
-									value={section.subTopic || ''}
-									onChange={(e) =>
-										updateSectionField(index, 'subTopic', e.target.value)
-									}
-								/>
+								<Dropdown className="w-full">
+									<Dropdown.Trigger>
+										<button
+											type="button"
+											disabled={subTopics.length === 0}
+											className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gray-50/60 px-3 py-2 text-sm text-gray-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-blue-400"
+										>
+											<span className="truncate">
+												{subTopics.length === 0 ? 'Belum ada subtopic' : getSubTopicName(section.subTopicId)}
+											</span>
+											<FaChevronDown className="text-[11px] text-gray-400" />
+										</button>
+									</Dropdown.Trigger>
+
+									{subTopics.length > 0 ? (
+										<Dropdown.Content align="left" width="64" contentClasses="py-2 bg-white rounded-lg shadow-xl border border-gray-100 max-h-64 overflow-y-auto">
+											<Dropdown.Item
+												onClick={() => updateSectionField(index, 'subTopicId', '')}
+												className={`flex items-center justify-between px-3 py-2.5 ${
+													!section.subTopicId ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+												}`}
+											>
+												<span>Pilih subtopic</span>
+												{!section.subTopicId ? <FaCheck className="text-[10px]" /> : null}
+											</Dropdown.Item>
+											{subTopics.map((subTopic) => {
+												const active = String(section.subTopicId) === String(subTopic.id);
+
+												return (
+													<Dropdown.Item
+														key={subTopic.id}
+														onClick={() => updateSectionField(index, 'subTopicId', String(subTopic.id))}
+														className={`flex items-center justify-between px-3 py-2.5 ${
+															active ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+														}`}
+													>
+														<span className="truncate">{subTopic.name}</span>
+														{active ? <FaCheck className="text-[10px]" /> : null}
+													</Dropdown.Item>
+												);
+											})}
+										</Dropdown.Content>
+									) : null}
+								</Dropdown>
 							</div>
 
 							<textarea

@@ -103,8 +103,8 @@ export default function Register({ status }) {
 
       <div className="relative h-screen overflow-hidden bg-[#050a24]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(255,255,255,0.16)_0%,rgba(255,255,255,0)_45%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(255,208,0,0.10)_0%,rgba(255,208,0,0)_35%)]" />
-        <div className="absolute top-16 left-12 h-40 w-40 rounded-full bg-yellow-300/10 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(99,102,241,0.10)_0%,rgba(99,102,241,0)_35%)]" />
+        <div className="absolute top-16 left-12 h-40 w-40 rounded-full bg-blue-400/10 blur-3xl" />
         <div className="absolute bottom-10 right-10 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
 
         <div className="relative z-10 grid h-screen grid-cols-1 overflow-hidden lg:grid-cols-2">
@@ -124,7 +124,7 @@ export default function Register({ status }) {
                 <br />
                 bareng
                 <br />
-                <span className="text-yellow-300">OOpedia.</span>
+                <span className="text-blue-400">OOpedia.</span>
               </h1>
 
               <p className="mt-5 max-w-lg text-base leading-7 text-white/75">
@@ -248,7 +248,7 @@ export default function Register({ status }) {
                     <button
                       type="submit"
                       disabled={processing}
-                      className="w-full rounded-xl bg-yellow-400 py-3.5 font-semibold text-slate-900 transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-xl bg-blue-600 py-3.5 font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {processing ? "Memproses..." : "Daftar Sekarang"}
                     </button>
@@ -259,7 +259,7 @@ export default function Register({ status }) {
                   Sudah punya akun?{" "}
                   <Link
                     href="/login"
-                    className="font-semibold text-yellow-300 hover:underline"
+                    className="font-semibold text-blue-400 hover:underline"
                   >
                     Masuk di sini
                   </Link>

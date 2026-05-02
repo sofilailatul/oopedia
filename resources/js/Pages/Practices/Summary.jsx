@@ -299,6 +299,28 @@ function HeroBanner({ isPassed, finalScore, threshold, materialName, levelText, 
           </div>
         </div>
       </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-sm lg:hidden">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-inner ${iconBg}`}>
+            <IconComp className="h-4.5 w-4.5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Rencana Lanjut</p>
+            <p className="text-[12px] font-bold text-slate-900 leading-snug truncate">{actionMeta.heading}</p>
+          </div>
+        </div>
+        <Button
+          as={Link}
+          href={actionMeta.ctaHref}
+          variant="solid"
+          color={btnColor}
+          size="sm"
+          className="!rounded-lg font-bold uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/20"
+        >
+          {actionMeta.ctaLabel}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -422,7 +444,7 @@ function QuestionReviewCard({ item, index, showCorrectAnswers }) {
       <div className="mt-2 space-y-2.5">
         {/* Code Snippet for drag-drop questions */}
         {item.questionType === "drag_drop" && item.codeSnippet && (
-          <div className="rounded-xl border border-slate-700/30 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-sm overflow-hidden">
+          <div className="rounded-xl border border-slate-700/30 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 shadow-sm overflow-hidden max-w-full">
             <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border-b border-slate-700/50">
               <div className="flex items-center gap-1">
                 <span className="h-2 w-2 rounded-full bg-rose-400/80" />
@@ -431,8 +453,8 @@ function QuestionReviewCard({ item, index, showCorrectAnswers }) {
               </div>
               <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400 ml-1">Code Snippet</span>
             </div>
-            <div className="p-3 overflow-x-auto">
-              <pre className="text-[11px] leading-relaxed font-mono text-emerald-300 whitespace-pre-wrap">
+            <div className="p-3 overflow-x-auto max-w-full">
+              <pre className="text-[12px] leading-relaxed font-mono text-emerald-300 whitespace-pre-wrap break-words">
                 <code>{item.codeSnippet}</code>
               </pre>
             </div>
@@ -518,7 +540,7 @@ function DragDropAnswer({ item, showCorrectAnswers }) {
               {userSteps.map((step, index) => (
                 <div key={index} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white border border-slate-100 shadow-sm">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-medium text-slate-500">{index + 1}</span>
-                  <p className="text-[12px] font-medium text-slate-800 leading-tight">{step}</p>
+                  <p className="text-[10px] font-medium text-slate-800 leading-tight">{step}</p>
                 </div>
               ))}
             </div>
@@ -536,7 +558,7 @@ function DragDropAnswer({ item, showCorrectAnswers }) {
               {correctSteps.map((step, index) => (
                 <div key={index} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white border border-emerald-100 shadow-sm">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-[10px] font-medium text-white">{index + 1}</span>
-                  <p className="text-[12px] font-medium text-slate-800 leading-tight">{step}</p>
+                  <p className="text-[10px] font-medium text-slate-800 leading-tight">{step}</p>
                 </div>
               ))}
             </div>

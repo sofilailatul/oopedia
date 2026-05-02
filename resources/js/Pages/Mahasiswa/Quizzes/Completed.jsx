@@ -110,18 +110,10 @@ export default function Completed({ attempt, materialScores = [], recommendation
                     const ui = recommendationUi(Number(m.percentage ?? 0));
                     return (
                       <div key={m.material_id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-all hover:shadow-md">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="min-w-0">
                             <p className="text-[11px] font-bold text-slate-800 truncate">{m.name}</p>
-                            <p className="mt-0.5 text-[9px] font-bold text-slate-500">{m.earned_score} / {m.max_score} poin tercapai</p>
                           </div>
-                          <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${ui.iconClass}`}>
-                            <Icons.Materials className="h-3.5 w-3.5" />
-                          </div>
-                        </div>
-
-                        <div className="mt-2.5 mb-2.5 flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden shadow-inner">
-                          <div className={`h-full rounded-full ${ui.bar} transition-all duration-1000`} style={{ width: `${m.percentage}%` }} />
                         </div>
 
                         <Button

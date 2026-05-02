@@ -318,6 +318,97 @@ class QuizController extends Controller
         ]);
     }
 
+    public function downloadTemplate(QuizModel $quiz)
+    {
+        $user = Auth::user();
+
+        $canManage = (int) $quiz->created_by === (int) $user->id
+            || $user->role === 'superadmin';
+
+        abort_unless($canManage, 403);
+
+        $materials = $quiz->materials()
+            ->with('subTopics')
+            ->orderBy('material_name')
+            ->get();
+
+        $header = [
+            'Materi',
+            'Subtopik',
+            'Pertanyaan',
+            'Opsi A',
+            'Opsi B',
+            'Opsi C',
+            'Opsi D',
+            'Jawaban',
+            'Poin',
+            'Feedback Benar',
+            'Feedback Salah',
+        ];
+
+        $rows = [];
+
+        foreach ($materials as $material) {
+            $subtopicNames = $material->subTopics
+                ->map(function ($sub) {
+                    return $sub->subtopic_name
+                        ?? $sub->sub_topic_name
+                        ?? $sub->name;
+                })
+                ->filter()
+                ->values()
+                ->all();
+
+            $rows[] = [
+                $material->material_name,
+                $subtopicNames
+                    ? ('SUBTOPIK: ' . implode(' | ', $subtopicNames))
+                    : 'SUBTOPIK: -',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+                '',
+            ];
+        }
+
+        $rows[] = [
+            $materials->first()?->material_name ?? '',
+            $materials->first()?->subTopics->first()?->name
+                ?? $materials->first()?->subTopics->first()?->subtopic_name
+                ?? $materials->first()?->subTopics->first()?->sub_topic_name
+                ?? '',
+            'Contoh soal 1',
+            'Jawaban A',
+            'Jawaban B',
+            'Jawaban C',
+            'Jawaban D',
+            'A',
+            '10',
+            'Jawaban kamu benar.',
+            'Jawaban kamu salah.',
+        ];
+
+        $escape = static fn ($value) => '"' . str_replace('"', '""', (string) $value) . '"';
+
+        $lines = [];
+        $lines[] = implode(',', array_map($escape, $header));
+        foreach ($rows as $row) {
+            $lines[] = implode(',', array_map($escape, $row));
+        }
+
+        $filename = "template_quiz_{$quiz->id}.csv";
+
+        return response(implode("\n", $lines), 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename={$filename}",
+        ]);
+    }
+
     public function saveQuestions(Request $request, QuizModel $quiz)
     {
         $user = Auth::user();

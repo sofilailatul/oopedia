@@ -21,13 +21,18 @@ class ClassController extends Controller
     {
         $user = $request->user();
 
-        $classes = ClassModel::with(['lecturer'])
-            ->withCount('users')
-            ->latest()
-            ->get(['id', 'class_name', 'class_code', 'description', 'created_at', 'created_by']);
+        $role = strtolower($user->role ?? '');
+
+        $classQuery = ClassModel::with(['lecturer'])->withCount('users')->latest();
+
+        // Dosen hanya melihat kelas miliknya sendiri
+        if ($role === 'dosen') {
+            $classQuery->where('created_by', $user->id);
+        }
+
+        $classes = $classQuery->get(['id', 'class_name', 'class_code', 'description', 'created_at', 'created_by']);
 
         $lecturers = [];
-        $role = strtolower($user->role ?? '');
         if ($role === 'superadmin') {
             // Ambil semua user yang rolenya dosen (baik dari kolom role maupun Spatie roles)
             $lecturers = UserModel::query()

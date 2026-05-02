@@ -250,6 +250,139 @@ class PracticeController extends Controller
         ]);
     }
 
+    public function downloadTemplate(Request $request, PracticeModel $practice)
+    {
+        $user = Auth::user();
+
+        $practice->load(['material:id,material_name,created_by']);
+        $isOwner = $practice->material && (int) $practice->material->created_by === (int) $user->id;
+        abort_unless($isOwner || $user->role === 'superadmin', 403);
+
+        $type = strtolower($request->query('type', 'mc'));
+
+        $subtopics = SubTopicModel::query()
+            ->where('material_id', $practice->material_id)
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+
+        $materialName = $practice->material?->material_name ?? '';
+        $subtopicList = implode(' | ', $subtopics);
+
+        if ($type === 'drag') {
+            $header = [
+                'Pertanyaan',
+                'Item 1',
+                'Item 2',
+                'Item 3',
+                'Item 4',
+                'Item 5',
+                'Item 6',
+                'Item 7',
+                'Item 8',
+                'Item 9',
+                'Item 10',
+                'Item 11',
+                'Item 12',
+                'Item 13',
+                'Item 14',
+                'Code Snippet',
+                'Poin',
+                'Feedback Benar',
+                'Feedback Salah',
+                'Materi',
+                'Subtopik',
+            ];
+
+            $rows = [
+                [
+                    '',
+                    '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    $materialName,
+                    $subtopicList ? "SUBTOPIK: {$subtopicList}" : 'SUBTOPIK: -',
+                ],
+                [
+                    'Contoh drag and drop',
+                    'Langkah 1',
+                    'Langkah 2',
+                    'Langkah 3',
+                    'Langkah 4',
+                    '', '', '', '', '', '', '', '', '', '',
+                    'console.log("Hello");',
+                    '10',
+                    'Jawaban kamu benar.',
+                    'Jawaban kamu salah.',
+                    $materialName,
+                    $subtopics[0] ?? '',
+                ],
+            ];
+
+            $filename = "template_soal_drag_drop_practice_{$practice->id}.csv";
+        } else {
+            $header = [
+                'Pertanyaan',
+                'Opsi A',
+                'Opsi B',
+                'Opsi C',
+                'Opsi D',
+                'Jawaban',
+                'Code Snippet',
+                'Poin',
+                'Feedback Benar',
+                'Feedback Salah',
+                'Materi',
+                'Subtopik',
+            ];
+
+            $rows = [
+                [
+                    '',
+                    '', '', '', '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    $materialName,
+                    $subtopicList ? "SUBTOPIK: {$subtopicList}" : 'SUBTOPIK: -',
+                ],
+                [
+                    'Contoh soal 1',
+                    'Jawaban A',
+                    'Jawaban B',
+                    'Jawaban C',
+                    'Jawaban D',
+                    'A',
+                    'console.log("Hello");',
+                    '10',
+                    'Jawaban kamu benar.',
+                    'Jawaban kamu salah.',
+                    $materialName,
+                    $subtopics[0] ?? '',
+                ],
+            ];
+
+            $filename = "template_soal_mc_practice_{$practice->id}.csv";
+        }
+
+        $escape = static fn ($value) => '"' . str_replace('"', '""', (string) $value) . '"';
+
+        $lines = [];
+        $lines[] = implode(',', array_map($escape, $header));
+        foreach ($rows as $row) {
+            $lines[] = implode(',', array_map($escape, $row));
+        }
+
+        return response(implode("\n", $lines), 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename={$filename}",
+        ]);
+    }
+
     public function show(PracticeModel $practice)
     {
         $user = Auth::user();
@@ -317,7 +450,7 @@ class PracticeController extends Controller
         ]);
 
         $type = $data['type'];
-        $level = $type === 'pretest' ? 'easy' : $data['level'];
+        $level = $type === 'pretest' ? null : $data['level'];
 
         $existsQuery = PracticeModel::query()
             ->where('material_id', $data['material_id'])
