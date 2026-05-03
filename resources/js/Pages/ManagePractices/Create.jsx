@@ -128,6 +128,7 @@ function CreatePracticeContent({
 	const [error, setError] = React.useState("");
 	const [importError, setImportError] = React.useState("");
 	const [importSummary, setImportSummary] = React.useState("");
+	const [isImporting, setIsImporting] = React.useState(false);
 	const popup = usePopup();
 	const role = (authUser?.role || "").toLowerCase();
 	const isSuperadmin = role === "superadmin";
@@ -391,16 +392,21 @@ function CreatePracticeContent({
 	};
 
 	const handleImportCsv = async (mode) => {
+		if (isImporting) return;
+		setIsImporting(true);
 		setImportError("");
 		setImportSummary("");
-		const file =
-			mode === "drag"
-				? importDragFileRef.current?.files?.[0]
-				: importMcFileRef.current?.files?.[0];
-		if (!file) {
-			setImportError("Pilih file CSV terlebih dahulu.");
-			return;
-		}
+		
+		try {
+			const file =
+				mode === "drag"
+					? importDragFileRef.current?.files?.[0]
+					: importMcFileRef.current?.files?.[0];
+			if (!file) {
+				setImportError("Pilih file CSV terlebih dahulu.");
+				setIsImporting(false);
+				return;
+			}
 
 		const text = await file.text();
 		const parsed = parseCsvText(text);
@@ -547,6 +553,15 @@ function CreatePracticeContent({
 		setImportSummary(
 			`Berhasil impor ${imported.length} soal${skipped ? `, ${skipped} baris dilewati.` : "."}`,
 		);
+
+		if (mode === "drag" && importDragFileRef.current) {
+			importDragFileRef.current.value = "";
+		} else if (mode === "mc" && importMcFileRef.current) {
+			importMcFileRef.current.value = "";
+		}
+		} finally {
+			setIsImporting(false);
+		}
 	};
 
 	return (
@@ -593,9 +608,10 @@ function CreatePracticeContent({
 								variant="outline"
 								color="blue"
 								size="sm"
+								disabled={isImporting}
 								onClick={() => handleImportCsv("mc")}
 							>
-								Import
+								{isImporting ? "Mengimpor..." : "Import"}
 							</Button>
 							<a
 								href={route(templateRouteName, { practice: practice?.id, type: "mc" })}
@@ -627,9 +643,10 @@ function CreatePracticeContent({
 								variant="outline"
 								color="blue"
 								size="sm"
+								disabled={isImporting}
 								onClick={() => handleImportCsv("drag")}
 							>
-								Import
+								{isImporting ? "Mengimpor..." : "Import"}
 							</Button>
 							<a
 								href={route(templateRouteName, { practice: practice?.id, type: "drag" })}
