@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/Layouts/AppLayout";
-import { router } from "@inertiajs/react";
+import { router, usePage } from "@inertiajs/react";
 import Icons from "@/icons";
 import { FaQuestionCircle } from "react-icons/fa";
 
@@ -11,6 +11,9 @@ import { canStartPractice, getPracticeStatus } from "@/Features/practice/core";
 import { useTour } from "@/Hooks/useTour";
 
 export default function Index({ practices = [], hasClass = true }) {
+    const { auth } = usePage().props;
+    const rawRole = auth?.user?.role ?? auth?.user?.roles?.[0]?.name ?? auth?.user?.roles?.[0] ?? "tamu";
+    const isGuest = String(rawRole).toLowerCase() === "tamu";
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [selectedPractice, setSelectedPractice] = useState(null);
     const [tab, setTab] = useState("all");
@@ -72,8 +75,8 @@ export default function Index({ practices = [], hasClass = true }) {
     }, [practices, tab]);
 
     const canStart = useMemo(() => {
-        return canStartPractice(selectedPractice);
-    }, [selectedPractice]);
+        return canStartPractice(selectedPractice) && !isGuest;
+    }, [selectedPractice, isGuest]);
 
     const openSidebar = (practice) => {
         if (practice?.is_locked) return;
@@ -150,6 +153,10 @@ export default function Index({ practices = [], hasClass = true }) {
                                     onClose={closeSidebar}
                                     onStart={handleStartPractice}
                                     canStart={canStart}
+                                    startLabel={isGuest ? "Gabung ke kelas terlebih dahulu" : undefined}
+                                    showJoinCta={isGuest}
+                                    joinHref={isGuest ? route("dashboard") : undefined}
+                                    joinLabel="Gabung Kelas"
                                 />
                             </div>
                         )}
@@ -189,6 +196,10 @@ export default function Index({ practices = [], hasClass = true }) {
                                         onClose={closeSidebar}
                                         onStart={handleStartPractice}
                                         canStart={canStart}
+                                        startLabel={isGuest ? "Gabung ke kelas terlebih dahulu" : undefined}
+                                        showJoinCta={isGuest}
+                                        joinHref={isGuest ? route("dashboard") : undefined}
+                                        joinLabel="Gabung Kelas"
                                     />
                                 </div>
                             </aside>

@@ -18,6 +18,10 @@ export default function PracticeSidebar({
   onClose,
   onStart,
   canStart = true,
+  startLabel,
+  showJoinCta = false,
+  joinHref,
+  joinLabel,
 }) {
   const [openLevels, setOpenLevels] = React.useState({
     easy: false,
@@ -138,24 +142,39 @@ export default function PracticeSidebar({
 
       {/* CTA — sticky di bawah, tidak ikut scroll */}
       <div className="p-5 pt-3 border-t border-slate-100 flex-shrink-0">
-        <Button
-          type="button"
-          disabled={!canStart}
-          onClick={() => onStart?.()}
-          variant="solid"
-          color="indigo"
-          size="lg"
-          className={`w-full rounded-2xl font-semibold py-3.5 transition-all
-            ${!canStart
-              ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none"
-              : "shadow-[0_4px_14px_0_rgb(79,70,229,0.3)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.2)] hover:bg-indigo-700"
-            }`}
-        >
-          <span className="inline-flex items-center gap-2 text-sm">
-            {flow.button}
-            <FaArrowRight style={{ fontSize: 11 }} />
-          </span>
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button
+            type="button"
+            disabled={!canStart}
+            onClick={() => onStart?.()}
+            variant="solid"
+            color="indigo"
+            size="lg"
+            className={`w-full rounded-2xl font-semibold py-3.5 transition-all
+              ${!canStart
+                ? "bg-slate-100 text-slate-400 border border-slate-200 shadow-none"
+                : "shadow-[0_4px_14px_0_rgb(79,70,229,0.3)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.2)] hover:bg-indigo-700"
+              }`}
+          >
+            <span className="inline-flex items-center gap-2 text-sm">
+              {startLabel ?? flow.button}
+              <FaArrowRight style={{ fontSize: 11 }} />
+            </span>
+          </Button>
+
+          {showJoinCta && joinHref && (
+            <Button
+              as={Link}
+              href={joinHref}
+              variant="outline"
+              color="blue"
+              size="lg"
+              className="w-full rounded-2xl font-semibold py-3.5"
+            >
+              {joinLabel ?? "Gabung Kelas"}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

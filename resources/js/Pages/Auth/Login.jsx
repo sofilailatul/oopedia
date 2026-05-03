@@ -141,8 +141,6 @@ export default function Login({ status }) {
           <div className="relative hidden h-full lg:block">
             <div className="absolute bottom-20 left-16 max-w-[580px] text-white">
               <h1 className="mt-6 text-5xl font-semibold leading-[1.05]">
-              Balik lagi,
-              <br />
               lanjutkan progres
               <br />
               belajarmu di
