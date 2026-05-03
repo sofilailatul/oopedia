@@ -45,6 +45,12 @@ class PracticeController extends Controller
     public function entry(MaterialModel $material)
     {
         $user = Auth::user();
+        $role = strtolower($user->role ?? 'tamu');
+
+        if ($role === 'tamu') {
+            return redirect()->route('practices.index')
+                ->with('error', 'Gabung kelas terlebih dahulu untuk memulai latihan soal.');
+        }
 
         $progress = UserProgressModel::firstOrCreate(
             [
