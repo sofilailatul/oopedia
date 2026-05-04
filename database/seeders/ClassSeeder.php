@@ -11,13 +11,19 @@ class ClassSeeder extends Seeder
     public function run(): void
     {
         $classA = ClassModel::updateOrCreate(
-            ['class_code' => 'OOP-A-2026'],
-            ['class_name' => 'OOP Kelas A', 'description' => 'Kelas demo A']
+            ['class_code' => 'SIB2D'],
+            [
+                'class_name' => 'SIB 2 - D',
+                'description' => 'KELAS SIB 2D',
+            ]
         );
 
         $classB = ClassModel::updateOrCreate(
-            ['class_code' => 'OOP-B-2026'],
-            ['class_name' => 'OOP Kelas B', 'description' => 'Kelas demo B']
+            ['class_code' => 'SIB2C'],
+            [
+                'class_name' => 'SIB 2 - C',
+                'description' => 'KELAS SIB 2C',
+            ]
         );
 
         SeederState::$classAId = (int) $classA->id;
