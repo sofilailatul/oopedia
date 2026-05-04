@@ -65,7 +65,6 @@ class ProgressController extends Controller
             $class = $classQuery->findOrFail($selectedClassId);
 
             $quizzes = QuizModel::where('class_id', $class->id)
-                ->where('created_by', $user->id)
                 ->orderBy('id')
                 ->get(['id', 'title']);
 

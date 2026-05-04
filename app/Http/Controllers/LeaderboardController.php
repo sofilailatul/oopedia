@@ -76,17 +76,6 @@ class LeaderboardController extends Controller
 
         // Ambil nama kelas
         $className = DB::table('classes')->where('id', $classId)->value('class_name');
-        $lecturerId = DB::table('classes')->where('id', $classId)->value('created_by');
-
-        if (!$lecturerId) {
-            return Inertia::render('Mahasiswa/Leaderboard/Index', [
-                'rankings' => [],
-                'materials' => [],
-                'currentUserId' => $user->id,
-                'className' => $className,
-                'hasClass' => true,
-            ]);
-        }
 
         // Ambil semua user di kelas ini
         $classmateIds = DB::table('class_user')
@@ -98,9 +87,8 @@ class LeaderboardController extends Controller
             ->get(['id', 'nama', 'email'])
             ->keyBy('id');
 
-        // Ambil semua materi milik dosen kelas ini
+        // Ambil semua materi (tanpa filter dosen)
         $materials = MaterialModel::query()
-            ->where('created_by', $lecturerId)
             ->orderBy('order_number')
             ->get(['id', 'material_name']);
 
