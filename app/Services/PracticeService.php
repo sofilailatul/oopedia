@@ -23,26 +23,22 @@ class PracticeService
             ->where('user_id', $userId)
             ->value('class_id');
 
-        if (!$classId) {
-            return collect();
+        $lecturerId = null;
+        if ($classId) {
+            $lecturerId = DB::table('classes')
+                ->where('id', $classId)
+                ->value('created_by');
         }
 
-        $lecturerId = DB::table('classes')
-            ->where('id', $classId)
-            ->value('created_by');
-
-        if (!$lecturerId) {
-            return collect();
-        }
-
-        // Semua latihan soal yang tersedia untuk kelas ini
-        $practiceRows = PracticeModel::query()
+        // Semua latihan soal yang tersedia
+        $query = PracticeModel::query()
             ->with('material:id,material_name,created_by')
-            ->whereHas('material', function ($q) use ($lecturerId) {
-                $q->where('created_by', $lecturerId);
-            })
-            ->orderBy('material_id')
-            ->get();
+            ->orderBy('material_id');
+
+        // Optional: If we want to restrict to lecturer's materials ONLY when they have a class.
+        // But the user requested "revisi agar latihan yang tampil itu semua latihan yang ada".
+        // So we just get all practices.
+        $practiceRows = $query->get();
 
         // Progress membaca materi per user (apakah sudah pernah selesai membaca)
         $readProgress = DB::table('user_progress')
