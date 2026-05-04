@@ -361,6 +361,7 @@ function ShowClassModal({ classId, lecturerName }) {
 	const [data, setData] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
+	const [removingId, setRemovingId] = useState(null);
 
 	React.useEffect(() => {
 		let mounted = true;
@@ -396,6 +397,35 @@ function ShowClassModal({ classId, lecturerName }) {
 
 	const initials = (name) => name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
 	const avatarColors = ['bg-violet-100 text-violet-700','bg-sky-100 text-sky-700','bg-emerald-100 text-emerald-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700'];
+
+	const handleRemoveStudent = (student) => {
+		popup.confirm({
+			title: 'Keluarkan mahasiswa',
+			message: `Yakin ingin mengeluarkan ${student?.nama || student?.name || 'mahasiswa'} dari kelas ini?`,
+			confirmText: 'Ya, keluarkan',
+			onConfirm: async () => {
+				if (removingId) return;
+				setRemovingId(student.id);
+				try {
+					await window.axios.delete(`/classes/${classId}/students/${student.id}`);
+					setData((prev) => prev
+						? { ...prev, users: (prev.users || []).filter((u) => u.id !== student.id) }
+						: prev
+					);
+					popup.alert({
+						type: 'success',
+						title: 'Berhasil',
+						message: 'Mahasiswa berhasil dikeluarkan dari kelas.',
+					});
+				} catch (err) {
+					const message = getApiErrorMessage(err, 'Gagal mengeluarkan mahasiswa.');
+					popup.alert({ type: 'error', title: 'Gagal', message });
+				} finally {
+					setRemovingId(null);
+				}
+			},
+		});
+	};
 
 	return (
 		<div className="space-y-5">
@@ -436,6 +466,16 @@ function ShowClassModal({ classId, lecturerName }) {
 									{initials(s.nama || s.name)}
 								</span>
 								<span className="text-[12px] font-medium text-slate-700 truncate">{s.nama || s.name}</span>
+								<div className="ml-auto flex items-center gap-2">
+									<button
+										type="button"
+										onClick={() => handleRemoveStudent(s)}
+										disabled={removingId === s.id}
+										className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+									>
+										{removingId === s.id ? 'Menghapus...' : 'Keluarkan'}
+									</button>
+								</div>
 							</li>
 						))}
 					</ul>
