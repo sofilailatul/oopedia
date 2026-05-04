@@ -123,6 +123,43 @@ class ClassController extends Controller
         return response()->json(['message' => 'deleted']);
     }
 
+    public function removeStudent(Request $request, $class, $studentId)
+    {
+        $actor = $request->user();
+        $role = strtolower($actor->role ?? '');
+
+        $class = ClassModel::findOrFail($class);
+
+        if ($role === 'dosen' && (int) $class->created_by !== (int) $actor->id) {
+            abort(403, 'Anda tidak memiliki akses ke kelas ini.');
+        }
+
+        $student = UserModel::findOrFail($studentId);
+
+        $isInClass = $class->users()->where('users.id', $studentId)->exists();
+        if (!$isInClass) {
+            return response()->json(['message' => 'Mahasiswa tidak terdaftar di kelas ini.'], 404);
+        }
+
+        DB::transaction(function () use ($class, $student) {
+            $class->users()->detach($student->id);
+
+            UserProgressModel::where('user_id', $student->id)
+                ->where('class_id', $class->id)
+                ->delete();
+
+            $remainingClasses = DB::table('class_user')
+                ->where('user_id', $student->id)
+                ->count();
+
+            if ($remainingClasses === 0 && $student->role === 'mahasiswa') {
+                $student->update(['role' => 'tamu']);
+            }
+        });
+
+        return response()->json(['message' => 'Mahasiswa berhasil dikeluarkan dari kelas.']);
+    }
+
     public function join(Request $request)
     {
         try {

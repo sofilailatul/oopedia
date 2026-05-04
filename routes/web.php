@@ -183,6 +183,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/classes', [ClassController::class, 'store'])->name('classes.store');
         Route::put('/classes/{class}', [ClassController::class, 'update'])->name('classes.update');
         Route::delete('/classes/{class}', [ClassController::class, 'destroy'])->name('classes.destroy');
+        Route::delete('/classes/{class}/students/{student}', [ClassController::class, 'removeStudent'])
+            ->name('classes.students.remove');
 
         // ===== PRACTICE (Common) =====
         Route::post('/practices', [DosenPracticeController::class, 'store'])->name('dosen.practices.store');
