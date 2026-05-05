@@ -250,9 +250,16 @@ class LeaderboardController extends Controller
         // Build rankings
         $rankings = [];
         foreach ($users as $u) {
-            $totalScore = 0;
-            $materialBreakdown = [];
+            $totalQuizScore = 0;
+            $efficiencyPoints = 0;
 
+            // Calculate Total Quiz Score from latest attempts
+            $userLatestAttempts = array_filter($latestAttemptPerUserQuiz, fn($att) => $att->user_id == $u->id);
+            foreach ($userLatestAttempts as $att) {
+                $totalQuizScore += $att->total_score;
+            }
+
+            $materialBreakdown = [];
             foreach ($materials as $mat) {
                 $pretest = $practiceMap[$u->id][$mat->id]['pretest'] ?? 0;
                 
@@ -267,13 +274,20 @@ class LeaderboardController extends Controller
                 
                 $quizScore = $quizMap[$u->id][$mat->id] ?? 0;
 
-                // Total per material: hanya mode normal (easy + medium + hard).
-                // Pretest, kuis, dan remedial TIDAK dihitung ke total.
-                $materialTotal = $easyNormal
-                                + $mediumNormal
-                                + $hardNormal;
+                // Total per material (for detail display)
+                $materialTotal = $easyNormal + $mediumNormal + $hardNormal;
 
-                $totalScore += $materialTotal;
+                // Efficiency Points (Tie-breaker logic)
+                $hasPassedHard = $hardNormal >= 80 || $hardRemed >= 80;
+                if ($hasPassedHard) {
+                    if ($pretest >= 80) {
+                        $efficiencyPoints += 3;
+                    } elseif ($pretest >= 60) {
+                        $efficiencyPoints += 2;
+                    } else {
+                        $efficiencyPoints += 1;
+                    }
+                }
 
                 $materialBreakdown[] = [
                     'material_id' => $mat->id,
@@ -291,17 +305,24 @@ class LeaderboardController extends Controller
             }
 
             $rankings[] = [
-                'user_id'      => $u->id,
-                'nama'         => $u->nama,
-                'email'        => $u->email,
-                'total_score'  => $totalScore,
-                'materials'    => $materialBreakdown,
-                'quiz_attempts'=> $quizAttemptsMap[$u->id] ?? [],
+                'user_id'           => $u->id,
+                'nama'              => $u->nama,
+                'email'             => $u->email,
+                'total_score'       => $totalQuizScore, // Set total_score to quiz sum
+                'efficiency_points' => $efficiencyPoints,
+                'materials'         => $materialBreakdown,
+                'quiz_attempts'     => $quizAttemptsMap[$u->id] ?? [],
             ];
         }
 
-        // Sort by total_score desc, assign rank
-        usort($rankings, fn($a, $b) => $b['total_score'] <=> $a['total_score']);
+        // Sort by total_score desc (Quiz), then efficiency_points desc (Practice Path)
+        usort($rankings, function($a, $b) {
+            if ($b['total_score'] !== $a['total_score']) {
+                return $b['total_score'] <=> $a['total_score'];
+            }
+            return $b['efficiency_points'] <=> $a['efficiency_points'];
+        });
+
         foreach ($rankings as $i => &$r) {
             $r['rank'] = $i + 1;
         }
