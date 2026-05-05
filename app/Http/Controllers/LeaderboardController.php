@@ -58,11 +58,30 @@ class LeaderboardController extends Controller
     public function combined(Request $request)
     {
         $user = $request->user();
+        $isMahasiswa = $user->role === 'mahasiswa';
+        $isSuperadmin = $user->role === 'superadmin';
 
-        // Ambil class_id user saat ini
-        $classId = DB::table('class_user')
-            ->where('user_id', $user->id)
-            ->value('class_id');
+        // Available classes for Dosen/Admin
+        $availableClasses = collect();
+        if (!$isMahasiswa) {
+            $classesQuery = DB::table('classes')->orderBy('class_name');
+            if (!$isSuperadmin) {
+                $classesQuery->where('created_by', $user->id);
+            }
+            $availableClasses = $classesQuery->get(['id', 'class_name', 'class_code']);
+        }
+
+        // Selected Class ID
+        $classId = $request->query('class_id');
+        if (!$classId) {
+            if ($isMahasiswa) {
+                $classId = DB::table('class_user')
+                    ->where('user_id', $user->id)
+                    ->value('class_id');
+            } else {
+                $classId = $availableClasses->first()?->id;
+            }
+        }
 
         if (!$classId) {
             return Inertia::render('Mahasiswa/Leaderboard/Index', [
@@ -71,11 +90,14 @@ class LeaderboardController extends Controller
                 'currentUserId' => $user->id,
                 'className' => null,
                 'hasClass' => false,
+                'authUser' => $user,
+                'availableClasses' => $availableClasses,
             ]);
         }
 
         // Ambil nama kelas
-        $className = DB::table('classes')->where('id', $classId)->value('class_name');
+        $classData = DB::table('classes')->where('id', $classId)->first();
+        $className = $classData?->class_name;
 
         // Ambil semua user di kelas ini
         $classmateIds = DB::table('class_user')
@@ -245,10 +267,9 @@ class LeaderboardController extends Controller
                 
                 $quizScore = $quizMap[$u->id][$mat->id] ?? 0;
 
-                // Total per material: hanya mode normal (pretest + easy + medium + hard).
-                // Kuis dan remedial TIDAK dihitung ke total.
-                $materialTotal = $pretest
-                                + $easyNormal
+                // Total per material: hanya mode normal (easy + medium + hard).
+                // Pretest, kuis, dan remedial TIDAK dihitung ke total.
+                $materialTotal = $easyNormal
                                 + $mediumNormal
                                 + $hardNormal;
 
@@ -294,6 +315,9 @@ class LeaderboardController extends Controller
             'currentUserId' => $user->id,
             'className' => $className,
             'hasClass' => true,
+            'authUser' => $user,
+            'availableClasses' => $availableClasses,
+            'selectedClassId' => (int) $classId,
         ]);
     }
 

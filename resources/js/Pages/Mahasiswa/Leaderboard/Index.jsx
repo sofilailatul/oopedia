@@ -212,7 +212,31 @@ function PodiumCard({ entry, rank, isCurrentUser }) {
   );
 }
 
-export default function Index({ rankings = [], materials = [], currentUserId, className, hasClass = true }) {
+export default function Index({ 
+  rankings = [], 
+  materials = [], 
+  currentUserId, 
+  className, 
+  hasClass = true,
+  authUser,
+  availableClasses = [],
+  selectedClassId = null
+}) {
+  const role = (authUser?.role || "").toLowerCase();
+  const isAdminOrDosen = role === "superadmin" || role === "dosen";
+  const isSuperadmin = role === "superadmin";
+
+  const exportPath = isAdminOrDosen
+    ? isSuperadmin 
+      ? route("grades.export")
+      : route("dosen.grades.export")
+    : null;
+
+  const handleClassChange = (e) => {
+    const id = e.target.value;
+    const currentPath = window.location.pathname;
+    window.location.href = `${currentPath}?class_id=${id}`;
+  };
   const pageTitle = className ? `Leaderboard Kelas ${className}` : "Leaderboard Kelas";
   const [expandedUser, setExpandedUser] = useState(null);
 
@@ -228,6 +252,42 @@ export default function Index({ rankings = [], materials = [], currentUserId, cl
   return (
     <AppLayout title="Leaderboard Kelas" label="Leaderboard">
       <div className="mx-auto px-2 space-y-8">
+        
+        {isAdminOrDosen && availableClasses.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-100 text-sky-600">
+                <Icons.Class className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Pilih Kelas</p>
+                <select 
+                  className="mt-0.5 border-none bg-transparent p-0 text-sm font-bold text-slate-900 focus:ring-0"
+                  value={selectedClassId || ""}
+                  onChange={handleClassChange}
+                >
+                  {availableClasses.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.class_name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {hasClass && (
+              <a
+                href={`${exportPath}?class_id=${selectedClassId}`}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export Excel Rekap Nilai
+              </a>
+            )}
+          </div>
+        )}
 
         {!hasClass && (
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-8 text-center">

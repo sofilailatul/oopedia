@@ -12,7 +12,10 @@ use App\Models\UserModel;
 use App\Models\UserProgressModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ProgressController extends Controller
 {
@@ -213,6 +216,375 @@ class ProgressController extends Controller
             'backRouteName' => $backRouteName,
             'authUser' => $lecturer,
         ]);
+    }
+
+    public function exportClassScores(Request $request)
+    {
+        $user = $request->user();
+        $classId = $request->integer('class_id');
+
+        if (!$classId) {
+            abort(404, 'Class ID is required.');
+        }
+
+        $isSuperadmin = $user->role === 'superadmin';
+
+        $classQuery = ClassModel::with([
+            'users' => function ($q) {
+                $q->where('role', 'mahasiswa')->orderBy('nama');
+            },
+        ]);
+
+        if (!$isSuperadmin) {
+            $classQuery->where('created_by', $user->id);
+        }
+
+        $class = $classQuery->findOrFail($classId);
+        Log::info('Export class scores class resolved', [
+            'class_id' => $class->id,
+            'class_code' => $class->class_code,
+            'class_name' => $class->class_name,
+        ]);
+        $students = $class->users;
+        $studentIds = $students->pluck('id');
+
+        $materials = MaterialModel::query()
+            ->orderBy('order_number')
+            ->get(['id', 'material_name']);
+        $materialIds = $materials->pluck('id');
+
+        $practiceMap = [];
+        if ($studentIds->isNotEmpty() && $materialIds->isNotEmpty()) {
+            $practiceAttempts = DB::table('practice_attempts')
+                ->join('practices', 'practices.id', '=', 'practice_attempts.practices_id')
+                ->whereIn('practice_attempts.user_id', $studentIds)
+                ->whereNotNull('practice_attempts.finished_at')
+                ->whereIn('practices.material_id', $materialIds)
+                ->select(
+                    'practice_attempts.user_id',
+                    'practices.material_id',
+                    'practices.level',
+                    'practice_attempts.attempt_type',
+                    'practice_attempts.mode',
+                    DB::raw('MAX(practice_attempts.final_score) as best_score')
+                )
+                ->groupBy('practice_attempts.user_id', 'practices.material_id', 'practices.level', 'practice_attempts.attempt_type', 'practice_attempts.mode')
+                ->get();
+
+            foreach ($practiceAttempts as $row) {
+                $key = $row->level;
+                if ($key === 'normal') {
+                    $key = 'medium';
+                }
+
+                if ($row->attempt_type === 'pretest') {
+                    $key = 'pretest';
+                } elseif ($row->mode === 'focused_remedial') {
+                    $remedLevel = $row->level === 'normal' ? 'medium' : $row->level;
+                    $key = 'remed_' . $remedLevel;
+                }
+
+                $practiceMap[$row->user_id][$row->material_id][$key] = (int) $row->best_score;
+            }
+        }
+
+        $quizzes = QuizModel::query()
+            ->where('class_id', $class->id)
+            ->orderBy('id')
+            ->get(['id', 'title']);
+        $quizIds = $quizzes->pluck('id');
+
+        $latestAttempts = collect();
+        if ($studentIds->isNotEmpty() && $quizIds->isNotEmpty()) {
+            $attempts = QuizAttemptModel::query()
+                ->whereIn('user_id', $studentIds)
+                ->whereIn('quizzes_id', $quizIds)
+                ->whereNotNull('finished_at')
+                ->orderBy('finished_at')
+                ->get(['id', 'user_id', 'quizzes_id', 'total_score', 'finished_at']);
+
+            $latestAttempts = $attempts->groupBy(function ($attempt) {
+                return $attempt->user_id . '-' . $attempt->quizzes_id;
+            })->map(function ($group) {
+                return $group->last();
+            });
+        }
+
+        $attemptIds = $latestAttempts->pluck('id')->filter()->values();
+        $materialScores = collect();
+        if ($attemptIds->isNotEmpty()) {
+            $materialScores = DB::table('quiz_attempt_material_scores')
+                ->whereIn('quiz_attempts_id', $attemptIds)
+                ->select('quiz_attempts_id', 'material_id', 'earned_score', 'max_score')
+                ->get()
+                ->groupBy('quiz_attempts_id');
+        }
+
+        $fileName = 'nilai_kelas_' . $class->class_code . '_' . now()->format('Ymd_His') . '.xlsx';
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+            $header = ['Nama', 'Email'];
+            foreach ($materials as $material) {
+                $prefix = 'Materi ' . $material->material_name . ' - ';
+                $header[] = $prefix . 'Pretest';
+                $header[] = $prefix . 'Easy';
+                $header[] = $prefix . 'Remed Easy';
+                $header[] = $prefix . 'Medium';
+                $header[] = $prefix . 'Remed Medium';
+                $header[] = $prefix . 'Hard';
+                $header[] = $prefix . 'Remed Hard';
+            }
+
+            foreach ($quizzes as $quiz) {
+                $header[] = 'Quiz ' . $quiz->title . ' - Total';
+            }
+
+            foreach ($quizzes as $quiz) {
+                foreach ($materials as $material) {
+                    $header[] = 'Quiz ' . $quiz->title . ' - ' . $material->material_name . ' (%)';
+                }
+            }
+
+        $sheet->fromArray($header, null, 'A1');
+
+        $rowIndex = 2;
+        foreach ($students as $student) {
+            $row = [$student->nama, $student->email];
+
+            foreach ($materials as $material) {
+                $scores = $practiceMap[$student->id][$material->id] ?? [];
+                $row[] = $scores['pretest'] ?? 0;
+                $row[] = $scores['easy'] ?? 0;
+                $row[] = $scores['remed_easy'] ?? 0;
+                $row[] = $scores['medium'] ?? 0;
+                $row[] = $scores['remed_medium'] ?? 0;
+                $row[] = $scores['hard'] ?? 0;
+                $row[] = $scores['remed_hard'] ?? 0;
+            }
+
+            foreach ($quizzes as $quiz) {
+                $key = $student->id . '-' . $quiz->id;
+                $attempt = $latestAttempts->get($key);
+                $row[] = $attempt ? (int) $attempt->total_score : '';
+            }
+
+            foreach ($quizzes as $quiz) {
+                $key = $student->id . '-' . $quiz->id;
+                $attempt = $latestAttempts->get($key);
+                $attemptScores = $attempt
+                    ? $materialScores->get($attempt->id, collect())
+                    : collect();
+
+                $scoreMap = $attemptScores->keyBy('material_id');
+
+                foreach ($materials as $material) {
+                    $entry = $scoreMap->get($material->id);
+                    if (! $entry || (int) $entry->max_score === 0) {
+                        $row[] = '';
+                        continue;
+                    }
+
+                    $percent = round(((int) $entry->earned_score / (int) $entry->max_score) * 100);
+                    $row[] = $percent;
+                }
+            }
+
+            $sheet->fromArray($row, null, 'A' . $rowIndex);
+            $rowIndex++;
+        }
+
+        $tmpDir = storage_path('app/tmp');
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $filePath = $tmpDir . DIRECTORY_SEPARATOR . $fileName;
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($filePath);
+
+        return response()->download(
+            $filePath,
+            $fileName,
+            ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+        )->deleteFileAfterSend(true);
+    }
+
+    public function getLatestQuizAttempt(Request $request, int $classId, int $studentId, int $quizId)
+    {
+        $user = $request->user();
+        $isSuperadmin = $user->role === 'superadmin';
+
+        $classQuery = ClassModel::query();
+        if (! $isSuperadmin) {
+            $classQuery->where('created_by', $user->id);
+        }
+
+        $class = $classQuery->findOrFail($classId);
+
+        $isMember = DB::table('class_user')
+            ->where('class_id', $class->id)
+            ->where('user_id', $studentId)
+            ->exists();
+        abort_unless($isMember, 404);
+
+        $quiz = QuizModel::where('class_id', $class->id)->findOrFail($quizId);
+
+        $attempt = QuizAttemptModel::query()
+            ->where('user_id', $studentId)
+            ->where('quizzes_id', $quiz->id)
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at')
+            ->first();
+
+        if (! $attempt) {
+            // If no attempt, return materials from quiz with 0 scores
+            $materials = $quiz->materials()->orderBy('order_number')->get();
+            $materialScores = $materials->map(function ($m) {
+                return [
+                    'material_id' => $m->id,
+                    'material_name' => $m->material_name,
+                    'earned_score' => 0,
+                    'max_score' => 0,
+                    'percentage' => 0,
+                ];
+            });
+
+            return response()->json([
+                'attempt_id' => null,
+                'quiz_id' => $quiz->id,
+                'quiz_title' => $quiz->title,
+                'total_score' => 0,
+                'materials' => $materialScores,
+            ]);
+        }
+
+        $materialScores = DB::table('quiz_attempt_material_scores')
+            ->join('materials', 'materials.id', '=', 'quiz_attempt_material_scores.material_id')
+            ->where('quiz_attempts_id', $attempt->id)
+            ->select(
+                'quiz_attempt_material_scores.material_id',
+                'materials.material_name',
+                'quiz_attempt_material_scores.earned_score',
+                'quiz_attempt_material_scores.max_score',
+                'quiz_attempt_material_scores.percentage'
+            )
+            ->orderBy('materials.order_number')
+            ->get();
+
+        return response()->json([
+            'attempt_id' => $attempt->id,
+            'quiz_id' => $quiz->id,
+            'quiz_title' => $quiz->title,
+            'total_score' => (int) ($attempt->total_score ?? 0),
+            'materials' => $materialScores,
+        ]);
+    }
+
+    public function updateLatestQuizAttempt(Request $request, int $classId, int $studentId, int $quizId)
+    {
+        $user = $request->user();
+        $isSuperadmin = $user->role === 'superadmin';
+
+        $classQuery = ClassModel::query();
+        if (! $isSuperadmin) {
+            $classQuery->where('created_by', $user->id);
+        }
+
+        $class = $classQuery->findOrFail($classId);
+
+        $isMember = DB::table('class_user')
+            ->where('class_id', $class->id)
+            ->where('user_id', $studentId)
+            ->exists();
+        abort_unless($isMember, 404);
+
+        $quiz = QuizModel::where('class_id', $class->id)->findOrFail($quizId);
+
+        $attempt = QuizAttemptModel::query()
+            ->where('user_id', $studentId)
+            ->where('quizzes_id', $quiz->id)
+            ->whereNotNull('finished_at')
+            ->orderByDesc('finished_at')
+            ->first();
+
+        if (! $attempt) {
+            $attempt = QuizAttemptModel::create([
+                'user_id' => $studentId,
+                'quizzes_id' => $quiz->id,
+                'started_at' => now(),
+                'finished_at' => now(),
+                'total_score' => 0,
+            ]);
+        }
+
+        $data = $request->validate([
+            'total_score' => ['nullable', 'integer', 'min:0'],
+            'materials' => ['nullable', 'array'],
+            'materials.*.material_id' => ['required_with:materials', 'integer'],
+            'materials.*.earned_score' => ['required_with:materials', 'integer', 'min:0'],
+            'materials.*.max_score' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $totalScore = $data['total_score'] ?? null;
+        $materialsPayload = $data['materials'] ?? [];
+
+        DB::transaction(function () use ($attempt, $materialsPayload, &$totalScore) {
+            $sumScore = 0;
+
+            foreach ($materialsPayload as $item) {
+                $materialId = (int) $item['material_id'];
+                $earnedScore = (int) $item['earned_score'];
+                $maxScore = array_key_exists('max_score', $item)
+                    ? (int) $item['max_score']
+                    : null;
+
+                $scoreRow = DB::table('quiz_attempt_material_scores')
+                    ->where('quiz_attempts_id', $attempt->id)
+                    ->where('material_id', $materialId)
+                    ->first();
+
+                $finalMaxScore = $maxScore ?? (int) ($scoreRow->max_score ?? 0);
+                $percentage = $finalMaxScore > 0
+                    ? (int) round(($earnedScore / $finalMaxScore) * 100)
+                    : 0;
+
+                if ($scoreRow) {
+                    DB::table('quiz_attempt_material_scores')
+                        ->where('quiz_attempts_id', $attempt->id)
+                        ->where('material_id', $materialId)
+                        ->update([
+                            'earned_score' => $earnedScore,
+                            'max_score' => $finalMaxScore,
+                            'percentage' => $percentage,
+                            'updated_at' => now(),
+                        ]);
+                } else {
+                    DB::table('quiz_attempt_material_scores')
+                        ->insert([
+                            'quiz_attempts_id' => $attempt->id,
+                            'material_id' => $materialId,
+                            'earned_score' => $earnedScore,
+                            'max_score' => $finalMaxScore,
+                            'percentage' => $percentage,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                }
+
+                $sumScore += $earnedScore;
+            }
+
+            if ($totalScore === null) {
+                $totalScore = $sumScore;
+            }
+
+            QuizAttemptModel::where('id', $attempt->id)
+                ->update(['total_score' => $totalScore]);
+        });
+
+        return response()->json(['message' => 'Nilai quiz berhasil diperbarui.']);
     }
 
     private function resolvePracticeStatus($lastAttempt): string
