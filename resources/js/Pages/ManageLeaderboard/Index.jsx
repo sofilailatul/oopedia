@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import AppLayout from "@/Layouts/AppLayout";
 import Card from "@/Components/Card";
 import Button from "@/Components/Button";
 import { router, Link } from "@inertiajs/react";
+import { usePopup } from "@/Components/PopUp/PopUpProvider";
 
 export default function ManageLeaderboardIndex({ authUser, classes = [], selectedClassId = null, classDetail = null }) {
 	const role = (authUser?.role || "").toLowerCase();
@@ -20,6 +21,202 @@ export default function ManageLeaderboardIndex({ authUser, classes = [], selecte
 				/>
 			</div>
 		</AppLayout>
+	);
+}
+
+function EditQuizScoreModal({
+	classId,
+	student,
+	quiz,
+	fetchRouteName,
+	updateRouteName,
+	onSaved,
+}) {
+	const popup = usePopup();
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState("");
+	const [materials, setMaterials] = useState([]);
+	const [totalScore, setTotalScore] = useState(0);
+	const [saving, setSaving] = useState(false);
+
+	useEffect(() => {
+		let mounted = true;
+		setLoading(true);
+		setError("");
+
+		window.axios
+			.get(route(fetchRouteName, { class: classId, student: student.id, quiz: quiz.id }))
+			.then((res) => {
+				if (!mounted) return;
+				const data = res.data || {};
+				setTotalScore(Number(data.total_score ?? 0));
+				setMaterials(
+					(data.materials || []).map((item) => ({
+						material_id: item.material_id,
+						material_name: item.material_name,
+						earned_score: Number(item.earned_score ?? 0),
+						max_score: Number(item.max_score ?? 0),
+					}))
+				);
+			})
+			.catch(() => {
+				if (mounted) setError("Gagal memuat data quiz.");
+			})
+			.finally(() => {
+				if (mounted) setLoading(false);
+			});
+
+		return () => {
+			mounted = false;
+		};
+	}, [classId, student?.id, quiz?.id, fetchRouteName]);
+
+	const handleChange = (index, field, value) => {
+		setMaterials((prev) =>
+			prev.map((item, idx) =>
+				idx === index ? { ...item, [field]: Number(value) } : item
+			)
+		);
+	};
+
+	const computedTotal = useMemo(() => {
+		return materials.reduce((sum, item) => sum + (Number(item.earned_score) || 0), 0);
+	}, [materials]);
+
+	const handleSave = async () => {
+		if (saving) return;
+		setSaving(true);
+		setError("");
+
+		try {
+			await window.axios.put(
+				route(updateRouteName, { class: classId, student: student.id, quiz: quiz.id }),
+				{
+					total_score: Number(totalScore),
+					materials: materials.map((item) => ({
+						material_id: item.material_id,
+						earned_score: Number(item.earned_score) || 0,
+						max_score: Number(item.max_score) || 0,
+					})),
+				}
+			);
+
+			popup.alert({
+				type: "success",
+				title: "Berhasil",
+				message: "Nilai quiz berhasil diperbarui.",
+				onClose: () => popup.close(),
+			});
+			onSaved?.();
+		} catch (err) {
+			setError("Gagal menyimpan nilai quiz.");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	if (loading) {
+		return (
+			<div className="flex flex-col items-center justify-center py-10 gap-2">
+				<div className="h-8 w-8 rounded-full border-2 border-slate-200 border-t-slate-600 animate-spin" />
+				<p className="text-xs text-slate-400">Memuat data quiz...</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="space-y-4">
+			<div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+				<p className="text-xs font-semibold text-slate-500">Mahasiswa</p>
+				<p className="text-sm font-semibold text-slate-800">
+					{student?.nama} <span className="text-slate-400">•</span> {quiz?.title}
+				</p>
+			</div>
+
+			<div>
+				<label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Total Score</label>
+				<input
+					type="number"
+					min="0"
+					className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+					value={totalScore}
+					onChange={(e) => setTotalScore(e.target.value)}
+				/>
+				<p className="mt-1 text-[11px] text-slate-400">Total otomatis dari materi: {computedTotal}</p>
+			</div>
+
+			<div className="overflow-x-auto">
+				<table className="min-w-full text-xs">
+					<thead>
+						<tr className="text-slate-500">
+							<th className="text-left py-2">Materi</th>
+							<th className="text-center py-2">Skor</th>
+							<th className="text-center py-2">Maks</th>
+							<th className="text-center py-2">%</th>
+						</tr>
+					</thead>
+					<tbody>
+						{materials.length === 0 ? (
+							<tr>
+								<td colSpan={4} className="py-3 text-center text-slate-400">Tidak ada materi di quiz ini.</td>
+							</tr>
+						) : (
+							materials.map((item, idx) => {
+								const maxScore = Number(item.max_score) || 0;
+								const percent = maxScore > 0
+									? Math.round((Number(item.earned_score || 0) / maxScore) * 100)
+									: 0;
+
+								return (
+									<tr key={item.material_id} className="border-t border-slate-100">
+										<td className="py-2 text-slate-700">{item.material_name}</td>
+										<td className="py-2 text-center">
+											<input
+												type="number"
+												min="0"
+												className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-center"
+												value={item.earned_score}
+												onChange={(e) => handleChange(idx, "earned_score", e.target.value)}
+											/>
+										</td>
+										<td className="py-2 text-center">
+											<input
+												type="number"
+												min="0"
+												className="w-20 rounded-lg border border-slate-200 px-2 py-1 text-center"
+												value={item.max_score}
+												onChange={(e) => handleChange(idx, "max_score", e.target.value)}
+											/>
+										</td>
+										<td className="py-2 text-center font-semibold text-slate-600">{percent}</td>
+									</tr>
+								);
+							})
+						)}
+					</tbody>
+				</table>
+			</div>
+
+			{error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600">{error}</p>}
+
+			<div className="flex items-center justify-end gap-2">
+				<button
+					type="button"
+					className="rounded-xl border border-slate-200 px-4 py-2 text-[12px] font-semibold text-slate-600"
+					onClick={() => popup.close()}
+				>
+					Batal
+				</button>
+				<button
+					type="button"
+					disabled={saving}
+					className="rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-60"
+					onClick={handleSave}
+				>
+					{saving ? "Menyimpan..." : "Simpan"}
+				</button>
+			</div>
+		</div>
 	);
 }
 
@@ -120,6 +317,8 @@ function ClassList({ classes, selectedClassId, isSuperadmin }) {
 }
 
 function ScoreTable({ classDetail, isSuperadmin }) {
+  const popup = usePopup();
+
 	if (!classDetail) {
 		return (
 			<Card className="h-full rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center text-sm text-slate-500">
@@ -132,6 +331,29 @@ function ScoreTable({ classDetail, isSuperadmin }) {
 	const students = classDetail.students || [];
 	const classRouteName = isSuperadmin ? "classes.index" : "dosen.classes.index";
 	const gradeShowRouteName = isSuperadmin ? "grades.show" : "dosen.grades.show";
+	const exportRouteName = isSuperadmin ? "grades.export" : "dosen.grades.export";
+	const quizFetchRouteName = isSuperadmin ? "grades.quiz.latest" : "dosen.grades.quiz.latest";
+	const quizUpdateRouteName = isSuperadmin ? "grades.quiz.update" : "dosen.grades.quiz.update";
+	const exportPath = isSuperadmin
+		? route("grades.export")
+		: route("dosen.grades.export");
+
+	const openEditQuiz = (student, quiz) => {
+		popup.open({
+			title: "Edit nilai quiz",
+			size: "lg",
+			content: (
+				<EditQuizScoreModal
+					classId={classDetail.id}
+					student={student}
+					quiz={quiz}
+					fetchRouteName={quizFetchRouteName}
+					updateRouteName={quizUpdateRouteName}
+					onSaved={() => router.reload({ only: ["classDetail"] })}
+				/>
+			),
+		});
+	};
 
 	return (
 		<Card className="h-full rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
@@ -142,15 +364,28 @@ function ScoreTable({ classDetail, isSuperadmin }) {
 						Kode kelas {classDetail.class_code} &bull; {students.length} mahasiswa &bull; {quizzes.length} kuis
 					</p>
 				</div>
-				<Button
-					as="a"
-					variant="outline"
-					color="slate"
-					className="rounded-full border-slate-300 px-3 py-1 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50"
-					href={route(classRouteName)}
-				>
-					Kelola kelas
-				</Button>
+				<div className="flex flex-wrap items-center gap-2">
+					<a
+						href={`${exportPath}?class_id=${classDetail.id}`}
+						className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-700"
+						target="_blank"
+						rel="noreferrer"
+					>
+						<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+						</svg>
+						Export Excel
+					</a>
+					<Button
+						as="a"
+						variant="outline"
+						color="slate"
+						className="rounded-full border-slate-300 px-3 py-1 text-[11px] text-slate-600 hover:border-slate-400 hover:bg-slate-50"
+						href={route(classRouteName)}
+					>
+						Kelola kelas
+					</Button>
+				</div>
 			</div>
 			<div className="mt-0 overflow-x-auto">
 				<table className="min-w-full border-separate border-spacing-y-1 text-xs">
@@ -213,13 +448,22 @@ function ScoreTable({ classDetail, isSuperadmin }) {
 										const score = entry ? entry.score : null;
 										return (
 											<td key={quiz.id} className="px-3 py-2 text-center text-[11px]">
-												{score !== null ? (
-													<span className={score >= 70 ? "font-semibold text-emerald-600" : "font-semibold text-slate-700"}>
-														{score}
-													</span>
-												) : (
-													<span className="text-slate-400">-</span>
-												)}
+												<div className="flex flex-col items-center gap-1">
+													{score !== null ? (
+														<span className={score >= 70 ? "font-semibold text-emerald-600" : "font-semibold text-slate-700"}>
+															{score}
+														</span>
+													) : (
+														<span className="text-slate-400">-</span>
+													)}
+													<button
+														type="button"
+														onClick={() => openEditQuiz(student, quiz)}
+														className="text-[10px] font-semibold text-sky-600 hover:underline"
+													>
+														Edit
+													</button>
+												</div>
 											</td>
 										);
 									})}

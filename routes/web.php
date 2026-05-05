@@ -127,8 +127,14 @@ Route::middleware('auth')->group(function () {
         // ===== NILAI MAHASISWA (dosen) =====
         Route::get('/dosen/nilai-mahasiswa', [ProgressController::class, 'dosenClassScoresPage'])
             ->name('dosen.grades.index');
+        Route::get('/dosen/nilai-mahasiswa/export', [ProgressController::class, 'exportClassScores'])
+            ->name('dosen.grades.export');
         Route::get('/dosen/nilai-mahasiswa/{student}', [ProgressController::class, 'dosenStudentDetailPage'])
             ->name('dosen.grades.show');
+        Route::get('/dosen/nilai-mahasiswa/{class}/students/{student}/quizzes/{quiz}', [ProgressController::class, 'getLatestQuizAttempt'])
+            ->name('dosen.grades.quiz.latest');
+        Route::put('/dosen/nilai-mahasiswa/{class}/students/{student}/quizzes/{quiz}', [ProgressController::class, 'updateLatestQuizAttempt'])
+            ->name('dosen.grades.quiz.update');
 
         // ===== PRACTICE (dosen) =====
         Route::get('/dosen/latihan-soal', [DosenPracticeController::class, 'index'])
@@ -288,8 +294,14 @@ Route::middleware('auth')->group(function () {
         // Nilai Mahasiswa (superadmin) -> gunakan halaman ManageLeaderboard
         Route::get('/superadmin/nilai-mahasiswa', [ProgressController::class, 'dosenClassScoresPage'])
             ->name('grades.index');
+        Route::get('/superadmin/nilai-mahasiswa/export', [ProgressController::class, 'exportClassScores'])
+            ->name('grades.export');
         Route::get('/superadmin/nilai-mahasiswa/{student}', [ProgressController::class, 'dosenStudentDetailPage'])
             ->name('grades.show');
+        Route::get('/superadmin/nilai-mahasiswa/{class}/students/{student}/quizzes/{quiz}', [ProgressController::class, 'getLatestQuizAttempt'])
+            ->name('grades.quiz.latest');
+        Route::put('/superadmin/nilai-mahasiswa/{class}/students/{student}/quizzes/{quiz}', [ProgressController::class, 'updateLatestQuizAttempt'])
+            ->name('grades.quiz.update');
 
         // Kelola Kelas (superadmin) -> gunakan halaman ManageClasses (method sama dg dosen)
         Route::get('/superadmin/kelas', [ClassController::class, 'manageIndex'])
