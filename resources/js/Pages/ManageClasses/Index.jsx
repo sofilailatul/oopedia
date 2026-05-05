@@ -503,7 +503,9 @@ function EditClassModal({ initialClass, lecturerName, lecturers = [], isSuperadm
 	const [name, setName] = useState(initialClass.class_name || '');
 	const [classCode, setClassCode] = useState(initialClass.class_code || '');
 	const [description, setDescription] = useState(initialClass.description || '');
-	const [selectedLecturerId, setSelectedLecturerId] = useState(initialClass.lecturer_id || null);
+	const [selectedLecturerId, setSelectedLecturerId] = useState(
+		initialClass.lecturer_id || initialClass.created_by || null,
+	);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [error, setError] = useState('');
 

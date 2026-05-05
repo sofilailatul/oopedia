@@ -100,14 +100,26 @@ class ClassController extends Controller
     {
         $class = ClassModel::findOrFail($class);
 
+        $user = $request->user();
+        $role = strtolower($user->role ?? '');
+
         $data = $request->validate([
             'class_name' => ['sometimes','required','string','max:255'],
             'class_code' => ['sometimes','required','string','max:10', Rule::unique('classes', 'class_code')->ignore($class->id)],
             'description' => ['sometimes','nullable','string'],
+            'lecturer_id' => ['sometimes','nullable','integer','exists:users,id'],
         ]);
 
         if (array_key_exists('class_code', $data)) {
             $data['class_code'] = strtoupper(trim($data['class_code']));
+        }
+
+        if ($role === 'superadmin' && array_key_exists('lecturer_id', $data)) {
+            if (!empty($data['lecturer_id'])) {
+                $lecturer = UserModel::where('role', 'dosen')->findOrFail($data['lecturer_id']);
+                $data['created_by'] = $lecturer->id;
+            }
+            unset($data['lecturer_id']);
         }
 
         $class->update($data);

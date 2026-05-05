@@ -234,6 +234,7 @@ function QuizEditContent({
 		passing_score: quiz.passing_score || 70,
 		start_at: quiz.start_at || "",
 		end_at: quiz.end_at || "",
+		material_ids: (materials ?? []).map((material) => material.id),
 	});
 
 	const [submitting, setSubmitting] = React.useState(false);
@@ -398,12 +399,19 @@ function QuizEditContent({
 		formDataPost.append("passing_score", formData.passing_score);
 		formDataPost.append("start_at", formData.start_at || "");
 		formDataPost.append("end_at", formData.end_at || "");
+		(formData.material_ids || []).forEach((id) => {
+			formDataPost.append("material_ids[]", id);
+		});
 
 		questions.forEach((q, index) => {
 			formDataPost.append(`questions[${index}][id]`, q.id ?? "");
 			formDataPost.append(
 				`questions[${index}][material_id]`,
 				q.material_id ?? "",
+			);
+			formDataPost.append(
+				`questions[${index}][subtopic_id]`,
+				q.subtopic_id ?? "",
 			);
 			formDataPost.append(
 				`questions[${index}][quiz_text]`,
