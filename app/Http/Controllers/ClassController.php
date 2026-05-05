@@ -102,6 +102,8 @@ class ClassController extends Controller
 
         $user = $request->user();
         $role = strtolower($user->role ?? '');
+        $isSuperadmin = $role === 'superadmin'
+            || (method_exists($user, 'hasRole') && $user->hasRole('superadmin'));
 
         $data = $request->validate([
             'class_name' => ['sometimes','required','string','max:255'],
@@ -114,9 +116,14 @@ class ClassController extends Controller
             $data['class_code'] = strtoupper(trim($data['class_code']));
         }
 
-        if ($role === 'superadmin' && array_key_exists('lecturer_id', $data)) {
+        if ($isSuperadmin && array_key_exists('lecturer_id', $data)) {
             if (!empty($data['lecturer_id'])) {
-                $lecturer = UserModel::where('role', 'dosen')->findOrFail($data['lecturer_id']);
+                $lecturer = UserModel::query()
+                    ->where('role', 'dosen')
+                    ->orWhereHas('roles', function ($q) {
+                        $q->where('name', 'dosen');
+                    })
+                    ->findOrFail($data['lecturer_id']);
                 $data['created_by'] = $lecturer->id;
             }
             unset($data['lecturer_id']);
