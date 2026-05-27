@@ -47,4 +47,9 @@ class ClassModel extends Model
             $q->where('users.id', $userId);
         });
     }
+
+    public function scopeManagedByLecturer($query, int $userId)
+    {
+        return $query->where('created_by', $userId);
+    }
 }
