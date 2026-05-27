@@ -140,6 +140,8 @@ class ClassController extends Controller
 
         $class->update($data);
 
+        $class->load('lecturer');
+
         return response()->json($class);
     }
 
