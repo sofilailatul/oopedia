@@ -16,6 +16,23 @@ use Illuminate\Support\Str;
 
 class ClassController extends Controller
 {
+    private function resolveResponsibleLecturerId(?int $lecturerId): ?int
+    {
+        if (!$lecturerId) {
+            return null;
+        }
+
+        $lecturer = UserModel::findOrFail($lecturerId);
+        $role = strtolower($lecturer->role ?? '');
+        $hasDosenRole = method_exists($lecturer, 'hasRole') && $lecturer->hasRole('dosen');
+
+        if ($role !== 'dosen' && ! $hasDosenRole) {
+            abort(422, 'User yang dipilih harus berperan sebagai dosen.');
+        }
+
+        return $lecturer->id;
+    }
+
     // Halaman Inertia untuk mengelola kelas (dipakai Dosen & Superadmin)
     public function manageIndex(Request $request)
     {
@@ -81,9 +98,7 @@ class ClassController extends Controller
 
         $createdBy = $user->id;
         if ($role === 'superadmin' && !empty($data['lecturer_id'])) {
-            // Pastikan lecturer_id benar-benar dosen
-            $lecturer = UserModel::where('role', 'dosen')->findOrFail($data['lecturer_id']);
-            $createdBy = $lecturer->id;
+            $createdBy = $this->resolveResponsibleLecturerId((int) $data['lecturer_id']);
         }
 
         $class = ClassModel::create([
@@ -118,13 +133,7 @@ class ClassController extends Controller
 
         if ($isSuperadmin && array_key_exists('lecturer_id', $data)) {
             if (!empty($data['lecturer_id'])) {
-                $lecturer = UserModel::query()
-                    ->where('role', 'dosen')
-                    ->orWhereHas('roles', function ($q) {
-                        $q->where('name', 'dosen');
-                    })
-                    ->findOrFail($data['lecturer_id']);
-                $data['created_by'] = $lecturer->id;
+                $data['created_by'] = $this->resolveResponsibleLecturerId((int) $data['lecturer_id']);
             }
             unset($data['lecturer_id']);
         }
