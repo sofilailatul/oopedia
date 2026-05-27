@@ -127,7 +127,9 @@ class DashboardController extends Controller
     
         // ── Materials (butuh kelas) ───────────────────────────────────────────
         if ($hasClass) {
-            $dosenId = DB::table('classes')->where('id', $classId)->value('created_by');
+            $dosenId = DB::table('classes')
+                ->where('id', $classId)
+                ->value(DB::raw('COALESCE(lecturer_id, created_by)'));
     
             $stats['materials_completed'] = DB::table('user_progress')
                 ->where('user_id', $userId)
@@ -193,7 +195,9 @@ class DashboardController extends Controller
             return $this->emptyLearningPath($stats);
         }
     
-        $dosenId = DB::table('classes')->where('id', $classId)->value('created_by');
+        $dosenId = DB::table('classes')
+            ->where('id', $classId)
+            ->value(DB::raw('COALESCE(lecturer_id, created_by)'));
     
         // ── 1. Ambil semua materi milik dosen kelas ini, urut by order/id ────
         $allMaterials = DB::table('materials')

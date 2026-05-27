@@ -66,7 +66,13 @@ class LeaderboardController extends Controller
         if (!$isMahasiswa) {
             $classesQuery = DB::table('classes')->orderBy('class_name');
             if (!$isSuperadmin) {
-                $classesQuery->where('created_by', $user->id);
+                $classesQuery->where(function ($query) use ($user) {
+                    $query->where('lecturer_id', $user->id)
+                        ->orWhere(function ($legacyQuery) use ($user) {
+                            $legacyQuery->whereNull('lecturer_id')
+                                ->where('created_by', $user->id);
+                        });
+                });
             }
             $availableClasses = $classesQuery->get(['id', 'class_name', 'class_code']);
         }

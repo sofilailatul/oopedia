@@ -45,7 +45,7 @@ class ProgressController extends Controller
             ->orderBy('class_name');
 
         if (! $isSuperadmin) {
-            $classesQuery->where('created_by', $user->id);
+            $classesQuery->managedByLecturer($user->id);
         }
 
         $classes = $classesQuery->get(['id', 'class_name', 'class_code']);
@@ -62,7 +62,7 @@ class ProgressController extends Controller
             ]);
 
             if (! $isSuperadmin) {
-                $classQuery->where('created_by', $user->id);
+                $classQuery->managedByLecturer($user->id);
             }
 
             $class = $classQuery->findOrFail($selectedClassId);
