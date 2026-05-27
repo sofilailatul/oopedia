@@ -472,7 +472,7 @@ function NoClassBanner() {
         </p>
       </div>
     </div>
-                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
+  );
 }
 
 export default function MahasiswaDashboard({
@@ -538,7 +538,6 @@ export default function MahasiswaDashboard({
             Panduan Dashboard
           </button>
         </div>
-
 
         {/* no class warning */}
         {!hasClass && <NoClassBanner />}
