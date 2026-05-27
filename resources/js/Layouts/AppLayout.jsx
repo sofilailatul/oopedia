@@ -1,3 +1,4 @@
+import React from 'react';
 import AppShell from '@/Components/Shell/AppShell';
 import Sidebar from '@/Components/Shell/Sidebar';
 import Navbar from '@/Components/Shell/Navbar';
@@ -23,8 +24,15 @@ export default function AppLayout({
   backLabel = 'Kembali',
   onBackClick,
 }) {
-  const { auth } = usePage().props
+  const page = usePage()
+  const { auth } = page.props
+  const { url } = page
   const role = normalizeRole(auth?.user)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false)
+
+  React.useEffect(() => {
+    setMobileSidebarOpen(false)
+  }, [url])
 
   const roleLabel =
     role === 'mahasiswa' ? 'mahasiswa'
@@ -36,8 +44,21 @@ export default function AppLayout({
     <>
       <Head title={`${label}`} />
       <AppShell
-        sidebar={<Sidebar />}
-        navbar={<Navbar title={title} backHref={backHref} backLabel={backLabel} onBackClick={onBackClick} />}
+        sidebar={
+          <Sidebar
+            mobileOpen={mobileSidebarOpen}
+            onCloseMobile={() => setMobileSidebarOpen(false)}
+          />
+        }
+        navbar={
+          <Navbar
+            title={title}
+            backHref={backHref}
+            backLabel={backLabel}
+            onBackClick={onBackClick}
+            onMenuClick={() => setMobileSidebarOpen(true)}
+          />
+        }
         fullHeight={fullHeight}
       >
         {children}

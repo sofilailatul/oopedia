@@ -148,18 +148,18 @@ export default function MateriIndex({ materials = [] }) {
 
   return (
     <AppLayout title="Materi" label="Daftar Materi">
-      <div className=" mx-auto px-2 space-y-6">
+      <div className="mx-auto space-y-6 px-2 md:px-0">
 
         {/* ── Page Header ────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 md:text-3xl">
               Daftar Materi
             </h1>
           </div>
 
           {/* Overall progress chip */}
-          <div className="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 shadow-sm w-fit">
+          <div className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white px-4 py-3 shadow-sm sm:w-fit">
             <div className="flex flex-col items-end gap-1 min-w-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                 Progress

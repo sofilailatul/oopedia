@@ -456,13 +456,13 @@ function ScoreTable({ classDetail, isSuperadmin }) {
 													) : (
 														<span className="text-slate-400">-</span>
 													)}
-													<button
+													{/* <button
 														type="button"
 														onClick={() => openEditQuiz(student, quiz)}
 														className="text-[10px] font-semibold text-sky-600 hover:underline"
 													>
 														Edit
-													</button>
+													</button> */}
 												</div>
 											</td>
 										);
