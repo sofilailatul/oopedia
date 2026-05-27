@@ -36,6 +36,11 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 	const lecturerName = user.nama || user.name || 'Dosen';
 	const role = String(user.role || '').toLowerCase();
 	const isSuperadmin = role === 'superadmin';
+	const [classList, setClassList] = useState(classes);
+
+	React.useEffect(() => {
+		setClassList(classes);
+	}, [classes]);
 
 	const handleOpenCreate = () => {
 		popup.open({
@@ -70,7 +75,12 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 					lecturers={lecturers}
 					isSuperadmin={isSuperadmin}
 					lecturerName={lecturerLabel || lecturerName}
-					onSuccess={() => router.reload({ only: ['classes'] })}
+					onSuccess={(updatedClass) => {
+						if (updatedClass?.id) {
+							setClassList((prev) => prev.map((item) => (item.id === updatedClass.id ? updatedClass : item)));
+						}
+						router.reload({ only: ['classes'] });
+					}}
 				/>
 			),
 		});
@@ -99,8 +109,8 @@ function DosenClassesContent({ classes = [], authUser, lecturers = [] }) {
 
 			{/* Cards grid */}
 			<div className="mt-1 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{classes.length ? (
-					classes.map((cls) => (
+				{classList.length ? (
+					classList.map((cls) => (
 						<ClassCard
 							key={cls.id}
 							cls={cls}
@@ -517,11 +527,12 @@ function EditClassModal({ initialClass, lecturerName, lecturers = [], isSuperadm
 		if (classCode.length > 6) { setError('Kode kelas maksimal 6 karakter.'); setIsSubmitting(false); return; }
 		if (!codeRegex.test(classCode)) { setError('Kode kelas hanya boleh berisi huruf dan angka.'); setIsSubmitting(false); return; }
 		try {
-			await window.axios.put(`/classes/${initialClass.id}`, {
+			const response = await window.axios.put(`/classes/${initialClass.id}`, {
 				class_name: name, class_code: classCode, description,
 				...(isSuperadmin && selectedLecturerId ? { lecturer_id: selectedLecturerId } : {}),
 			});
-			onSuccess?.();
+				const updatedClass = response?.data;
+				onSuccess?.(updatedClass);
 			popup.alert({ type: 'success', title: 'Berhasil', message: 'Kelas berhasil diperbarui.', onClose: () => popup.close() });
 		} catch (err) {
 			const message = getApiErrorMessage(err, 'Gagal mengubah kelas. Coba lagi.');
