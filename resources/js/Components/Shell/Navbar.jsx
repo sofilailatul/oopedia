@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, router, usePage } from "@inertiajs/react";
-import { FaArrowLeft, FaChevronDown, FaUser, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
+import { FaArrowLeft, FaBars, FaChevronDown, FaSignOutAlt, FaUserCircle } from "react-icons/fa";
 
 function useOutsideClick(ref, handler) {
   useEffect(() => {
@@ -22,6 +22,7 @@ export default function Navbar({
   backHref = "",
   backLabel = "Kembali",
   onBackClick,
+  onMenuClick,
 }) {
   const { auth } = usePage().props;
 
@@ -46,12 +47,19 @@ export default function Navbar({
 
   return (
 <div className="relative">
-  {/* Outer shell */}
-    {/* Inner glass bar */}
-    <div className="relative z-20 flex items-center justify-between rounded-full border border-sky-200 bg-sky-50 px-5 py-3 text-slate-800 shadow-[0_10px_30px_rgba(148,163,184,0.12)] backdrop-blur-xl">
+    <div className="relative z-20 flex items-center justify-between gap-3 rounded-2xl border border-sky-200 bg-sky-50 px-3 py-3 text-slate-800 shadow-[0_10px_30px_rgba(148,163,184,0.12)] backdrop-blur-xl md:rounded-full md:px-5">
       
       {/* LEFT */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3">
+        <button
+          type="button"
+          onClick={onMenuClick}
+          aria-label="Buka menu navigasi"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 bg-white/70 text-slate-600 transition hover:bg-white md:hidden"
+        >
+          <FaBars aria-hidden="true" className="text-[14px]" />
+        </button>
+
         {showBack && (
           backHref ? (
             <Link
@@ -77,27 +85,27 @@ export default function Navbar({
         )}
 
         <div>
-          <h1 className="text-[17px] ml-2 font-semibold tracking-tight text-slate-700">
+          <h1 className="truncate text-[15px] font-semibold tracking-tight text-slate-700 md:text-[17px]">
             {title}
           </h1>
         </div>
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         <div className="relative" ref={menuRef}>
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex items-center gap-3 rounded-full border border-slate-200/80 bg-white/75 px-3 py-2 transition hover:bg-white"
+            className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/75 px-2.5 py-2 transition hover:bg-white md:gap-3 md:px-3"
           >
             {/* Ganti foto jadi icon */}
             <div className="flex h-5 w-5 items-center justify-center rounded-full bg-sky-50 text-sky-700 ring-1 ring-sky-100">
               <FaUserCircle className="text-[22px]" />
             </div>
 
-            <div className="text-left leading-tight">
-              <div className="text-[13px] font-medium text-slate-800">{nama}</div>
+            <div className="hidden max-w-[120px] text-left leading-tight md:block">
+              <div className="truncate text-[13px] font-medium text-slate-800">{nama}</div>
             </div>
 
             <FaChevronDown

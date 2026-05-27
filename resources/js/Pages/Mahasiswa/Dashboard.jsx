@@ -225,10 +225,10 @@ function DashboardHero({ name, learningPath, stats }) {
   const material = learningPath.current_material;
 
   return (
-    <div id="tour-hero" className="grid grid-cols-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+    <div id="tour-hero" className="grid grid-cols-1 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm lg:grid-cols-2">
 
       {/* LEFT = 2 kolom */}
-      <div className="p-6">
+      <div className="p-5 md:p-6">
         <p className="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-2">
           Halo, {name} 👋
         </p>
@@ -245,7 +245,7 @@ function DashboardHero({ name, learningPath, stats }) {
       </div>
 
       {/* RIGHT = 1 kolom */}
-      <div className=" bg-slate-700 p-4 justify-between">
+      <div className="justify-between bg-slate-700 p-4">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 mb-1">
             Langkah berikutnya
@@ -258,7 +258,7 @@ function DashboardHero({ name, learningPath, stats }) {
           </p>
         </div>
         <div className="mt-3">
-          <CtaButton action={action} />
+          <CtaButton action={action} block />
         </div>
       </div>
     </div>
@@ -339,15 +339,15 @@ function LearningFlowExplainer() {
     <section id="tour-explainer">
 
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 overflow-x-auto">
+      <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm overflow-x-auto">
         <h2 className="mb-1.5 text-[16px] font-black text-slate-900 tracking-tight">
           Gimana cara belajar di OOpedia?
         </h2>
-        <div className="grid grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
           {EXPLAINER_STEPS.map((step, i) => {
             const Icon = step.Icon;
             return (
-              <div key={step.num} className="flex items-center gap-2">
+              <div key={step.num} className="flex items-center gap-2 lg:block lg:space-y-2">
                 <div className={`${step.bg} rounded-2xl p-3 relative h-full`}>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Icon className={`w-4 h-4 ${step.icon_color}`} />
@@ -363,7 +363,7 @@ function LearningFlowExplainer() {
                   </p>
                 </div>
                 {i < EXPLAINER_STEPS.length - 1 && (
-                  <Ico.ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                  <Ico.ChevronRight className="hidden w-4 h-4 flex-shrink-0 text-slate-300 lg:block" />
                 )}
               </div>
             );
@@ -399,9 +399,9 @@ function QuizUnlockStatus({ learningPath }) {
   const isLocked = quiz.status === 'locked';
 
   return (
-    <div id="tour-quiz" className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
+    <div id="tour-quiz" className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm md:p-5">
 
-      <div className="flex items-start justify-between gap-4 mb-4">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
             <Ico.Trophy className="w-5 h-5" />
@@ -416,7 +416,7 @@ function QuizUnlockStatus({ learningPath }) {
         <StatusPill status={quiz.status} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div className="rounded-2xl bg-slate-50 px-4 py-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
             Materi terkait
@@ -459,7 +459,7 @@ function QuizUnlockStatus({ learningPath }) {
 
 function NoClassBanner() {
   return (
-    <div className="rounded-3xl border border-indigo-100 bg-indigo-50 p-5 flex items-start gap-3">
+    <div className="flex items-start gap-3 rounded-3xl border border-indigo-100 bg-indigo-50 p-4 md:p-5">
       <div className="w-10 h-10 rounded-2xl bg-white text-indigo-600 flex items-center justify-center flex-shrink-0">
         <Ico.Info className="w-5 h-5" />
       </div>
@@ -472,7 +472,7 @@ function NoClassBanner() {
         </p>
       </div>
     </div>
-  );
+                            <div className="rounded-2xl bg-slate-50 px-4 py-3">
 }
 
 export default function MahasiswaDashboard({
@@ -528,8 +528,8 @@ export default function MahasiswaDashboard({
 
   return (
     <AppLayout title="Dashboard" label="Dashboard">
-      <main className="mx-auto space-y-5">
-        <div className="flex justify-end mb-4">
+      <main className="mx-auto space-y-5 px-1 md:px-0">
+        <div className="mb-4 flex justify-end">
           <button
             onClick={startTour}
             className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"

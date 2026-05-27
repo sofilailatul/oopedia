@@ -57,7 +57,7 @@ function isActive(currentUrl, targetHref) {
   return path === targetHref || path.startsWith(targetHref + "/");
 }
 
-export default function Sidebar() {
+export default function Sidebar({ mobileOpen = false, onCloseMobile }) {
   const { url, props } = usePage();
   const role = normalizeRole(props?.auth?.user?.role);
   const items = NAV_BY_ROLE[role] || NAV_BY_ROLE.tamu;
@@ -78,10 +78,19 @@ export default function Sidebar() {
   }, [isCollapsed]);
 
   return (
+    <>
+    {mobileOpen && (
+      <div
+        className="fixed inset-0 z-40 bg-slate-950/30 md:hidden"
+        onClick={onCloseMobile}
+      />
+    )}
+
     <aside
       className={[
-        "relative z-20 flex shrink-0 flex-col rounded-3xl border border-sky-200 bg-gradient-to-b from-sky-50 to-white py-4 shadow-sm transition-all duration-200",
-        isCollapsed ? "w-[60px] px-2.5" : "w-[220px] px-4",
+        "fixed inset-y-0 left-0 z-50 flex h-dvh shrink-0 flex-col border border-sky-200 bg-gradient-to-b from-sky-50 to-white py-4 shadow-xl transition-transform duration-200 md:static md:z-20 md:h-auto md:rounded-3xl md:shadow-sm",
+        mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+        isCollapsed ? "w-[60px] px-2.5 md:w-[60px]" : "w-[min(84vw,260px)] px-4 md:w-[220px]",
       ].join(" ")}
     >
       <header
@@ -117,7 +126,7 @@ export default function Sidebar() {
         <button
           type="button"
           onClick={() => setIsCollapsed((prev) => !prev)}
-          className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+          className="hidden inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 md:inline-flex"
           aria-label={isCollapsed ? "Perbesar sidebar" : "Perkecil sidebar"}
           title={isCollapsed ? "Perbesar sidebar" : "Perkecil sidebar"}
         >
@@ -131,7 +140,7 @@ export default function Sidebar() {
         </div>
       ) : null}
 
-      <nav className="mt-2 flex flex-1 flex-col gap-1.5">
+      <nav className="mt-2 flex flex-1 flex-col gap-1.5 overflow-y-auto px-1 md:px-0">
         {items.map((item) => {
           const active = isActive(url, item.href);
           const Icon = item.icon;
@@ -175,5 +184,6 @@ export default function Sidebar() {
         })}
       </nav>
     </aside>
+    </>
   );
 }

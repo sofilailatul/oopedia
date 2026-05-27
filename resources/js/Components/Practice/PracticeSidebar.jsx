@@ -43,10 +43,10 @@ export default function PracticeSidebar({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col h-full overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
 
       {/* Header — fixed, tidak ikut scroll */}
-      <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 flex-shrink-0">
+      <div className="flex-shrink-0 border-b border-slate-100 px-4 py-4 md:px-6">
         <div>
           <h3 className="text-sm font-semibold text-slate-900 leading-snug">
             {selectedPractice?.material_name ?? "Pilih Materi"}
@@ -63,7 +63,7 @@ export default function PracticeSidebar({
 
       {/* Konten scrollable */}
       <div className="flex-1 overflow-y-auto">
-        <div className="flex flex-col gap-3 p-5">
+        <div className="flex flex-col gap-3 p-4 md:p-5">
 
           {/* Journey stepper — dengan skor per level */}
           <JourneyStepper steps={steps} scores={scores} pretestScore={progress?.pretest_score ?? null} />
@@ -141,7 +141,7 @@ export default function PracticeSidebar({
       </div>
 
       {/* CTA — sticky di bawah, tidak ikut scroll */}
-      <div className="p-5 pt-3 border-t border-slate-100 flex-shrink-0">
+      <div className="flex-shrink-0 border-t border-slate-100 p-4 pt-3 md:p-5">
         <div className="flex flex-col gap-2">
           <Button
             type="button"
@@ -209,13 +209,13 @@ function JourneyStepper({ steps, scores = {}, pretestScore = null }) {
       <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-3">
         Perjalananmu
       </p>
-      <div className="flex items-center">
+      <div className="flex items-center overflow-x-auto pb-2">
         {steps.map((step, i) => {
           const score = getStepScore(step.key, scores, pretestScore);
           return (
             <React.Fragment key={step.key}>
               <div className="flex flex-col items-center gap-1 flex-shrink-0">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-semibold ${STEP_STYLES[step.state].dot}`}>
+                <div className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold ${STEP_STYLES[step.state].dot}`}>
                   {STEP_ICONS[step.state]}
                 </div>
                 <span className={`text-[9px] ${STEP_STYLES[step.state].label}`}>

@@ -24,13 +24,13 @@ export default function QuizCard({ quiz, onClick }) {
       tabIndex={0}
       onClick={handleCardClick}
       onKeyDown={(e) => (e.key === "Enter" ? handleCardClick() : null)}
-      className={`text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-6 transition ${
+      className={`text-left bg-white rounded-2xl border border-slate-200 shadow-sm p-4 transition md:p-6 ${
         !isAvailable && !isDone
           ? "opacity-60 cursor-not-allowed"
           : "hover:shadow-md cursor-pointer"
       }`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${statusBadgeClass(quiz?.status)} ${
           !isAvailable && !isDone ? "bg-slate-100 text-slate-400 border border-slate-200" : ""
         }`}>
@@ -46,7 +46,7 @@ export default function QuizCard({ quiz, onClick }) {
         <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-slate-600">
           <Icons.User className="h-4 w-4" />
         </div>
-        <div className="text-[12px] text-slate-600">{quiz?.teacher_name ?? "Dosen"}</div>
+        <div className="min-w-0 text-[12px] text-slate-600">{quiz?.teacher_name ?? "Dosen"}</div>
       </div>
 
       {/* Materi */}
