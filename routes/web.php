@@ -235,7 +235,7 @@ Route::middleware('auth')->group(function () {
         Route::post('users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('superadmin.users.resetPassword');
 
         // Leaderboard (superadmin)
-        Route::prefix('leaderboard')->name('leaderboard.')->group(function () {
+        Route::prefix('leaderboard')->name('superadmin.leaderboard.')->group(function () {
             Route::get('/practice', [LeaderboardController::class, 'practice'])->name('practice');
             Route::get('/quiz', [LeaderboardController::class, 'quiz'])->name('quiz');
             Route::get('/combined', [LeaderboardController::class, 'combined'])->name('combined');
