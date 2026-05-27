@@ -129,7 +129,7 @@ class DashboardController extends Controller
         if ($hasClass) {
             $dosenId = DB::table('classes')
                 ->where('id', $classId)
-                ->value(DB::raw('COALESCE(lecturer_id, created_by)'));
+                ->value('created_by');
     
             $stats['materials_completed'] = DB::table('user_progress')
                 ->where('user_id', $userId)
@@ -197,7 +197,7 @@ class DashboardController extends Controller
     
         $dosenId = DB::table('classes')
             ->where('id', $classId)
-            ->value(DB::raw('COALESCE(lecturer_id, created_by)'));
+            ->value('created_by');
     
         // ── 1. Ambil semua materi milik dosen kelas ini, urut by order/id ────
         $allMaterials = DB::table('materials')

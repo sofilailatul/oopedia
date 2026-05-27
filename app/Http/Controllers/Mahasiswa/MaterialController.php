@@ -33,7 +33,7 @@ class MaterialController extends Controller
 		if ($classId) {
 			$dosenId = DB::table('classes')
 				->where('id', $classId)
-				->value(DB::raw('COALESCE(lecturer_id, created_by)'));
+				->value('created_by');
 			if ($dosenId) {
 				$query->where('created_by', $dosenId);
 			}
