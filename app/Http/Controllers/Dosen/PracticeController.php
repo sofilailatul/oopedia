@@ -475,9 +475,7 @@ class PracticeController extends Controller
             'material_id' => $data['material_id'],
             'type' => $type,
             'level' => $level,
-            'question_count_normal' => $type === 'practice'
-                ? (int) ($data['question_count_normal'] ?? 10)
-                : null,
+            'question_count_normal' => (int) ($data['question_count_normal'] ?? 10),
         ]);
 
         $routeName = Auth::user()->role === 'superadmin' ? 'superadmin.practices.edit' : 'dosen.practices.edit';
