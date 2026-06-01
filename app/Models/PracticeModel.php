@@ -15,6 +15,7 @@ class PracticeModel extends Model
         'material_id',
         'type',
         'level',
+        'question_count_normal',
         'min_score',
         'max_attempts'
     ];
@@ -22,6 +23,7 @@ class PracticeModel extends Model
     protected $casts = [
         'type' => 'string',
         'level' => 'string',
+        'question_count_normal' => 'integer',
         'min_score' => 'integer',
         'max_attempts' => 'integer',
     ];

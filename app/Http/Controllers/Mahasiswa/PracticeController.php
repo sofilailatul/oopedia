@@ -578,13 +578,14 @@ class PracticeController extends Controller
     {
         $practiceLevel          = $practice?->level;
         $resolvedLevel          = $attempt->level ?? $practiceLevel;
+        $resolvedQuestionCount  = (int) ($attempt->total_questions ?? $practice?->question_count_normal ?? 10);
 
         return [
             'mode'             => $attempt->attempt_type === 'pretest'
                                     ? 'pretest'
                                     : ($attempt->mode ?? 'normal'),
             'question_type'    => 'mixed',
-            'question_count'   => (int) ($attempt->total_questions ?? 10),
+            'question_count'   => $resolvedQuestionCount,
             'duration_seconds' => (int) ($attempt->duration_seconds ?? 15 * 60),
             'level'            => $resolvedLevel,
             'focused_subtopic_id' => $attempt->focused_subtopic_id,
