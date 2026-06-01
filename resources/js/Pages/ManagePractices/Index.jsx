@@ -332,6 +332,7 @@ function CreatePracticeModal({ materials = [], practices = [], storeRouteName, o
 	const [selectedMaterialId, setSelectedMaterialId] = React.useState("");
 	const [selectedType, setSelectedType] = React.useState("practice");
 	const [selectedLevel, setSelectedLevel] = React.useState("");
+	const [questionCountNormal, setQuestionCountNormal] = React.useState("10");
 	const [submitting, setSubmitting] = React.useState(false);
 	const [error, setError] = React.useState("");
 
@@ -379,6 +380,12 @@ function CreatePracticeModal({ materials = [], practices = [], storeRouteName, o
 			return;
 		}
 
+		const parsedQuestionCount = Number.parseInt(questionCountNormal, 10);
+		if (selectedType === "practice" && (!Number.isInteger(parsedQuestionCount) || parsedQuestionCount < 1)) {
+			setError("Jumlah soal mode normal harus berupa angka minimal 1.");
+			return;
+		}
+
 		setSubmitting(true);
 		setError("");
 
@@ -388,6 +395,8 @@ function CreatePracticeModal({ materials = [], practices = [], storeRouteName, o
 				material_id: selectedMaterialId,
 				type: selectedType,
 				level: selectedType === "pretest" ? null : selectedLevel,
+				question_count_normal:
+					selectedType === "practice" ? parsedQuestionCount : null,
 			},
 			{
 				onSuccess: () => {
@@ -509,6 +518,7 @@ function CreatePracticeModal({ materials = [], practices = [], storeRouteName, o
 						onClick={() => {
 							setSelectedType("pretest");
 							setSelectedLevel("");
+							setQuestionCountNormal("10");
 						}}
 						className={`flex-1 rounded-xl border px-3 py-2 text-xs font-medium transition ${
 							isPretestExists
@@ -522,6 +532,24 @@ function CreatePracticeModal({ materials = [], practices = [], storeRouteName, o
 					</button>
 				</div>
 			</div>
+
+			{selectedType === "practice" && (
+				<div className="space-y-1">
+					<p className="text-[11px] font-medium text-slate-500">Jumlah Soal Mode Normal</p>
+					<input
+						type="number"
+						min="1"
+						max="100"
+						value={questionCountNormal}
+						onChange={(e) => setQuestionCountNormal(e.target.value)}
+						placeholder="10"
+						className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+					/>
+					<p className="text-[11px] text-slate-400">
+						Soal yang tampil saat mode normal akan diambil acak sebanyak angka ini.
+					</p>
+				</div>
+			)}
 
 			<div className={`space-y-1 transition-opacity ${selectedType === "pretest" ? "opacity-50 pointer-events-none" : ""}`}>
 				<p className="text-[11px] font-medium text-slate-500">Pilih Level Soal {selectedType === "pretest" && "(Tidak berlaku untuk Pre-test)"}</p>

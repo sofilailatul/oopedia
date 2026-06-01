@@ -170,6 +170,7 @@ class PracticeController extends Controller
             'practice' => [
                 'id' => $practice->id,
                 'difficulty_level' => $practice->difficulty_level,
+                'question_count_normal' => $practice->question_count_normal ?? 10,
                 'material' => [
                     'id' => $practice->material->id,
                     'name' => $practice->material->material_name,
@@ -236,6 +237,7 @@ class PracticeController extends Controller
             'practice' => [
                 'id' => $practice->id,
                 'difficulty_level' => $practice->difficulty_level,
+                'question_count_normal' => $practice->question_count_normal ?? 10,
                 'material' => [
                     'id' => $practice->material->id,
                     'name' => $practice->material->material_name,
@@ -447,6 +449,7 @@ class PracticeController extends Controller
             'material_id' => ['required', 'integer', 'exists:materials,id'],
             'type' => ['required', 'in:practice,pretest'],
             'level' => ['required_if:type,practice', 'nullable', 'in:easy,medium,hard'],
+            'question_count_normal' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $type = $data['type'];
@@ -472,6 +475,9 @@ class PracticeController extends Controller
             'material_id' => $data['material_id'],
             'type' => $type,
             'level' => $level,
+            'question_count_normal' => $type === 'practice'
+                ? (int) ($data['question_count_normal'] ?? 10)
+                : null,
         ]);
 
         $routeName = Auth::user()->role === 'superadmin' ? 'superadmin.practices.edit' : 'dosen.practices.edit';
