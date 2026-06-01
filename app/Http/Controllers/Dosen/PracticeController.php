@@ -484,7 +484,13 @@ class PracticeController extends Controller
     {
         $data = $request->validate([
             'questions' => ['required', 'array', 'min:1'],
-            'questions.*.id' => ['nullable', 'integer'],
+            'questions.*.id' => [
+                'nullable',
+                'integer',
+                Rule::exists('practice_questions', 'id')->where(fn ($query) =>
+                    $query->where('practices_id', $practice->id)
+                ),
+            ],
             'questions.*.question_text' => ['required', 'string'],
             'questions.*.type' => ['nullable', Rule::in(['multiple_choice', 'drag_drop'])],
             'questions.*.points' => ['nullable', 'integer', 'min:1', 'max:100'],
@@ -506,20 +512,30 @@ class PracticeController extends Controller
         ]);
 
         DB::transaction(function () use ($data, $practice, $request) {
+            $keptQuestionIds = [];
+
             foreach ($data['questions'] as $index => $q) {
-                $question = PracticeQuestionModel::updateOrCreate(
-                    ['id' => $q['id'] ?? null],
-                    [
-                        'practices_id' => $practice->id,
-                        'question_text' => $q['question_text'],
-                        'type' => $q['type'] ?? 'multiple_choice',
-                        'points' => $q['points'] ?? 10,
-                        'subtopic_id' => $q['subtopic_id'] ?? null,
-                        'feedback_correct' => $q['feedback_correct'] ?? null,
-                        'feedback_incorrect' => $q['feedback_incorrect'] ?? null,
-                        'code_snippet' => $q['code_snippet'] ?? null,
-                    ]
-                );
+                $question = !empty($q['id'])
+                    ? PracticeQuestionModel::query()
+                        ->where('practices_id', $practice->id)
+                        ->find($q['id'])
+                    : new PracticeQuestionModel();
+
+                if (!$question) {
+                    $question = new PracticeQuestionModel();
+                }
+
+                $question->practices_id = $practice->id;
+                $question->question_text = $q['question_text'];
+                $question->type = $q['type'] ?? 'multiple_choice';
+                $question->points = $q['points'] ?? 10;
+                $question->subtopic_id = $q['subtopic_id'] ?? null;
+                $question->feedback_correct = $q['feedback_correct'] ?? null;
+                $question->feedback_incorrect = $q['feedback_incorrect'] ?? null;
+                $question->code_snippet = $q['code_snippet'] ?? null;
+                $question->save();
+
+                $keptQuestionIds[] = $question->id;
 
                 $imageKey = "questions.$index.image";
                 $removeImage = !empty($q['remove_image']);
@@ -562,6 +578,16 @@ class PracticeController extends Controller
                     }
                 }
             }
+
+            PracticeQuestionModel::query()
+                ->where('practices_id', $practice->id)
+                ->whereNotIn('id', $keptQuestionIds)
+                ->get()
+                ->each(function (PracticeQuestionModel $question) {
+                    $question->options()->delete();
+                    $question->items()->delete();
+                    $question->delete();
+                });
         });
 
         return back()->with('success', 'Saved');
