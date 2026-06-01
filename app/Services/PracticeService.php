@@ -19,26 +19,22 @@ class PracticeService
     
     public function getPracticesForUser($userId)
     {
-        $classId = DB::table('class_user')
-            ->where('user_id', $userId)
-            ->value('class_id');
+        $lecturerIds = DB::table('class_user as cu')
+            ->join('classes as c', 'c.id', '=', 'cu.class_id')
+            ->where('cu.user_id', $userId)
+            ->whereNotNull('c.created_by')
+            ->distinct()
+            ->pluck('c.created_by')
+            ->filter()
+            ->values();
 
-        $lecturerId = null;
-        if ($classId) {
-            $lecturerId = DB::table('classes')
-                ->where('id', $classId)
-                ->value('created_by');
-        }
-
-        // Semua latihan soal yang tersedia
-        $query = PracticeModel::query()
+        $practiceRows = PracticeModel::query()
+            ->whereHas('material', function ($query) use ($lecturerIds) {
+                $query->whereIn('created_by', $lecturerIds);
+            })
             ->with('material:id,material_name,created_by')
-            ->orderBy('material_id');
-
-        // Optional: If we want to restrict to lecturer's materials ONLY when they have a class.
-        // But the user requested "revisi agar latihan yang tampil itu semua latihan yang ada".
-        // So we just get all practices.
-        $practiceRows = $query->get();
+            ->orderBy('material_id')
+            ->get();
 
         // Progress membaca materi per user (apakah sudah pernah selesai membaca)
         $readProgress = DB::table('user_progress')
